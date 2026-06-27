@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #0b0c10;
+  --surface-color: rgba(31, 40, 51, 0.6);
+  --border-color: rgba(69, 162, 158, 0.2);
+  --primary-color: #66fcf1;
+  --secondary-color: #45a29e;
+  --text-main: #ffffff;
+  --text-muted: #c5c6c7;
+  
+  --status-green: #2ecc71;
+  --status-yellow: #f1c40f;
+  --status-red: #e74c3c;
+  --status-pending: #95a5a6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  background-image: radial-gradient(circle at 15% 50%, rgba(69, 162, 158, 0.1), transparent 25%),
+                    radial-gradient(circle at 85% 30%, rgba(102, 252, 241, 0.05), transparent 25%);
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-card {
+  background: var(--surface-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px 0 rgba(102, 252, 241, 0.1);
+  border-color: rgba(102, 252, 241, 0.3);
+}
+
+.btn {
+  background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+  color: #000;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Outfit', sans-serif;
+}
+
+.btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(102, 252, 241, 0.4);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.btn-outline:hover {
+  background: rgba(102, 252, 241, 0.1);
+  color: #fff;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.badge.pending { background: rgba(149, 165, 166, 0.2); color: var(--status-pending); border: 1px solid var(--status-pending); }
+.badge.green { background: rgba(46, 204, 113, 0.2); color: var(--status-green); border: 1px solid var(--status-green); }
+.badge.yellow { background: rgba(241, 196, 15, 0.2); color: var(--status-yellow); border: 1px solid var(--status-yellow); }
+.badge.red { background: rgba(231, 76, 60, 0.2); color: var(--status-red); border: 1px solid var(--status-red); }
+
+.ot-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.ot-header h3 {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.checklist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.status-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.status-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.status-btn:hover {
+  transform: scale(1.2);
+}
+
+.status-btn.green { background-color: var(--status-green); }
+.status-btn.yellow { background-color: var(--status-yellow); }
+.status-btn.red { background-color: var(--status-red); }
+
+.status-btn.active {
+  box-shadow: 0 0 10px 2px #fff;
+  border: 2px solid #fff;
+}

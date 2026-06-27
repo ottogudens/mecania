@@ -1,0 +1,28 @@
+# Node
+node_modules/
+dist/
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.env
+
+# Django
+db.sqlite3
+media/
+staticfiles/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Baileys WhatsApp Auth
+auth_info_baileys/
+
+# OS
+.DS_Store
+Thumbs.db
