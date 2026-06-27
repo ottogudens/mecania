@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'operations',
     'inventory',
     'finance',
+    'ai_assistant',
 ]
 
 MIDDLEWARE = [
