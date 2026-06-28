@@ -3,11 +3,12 @@ import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react
 import WorkOrderList from './components/WorkOrderList';
 import VisualInspection from './components/VisualInspection';
 import ClientPortal from './components/ClientPortal';
+import Login from './components/Login';
 
 import InventoryDashboard from './components/InventoryDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 
-const AdminLayout = () => {
+const AdminLayout = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('orders');
   
   return (
@@ -40,6 +41,13 @@ const AdminLayout = () => {
             💰 Finanzas
           </button>
           <Link to="/client" style={{ marginLeft: '2rem', color: 'var(--primary-color)' }}>Vista Cliente</Link>
+          <button 
+            className="btn btn-outline" 
+            style={{ marginLeft: '1rem', padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}
+            onClick={onLogout}
+          >
+            Cerrar Sesión
+          </button>
         </div>
       </header>
       <main>
@@ -67,10 +75,25 @@ const ClientLayout = () => {
 };
 
 function App() {
+  const [authRole, setAuthRole] = useState(localStorage.getItem('role') || null);
+
+  const handleLogin = (role) => {
+    setAuthRole(role);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('role');
+    setAuthRole(null);
+  };
+
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<AdminLayout />} />
+        <Route 
+          path="/" 
+          element={authRole ? <AdminLayout onLogout={handleLogout} /> : <Login onLogin={handleLogin} />} 
+        />
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
         <Route path="/client" element={<ClientLayout />} />
       </Routes>
     </Router>
