@@ -1,5 +1,4 @@
 from django.db import models
-from operations.models import WorkOrder
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
@@ -18,7 +17,7 @@ class StockTransaction(models.Model):
     ]
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='transactions')
-    work_order = models.ForeignKey(WorkOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name='parts_used')
+    work_order = models.ForeignKey('operations.WorkOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_transactions')
     quantity = models.IntegerField()
     transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
     created_at = models.DateTimeField(auto_now_add=True)
