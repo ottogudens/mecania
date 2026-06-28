@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 import requests
@@ -170,3 +171,29 @@ class AIDiagnosticsView(APIView):
         except Exception as e:
             print("Error OpenAI:", str(e))
             return Response({'error': 'Error al conectar con la Inteligencia Artificial.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AITranscribeView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, *args, **kwargs):
+        audio_file = request.FILES.get('audio')
+        if not audio_file:
+            return Response({'error': 'No se proporcionó ningún archivo de audio.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            
+            # OpenAI requires a file-like object with a filename attribute for audio
+            # We can pass the django uploaded file directly since it behaves like a file object
+            transcription = client.audio.transcriptions.create(
+              model="whisper-1", 
+              file=audio_file,
+              language="es" # Optionally force Spanish
+            )
+            
+            return Response({'transcription': transcription.text})
+            
+        except Exception as e:
+            print("Error OpenAI Whisper:", str(e))
+            return Response({'error': 'Error al transcribir el audio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

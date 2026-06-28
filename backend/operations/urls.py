@@ -4,7 +4,7 @@ from .views import (
     ClientViewSet, VehicleViewSet, WorkOrderViewSet, 
     WorkOrderItemViewSet, VisualInspectionViewSet, 
     CustomAuthToken, ClientAuthToken, ClientDataView,
-    AIDiagnosticsView
+    AIDiagnosticsView, AITranscribeView
 )
 
 router = DefaultRouter()
@@ -19,5 +19,6 @@ urlpatterns = [
     path('client/login/', ClientAuthToken.as_view(), name='client_login'),
     path('client/data/', ClientDataView.as_view(), name='client_data'),
     path('ai-diagnostics/', AIDiagnosticsView.as_view(), name='ai_diagnostics'),
+    path('ai-transcribe/', AITranscribeView.as_view(), name='ai_transcribe'),
     path('', include(router.urls)),
 ]
