@@ -43,7 +43,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         message = request.data.get('message', f"Hola {client.first_name}, tu vehículo {work_order.vehicle.license_plate} tiene una actualización. Estado: {work_order.get_status_display()}")
         
         try:
-            whatsapp_service_url = "http://localhost:3001/api/send-message" 
+            # En producción, configurar la variable de entorno WHATSAPP_SERVICE_URL (ej: https://whatsapp-production.up.railway.app)
+            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+            
             response = requests.post(whatsapp_service_url, json={
                 "number": client.phone,
                 "text": message

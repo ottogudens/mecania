@@ -16,7 +16,8 @@ const Settings = () => {
 
   const fetchWhatsAppStatus = async () => {
     try {
-      const response = await axios.get('http://localhost:3001/api/status');
+      const baseUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+      const response = await axios.get(`${baseUrl}/api/status`);
       setWaStatus(response.data.status);
       setQrCode(response.data.qr);
     } catch (err) {
