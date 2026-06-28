@@ -13,8 +13,8 @@ class Product(models.Model):
 
 class StockTransaction(models.Model):
     TRANSACTION_TYPES = [
-        ('IN', 'Stock In'),
-        ('OUT', 'Stock Out (Used in OT)'),
+        ('IN', 'Entrada de Stock'),
+        ('OUT', 'Salida de Stock (Usado en OT)'),
     ]
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='transactions')

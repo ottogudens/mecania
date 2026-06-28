@@ -14,9 +14,9 @@ const FinanceDashboard = () => {
     try {
       // Mock data for UI demonstration
       setInvoices([
-        { id: 101, work_order: 'OT-1', total_amount: '150.00', status: 'DRAFT', date: '2023-10-25' },
-        { id: 102, work_order: 'OT-2', total_amount: '320.50', status: 'PAID', date: '2023-10-24' },
-        { id: 103, work_order: 'OT-3', total_amount: '85.00', status: 'SENT', date: '2023-10-26' },
+        { id: 101, work_order: 'OT-1', total_amount: '150.00', status: 'BORRADOR', date: '2023-10-25' },
+        { id: 102, work_order: 'OT-2', total_amount: '320.50', status: 'PAGADO', date: '2023-10-24' },
+        { id: 103, work_order: 'OT-3', total_amount: '85.00', status: 'ENVIADO', date: '2023-10-26' },
       ]);
       setLoading(false);
     } catch (err) {
@@ -27,7 +27,7 @@ const FinanceDashboard = () => {
 
   const handlePayment = (id, method) => {
     setInvoices(invoices.map(i => 
-      i.id === id ? { ...i, status: 'PAID' } : i
+      i.id === id ? { ...i, status: 'PAGADO' } : i
     ));
     alert(`Pago de factura #${id} registrado vía ${method}`);
   };
@@ -51,7 +51,7 @@ const FinanceDashboard = () => {
           <div key={invoice.id} className="glass-card" style={{ position: 'relative' }}>
             <div className="ot-header">
               <h3>Factura #{invoice.id}</h3>
-              <span className={`badge ${invoice.status === 'PAID' ? 'green' : invoice.status === 'SENT' ? 'yellow' : 'pending'}`}>
+              <span className={`badge ${invoice.status === 'PAGADO' ? 'green' : invoice.status === 'ENVIADO' ? 'yellow' : 'pending'}`}>
                 {invoice.status}
               </span>
             </div>
@@ -65,7 +65,7 @@ const FinanceDashboard = () => {
             
             <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem' }}>
               <button className="btn btn-outline" style={{ flex: 1, padding: '0.5rem' }}>Ver PDF</button>
-              {invoice.status !== 'PAID' && (
+              {invoice.status !== 'PAGADO' && (
                 <>
                   <button 
                     className="btn green" 

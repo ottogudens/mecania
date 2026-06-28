@@ -13,7 +13,7 @@ const AdminLayout = () => {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>AutoMaster Admin</h1>
+        <h1>Administrador AutoMaster</h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <button 
             className={`btn ${activeTab === 'orders' ? '' : 'btn-outline'}`}
@@ -56,8 +56,8 @@ const ClientLayout = () => {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>AutoMaster Client</h1>
-        <Link to="/" style={{ color: 'var(--primary-color)' }}>Switch to Admin</Link>
+        <h1>Cliente AutoMaster</h1>
+        <Link to="/" style={{ color: 'var(--primary-color)' }}>Cambiar a Administrador</Link>
       </header>
       <main>
         <ClientPortal />

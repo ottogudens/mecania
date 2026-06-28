@@ -11,15 +11,15 @@ class Vehicle(models.Model):
 
 class WorkOrder(models.Model):
     STATUS_CHOICES = [
-        ('PENDING', 'Pending'),
-        ('IN_PROGRESS', 'In Progress'),
-        ('COMPLETED', 'Completed'),
-        ('DELIVERED', 'Delivered'),
+        ('PENDING', 'Pendiente'),
+        ('IN_PROGRESS', 'En Progreso'),
+        ('COMPLETED', 'Completado'),
+        ('DELIVERED', 'Entregado'),
     ]
 
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='work_orders')
     mileage = models.IntegerField()
-    fuel_level = models.IntegerField(help_text="Fuel level percentage (0-100)")
+    fuel_level = models.IntegerField(help_text="Porcentaje de nivel de combustible (0-100)")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -29,13 +29,13 @@ class WorkOrder(models.Model):
 
 class VisualInspection(models.Model):
     STATUS_CHOICES = [
-        ('GREEN', 'Good (Green)'),
-        ('YELLOW', 'Warning (Yellow)'),
-        ('RED', 'Critical (Red)'),
+        ('GREEN', 'Bien (Verde)'),
+        ('YELLOW', 'Advertencia (Amarillo)'),
+        ('RED', 'Crítico (Rojo)'),
     ]
 
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='inspections')
-    category = models.CharField(max_length=100, help_text="E.g., Brakes, Tires, Engine")
+    category = models.CharField(max_length=100, help_text="Ej., Frenos, Neumáticos, Motor")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     evidence_file = models.FileField(upload_to='inspections/evidence/', null=True, blank=True)
     observations = models.TextField(blank=True)
