@@ -6,6 +6,8 @@ from rest_framework.decorators import action
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
 import requests
+import os
+from openai import OpenAI
 from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection
 from .serializers import ClientSerializer, VehicleSerializer, WorkOrderSerializer, WorkOrderItemSerializer, VisualInspectionSerializer
 
@@ -129,4 +131,42 @@ class ClientDataView(APIView):
                 'active_orders': orders_data
             })
             
+            
         return Response(data)
+
+class AIDiagnosticsView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, *args, **kwargs):
+        symptoms = request.data.get('symptoms')
+        if not symptoms:
+            return Response({'error': 'Por favor, describe los síntomas del vehículo.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            
+            prompt = f"""
+            Eres 'MecanIA', un experto mecánico automotriz con décadas de experiencia.
+            Un usuario reporta los siguientes síntomas en su vehículo:
+            "{symptoms}"
+            
+            Proporciona un breve pre-diagnóstico técnico (máximo 3 párrafos), indicando las posibles causas 
+            y qué componentes específicos debería revisar el mecánico en el taller. Usa un tono profesional y amable.
+            """
+            
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un asistente mecánico experto."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            ai_message = response.choices[0].message.content
+            return Response({'diagnosis': ai_message})
+            
+        except Exception as e:
+            print("Error OpenAI:", str(e))
+            return Response({'error': 'Error al conectar con la Inteligencia Artificial.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

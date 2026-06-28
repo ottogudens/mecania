@@ -10,7 +10,13 @@ const WorkOrderList = () => {
   // Modals state
   const [showNewModal, setShowNewModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // AI State
+  const [aiSymptoms, setAiSymptoms] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
 
   const [newOrder, setNewOrder] = useState({
     vehicle_id: '',
@@ -108,6 +114,31 @@ const WorkOrderList = () => {
     setShowDetailsModal(true);
   };
 
+  const openAiModal = (order) => {
+    setSelectedOrder(order);
+    setAiSymptoms('');
+    setAiResponse('');
+    setShowAiModal(true);
+  };
+
+  const handleAiSubmit = async (e) => {
+    e.preventDefault();
+    setAiLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/operations/ai-diagnostics/', {
+        symptoms: aiSymptoms
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setAiResponse(response.data.diagnosis);
+    } catch (err) {
+      console.error(err);
+      setAiResponse("Hubo un error al contactar a MecanIA. Por favor, intenta de nuevo.");
+    }
+    setAiLoading(false);
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Órdenes de Trabajo...</div>;
   if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '2rem' }}>{error}</div>;
 
@@ -143,7 +174,9 @@ const WorkOrderList = () => {
               
               <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
-                <button className="btn btn-outline" style={{ flex: 1 }}>Inspección</button>
+                <button className="btn btn-outline" style={{ flex: 1, backgroundColor: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => openAiModal(order)}>
+                  🤖 Consultar MecanIA
+                </button>
                 <button 
                   className="btn" 
                   style={{ flex: '1 1 100%', backgroundColor: '#25D366', color: 'white' }}
@@ -271,6 +304,49 @@ const WorkOrderList = () => {
               </form>
             </div>
             
+          </div>
+        </div>
+      )}
+
+      {/* Modal Inteligencia Artificial */}
+      {showAiModal && selectedOrder && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
+          justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', background: 'linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.95))', border: '1px solid rgba(59,130,246,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, color: '#60a5fa' }}>🤖 MecanIA - Diagnóstico Asistido</h3>
+              <button onClick={() => setShowAiModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+            </div>
+            
+            <form onSubmit={handleAiSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Describe los síntomas del vehículo (OT #{selectedOrder.id})</label>
+                <textarea 
+                  className="input-field" style={{ width: '100%', minHeight: '100px', resize: 'vertical' }} required
+                  placeholder="Ej: El motor hace un ruido metálico al pasar de 3000 RPM y el escape saca humo azul..."
+                  value={aiSymptoms} 
+                  onChange={(e) => setAiSymptoms(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="submit" className="btn" style={{ background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)', border: 'none' }} disabled={aiLoading}>
+                  {aiLoading ? 'Analizando...' : 'Solicitar Pre-Diagnóstico'}
+                </button>
+              </div>
+            </form>
+
+            {aiResponse && (
+              <div style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
+                <h4 style={{ color: '#c4b5fd', marginTop: 0, marginBottom: '1rem' }}>Respuesta de MecanIA:</h4>
+                <div style={{ color: 'var(--text-light)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                  {aiResponse}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

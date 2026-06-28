@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ClientViewSet, VehicleViewSet, WorkOrderViewSet, 
     WorkOrderItemViewSet, VisualInspectionViewSet, 
-    CustomAuthToken, ClientAuthToken, ClientDataView
+    CustomAuthToken, ClientAuthToken, ClientDataView,
+    AIDiagnosticsView
 )
 
 router = DefaultRouter()
@@ -17,5 +18,6 @@ urlpatterns = [
     path('login/', CustomAuthToken.as_view(), name='api_login'),
     path('client/login/', ClientAuthToken.as_view(), name='client_login'),
     path('client/data/', ClientDataView.as_view(), name='client_data'),
+    path('ai-diagnostics/', AIDiagnosticsView.as_view(), name='ai_diagnostics'),
     path('', include(router.urls)),
 ]
