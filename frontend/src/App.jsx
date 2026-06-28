@@ -17,19 +17,19 @@ const AdminLayout = ({ onLogout }) => {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>Administrador AutoMaster</h1>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <h1>MecanIA</h1>
+        <div className="nav-links">
           <button 
             className={`btn ${activeTab === 'orders' ? '' : 'btn-outline'}`}
             onClick={() => setActiveTab('orders')}
           >
-            Órdenes
+            📋 Órdenes
           </button>
           <button 
             className={`btn ${activeTab === 'inspection' ? '' : 'btn-outline'}`}
             onClick={() => setActiveTab('inspection')}
           >
-            Inspección
+            🔍 Inspección
           </button>
           <button 
             className={`btn ${activeTab === 'inventory' ? '' : 'btn-outline'}`}
@@ -53,12 +53,11 @@ const AdminLayout = ({ onLogout }) => {
             className={`btn ${activeTab === 'settings' ? '' : 'btn-outline'}`}
             onClick={() => setActiveTab('settings')}
           >
-            ⚙️ Configuración
+            ⚙️ Config
           </button>
-          <Link to="/client" style={{ marginLeft: '2rem', color: 'var(--primary-color)' }}>Vista Cliente</Link>
+          <Link to="/client" className="client-link">Vista Cliente</Link>
           <button 
-            className="btn btn-outline" 
-            style={{ marginLeft: '1rem', padding: '0.4rem 0.8rem', fontSize: '0.9rem' }}
+            className="btn btn-outline logout-btn" 
             onClick={onLogout}
           >
             Cerrar Sesión
