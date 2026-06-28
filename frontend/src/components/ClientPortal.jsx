@@ -43,6 +43,27 @@ const ClientPortal = () => {
     }
   };
 
+  useEffect(() => {
+    if (step === 'AUTHENTICATED') {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+      const wsUrl = `${wsProtocol}//${backendHost}/ws/work_orders/`;
+      
+      const socket = new WebSocket(wsUrl);
+      
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'work_order_updated') {
+          console.log("Real-time update:", data.message);
+          // Re-fetch client data to get the latest status
+          fetchClientData();
+        }
+      };
+      
+      return () => socket.close();
+    }
+  }, [step]);
+
   // UI para Login
   if (step === 'LOGIN') {
     return (

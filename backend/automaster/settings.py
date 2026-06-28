@@ -38,6 +38,7 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -51,6 +52,7 @@ INSTALLED_APPS = [
     'inventory',
     'finance',
     'ai_assistant',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +85,25 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'automaster.wsgi.application'
+ASGI_APPLICATION = 'automaster.asgi.application'
+
+# Channels
+redis_url = env('REDIS_URL', default=None)
+if redis_url:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [redis_url],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer"
+        }
+    }
 
 
 # Database

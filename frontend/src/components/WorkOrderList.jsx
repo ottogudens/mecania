@@ -32,6 +32,35 @@ const WorkOrderList = () => {
 
   useEffect(() => {
     fetchData();
+
+    // WebSocket connection for real-time updates
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    // If running via Vite proxy (port 5173), we need to connect directly to Django (port 8000) or Railway backend
+    const backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+    const wsUrl = `${wsProtocol}//${backendHost}/ws/work_orders/`;
+    
+    const socket = new WebSocket(wsUrl);
+    
+    socket.onopen = () => {
+      console.log('Connected to WorkOrders WebSocket');
+    };
+    
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'work_order_updated') {
+        console.log("WebSocket Update Received:", data.message);
+        // Toast notification could go here
+        fetchData(); // Re-fetch the orders to get the latest changes
+      }
+    };
+    
+    socket.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+    };
+
+    return () => {
+      socket.close();
+    };
   }, []);
 
   const fetchData = async () => {
