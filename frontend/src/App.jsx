@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import WorkOrderList from './components/WorkOrderList';
 import VisualInspection from './components/VisualInspection';
 import ClientPortal from './components/ClientPortal';
@@ -76,14 +77,26 @@ const ClientLayout = () => {
 
 function App() {
   const [authRole, setAuthRole] = useState(localStorage.getItem('role') || null);
+  const [authToken, setAuthToken] = useState(localStorage.getItem('token') || null);
 
-  const handleLogin = (role) => {
+  useEffect(() => {
+    if (authToken) {
+      axios.defaults.headers.common['Authorization'] = `Token ${authToken}`;
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  }, [authToken]);
+
+  const handleLogin = (role, token) => {
     setAuthRole(role);
+    setAuthToken(token);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('role');
+    localStorage.removeItem('token');
     setAuthRole(null);
+    setAuthToken(null);
   };
 
   return (

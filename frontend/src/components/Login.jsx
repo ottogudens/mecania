@@ -1,18 +1,40 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const Login = ({ onLogin }) => {
   const [role, setRole] = useState('tenant');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Simulate authentication
-    localStorage.setItem('role', role);
-    onLogin(role);
-    navigate('/');
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await axios.post('http://localhost:8000/api/operations/login/', {
+        username: email, // Using email state for username field
+        password: password
+      });
+
+      const { token, role: backendRole } = response.data;
+      
+      // Store token and role
+      localStorage.setItem('token', token);
+      localStorage.setItem('role', backendRole);
+      
+      onLogin(backendRole, token);
+      navigate('/');
+    } catch (err) {
+      setError('Credenciales inválidas. Por favor intente de nuevo.');
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -37,6 +59,12 @@ const Login = ({ onLogin }) => {
             Super Admin
           </div>
         </div>
+
+        {error && (
+          <div style={{ color: '#ff4c4c', background: 'rgba(255, 76, 76, 0.1)', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center' }}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="input-group">
@@ -63,8 +91,8 @@ const Login = ({ onLogin }) => {
             />
           </div>
 
-          <button type="submit" className="btn" style={{ marginTop: '1rem', width: '100%' }}>
-            Iniciar Sesión como {role === 'tenant' ? 'Taller' : 'Admin'}
+          <button type="submit" className="btn" style={{ marginTop: '1rem', width: '100%' }} disabled={loading}>
+            {loading ? 'Iniciando Sesión...' : `Iniciar Sesión como ${role === 'tenant' ? 'Taller' : 'Admin'}`}
           </button>
         </form>
       </div>
