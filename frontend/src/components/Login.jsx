@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const Login = ({ onLogin }) => {
-  const [role, setRole] = useState('tenant');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -45,20 +44,7 @@ const Login = ({ onLogin }) => {
           <p style={{ color: 'var(--text-muted)' }}>Bienvenido al sistema de gestión</p>
         </div>
 
-        <div className="role-toggle-container">
-          <div 
-            className={`role-toggle-btn ${role === 'tenant' ? 'active' : ''}`}
-            onClick={() => setRole('tenant')}
-          >
-            Taller (Tenant)
-          </div>
-          <div 
-            className={`role-toggle-btn ${role === 'superadmin' ? 'active' : ''}`}
-            onClick={() => setRole('superadmin')}
-          >
-            Super Admin
-          </div>
-        </div>
+
 
         {error && (
           <div style={{ color: '#ff4c4c', background: 'rgba(255, 76, 76, 0.1)', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center' }}>
@@ -72,7 +58,7 @@ const Login = ({ onLogin }) => {
             <input 
               type="text" 
               className="glass-input" 
-              placeholder={role === 'tenant' ? 'taller@ejemplo.com' : 'admin@automaster.com'}
+              placeholder="usuario / email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -92,7 +78,7 @@ const Login = ({ onLogin }) => {
           </div>
 
           <button type="submit" className="btn" style={{ marginTop: '1rem', width: '100%' }} disabled={loading}>
-            {loading ? 'Iniciando Sesión...' : `Iniciar Sesión como ${role === 'tenant' ? 'Taller' : 'Admin'}`}
+            {loading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
       </div>
