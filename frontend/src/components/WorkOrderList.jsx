@@ -9,7 +9,10 @@ const WorkOrderList = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await axios.get('/api/operations/work-orders/');
+        const token = localStorage.getItem('token');
+        const response = await axios.get('/api/operations/work-orders/', {
+          headers: { Authorization: `Token ${token}` }
+        });
         setOrders(response.data);
         setLoading(false);
       } catch (err) {

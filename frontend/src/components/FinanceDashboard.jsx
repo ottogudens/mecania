@@ -12,7 +12,10 @@ const FinanceDashboard = () => {
 
   const fetchInvoices = async () => {
     try {
-      const response = await axios.get('/api/finance/invoices/');
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/finance/invoices/', {
+        headers: { Authorization: `Token ${token}` }
+      });
       setInvoices(response.data);
       setLoading(false);
     } catch (err) {
@@ -28,7 +31,10 @@ const FinanceDashboard = () => {
       const apiMethod = methodMap[method] || 'CASH';
       
       // Update invoice status to PAID
-      await axios.patch(`/api/finance/invoices/${id}/`, { status: 'PAID' });
+      const token = localStorage.getItem('token');
+      await axios.patch(`/api/finance/invoices/${id}/`, { status: 'PAID' }, {
+        headers: { Authorization: `Token ${token}` }
+      });
       
       // Record payment
       const invoice = invoices.find(i => i.id === id);
@@ -36,6 +42,8 @@ const FinanceDashboard = () => {
         invoice: id,
         amount: invoice.total_amount,
         method: apiMethod
+      }, {
+        headers: { Authorization: `Token ${token}` }
       });
       
       // Update UI optimistically or refetch

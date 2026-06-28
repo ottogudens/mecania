@@ -12,7 +12,10 @@ const InventoryDashboard = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('/api/inventory/products/');
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/inventory/products/', {
+        headers: { Authorization: `Token ${token}` }
+      });
       setProducts(response.data);
       setLoading(false);
     } catch (err) {
