@@ -15,17 +15,29 @@ class TranscribeAudioView(APIView):
         audio_file = request.FILES['audio']
         
         try:
-            # En un entorno real, descomentar esto si se tiene la API Key
-            # transcript = client.audio.transcriptions.create(
-            #     model="whisper-1", 
-            #     file=audio_file
-            # )
-            # text = transcript.text
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file
+            )
+            text = transcript.text
             
-            # Mock de respuesta por ahora para no consumir créditos o fallar sin Key
-            text = "El vehículo presenta un ruido metálico en la zona del motor al acelerar. Las pastillas de freno están desgastadas al 80%."
+            prompt = (
+                "Extrae los problemas reportados del siguiente texto o transcripción de audio "
+                "y devuélvelos como una lista clara de puntos (bullet points):\n\n"
+                f"{text}"
+            )
             
-            return Response({"transcription": text}, status=status.HTTP_200_OK)
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un asistente de taller mecánico experto en diagnosticar problemas vehiculares de forma concisa."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            issues = completion.choices[0].message.content
+            
+            return Response({"issues": issues}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -37,18 +49,23 @@ class GenerateDiagnosisView(APIView):
             return Response({"error": "Notes are required"}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            # En un entorno real, usar la API
-            # response = client.chat.completions.create(
-            #     model="gpt-4",
-            #     messages=[
-            #         {"role": "system", "content": "Eres un experto mecánico automotriz. Genera un reporte técnico profesional para el cliente basado en estas notas."},
-            #         {"role": "user", "content": notes}
-            #     ]
-            # )
-            # diagnosis = response.choices[0].message.content
+            prompt = (
+                "Basado en las siguientes notas y problemas reportados del vehículo:\n"
+                f"{notes}\n\n"
+                "Genera un diagnóstico técnico preliminar y recomienda 3 a 5 servicios "
+                "específicos que deberían realizarse para solucionar estos problemas. "
+                "Formatea la respuesta claramente."
+            )
             
-            # Mock de respuesta
-            diagnosis = "REPORTE TÉCNICO PROFESIONAL:\n\n1. Hallazgos en Motor: Se detecta ruido metálico inusual. Posible falla en la cadena de distribución o taqués. Requiere revisión profunda.\n2. Frenos: Se recomienda reemplazo urgente de pastillas de freno delanteras (80% de desgaste actual) por seguridad."
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un mecánico maestro experto. Da respuestas profesionales, técnicas pero comprensibles."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            diagnosis = completion.choices[0].message.content
             
             return Response({"diagnosis": diagnosis}, status=status.HTTP_200_OK)
         except Exception as e:
