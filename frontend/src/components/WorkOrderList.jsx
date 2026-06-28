@@ -3,26 +3,47 @@ import axios from 'axios';
 
 const WorkOrderList = () => {
   const [orders, setOrders] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Modals state
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  const [newOrder, setNewOrder] = useState({
+    vehicle_id: '',
+    mileage: '',
+    status: 'PENDING'
+  });
+
+  const [newItem, setNewItem] = useState({
+    description: '',
+    quantity: 1,
+    unit_price: 0
+  });
+
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('/api/operations/work-orders/', {
-          headers: { Authorization: `Token ${token}` }
-        });
-        setOrders(response.data);
-        setLoading(false);
-      } catch (err) {
-        console.error("Error fetching work orders:", err);
-        setError("Error al cargar las órdenes de trabajo. ¿Está funcionando el servidor Django?");
-        setLoading(false);
-      }
-    };
-    fetchOrders();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const [ordersRes, vehiclesRes] = await Promise.all([
+        axios.get('/api/operations/work-orders/', { headers: { Authorization: `Token ${token}` } }),
+        axios.get('/api/operations/vehicles/', { headers: { Authorization: `Token ${token}` } })
+      ]);
+      setOrders(ordersRes.data);
+      setVehicles(vehiclesRes.data);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setError("Error al cargar datos. ¿Está funcionando el servidor Django?");
+      setLoading(false);
+    }
+  };
 
   const handleNotifyClient = async (orderId) => {
     try {
@@ -38,6 +59,55 @@ const WorkOrderList = () => {
     }
   };
 
+  const handleCreateOrder = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/operations/work-orders/', newOrder, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setShowNewModal(false);
+      setNewOrder({ vehicle_id: '', mileage: '', status: 'PENDING' });
+      fetchData();
+      alert("OT creada exitosamente");
+    } catch (err) {
+      console.error(err);
+      alert("Error al crear OT.");
+    }
+  };
+
+  const handleAddItem = async (e) => {
+    e.preventDefault();
+    if (!selectedOrder) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/operations/work-order-items/', {
+        ...newItem,
+        work_order: selectedOrder.id
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      
+      setNewItem({ description: '', quantity: 1, unit_price: 0 });
+      fetchData(); // Reload orders to update the items inside selectedOrder
+      // Update selected order with new data
+      const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setSelectedOrder(response.data);
+      
+    } catch (err) {
+      console.error(err);
+      alert("Error al añadir ítem.");
+    }
+  };
+
+  const openDetails = (order) => {
+    setSelectedOrder(order);
+    setShowDetailsModal(true);
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Órdenes de Trabajo...</div>;
   if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '2rem' }}>{error}</div>;
 
@@ -45,7 +115,7 @@ const WorkOrderList = () => {
     <div className="work-orders">
       <div className="header" style={{ marginBottom: '2rem' }}>
         <h2>Órdenes de Trabajo Digitales (OT)</h2>
-        <button className="btn">Crear Nueva OT</button>
+        <button className="btn" onClick={() => setShowNewModal(true)}>Crear Nueva OT</button>
       </div>
       
       {orders.length === 0 ? (
@@ -72,7 +142,7 @@ const WorkOrderList = () => {
               </div>
               
               <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button className="btn btn-outline" style={{ flex: 1 }}>Detalles</button>
+                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
                 <button className="btn btn-outline" style={{ flex: 1 }}>Inspección</button>
                 <button 
                   className="btn" 
@@ -84,6 +154,124 @@ const WorkOrderList = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal Nueva OT */}
+      {showNewModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
+          justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '500px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0 }}>Crear Nueva OT</h3>
+              <button onClick={() => setShowNewModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+            </div>
+            
+            <form onSubmit={handleCreateOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Vehículo</label>
+                <select 
+                  className="input-field" style={{ width: '100%' }} required
+                  value={newOrder.vehicle_id} 
+                  onChange={(e) => setNewOrder({...newOrder, vehicle_id: e.target.value})}
+                >
+                  <option value="">Seleccione un vehículo...</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.license_plate} - {v.make} {v.model}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Kilometraje Actual</label>
+                <input 
+                  type="number" className="input-field" style={{ width: '100%' }} required
+                  value={newOrder.mileage} 
+                  onChange={(e) => setNewOrder({...newOrder, mileage: e.target.value})}
+                />
+              </div>
+
+              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowNewModal(false)}>Cancelar</button>
+                <button type="submit" className="btn">Crear OT</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detalles / Repuestos */}
+      {showDetailsModal && selectedOrder && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
+          justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
+              <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+            </div>
+            
+            <div style={{ marginBottom: '2rem' }}>
+              <h4>Repuestos y Servicios</h4>
+              {(!selectedOrder.items || selectedOrder.items.length === 0) ? (
+                <p style={{ color: 'var(--text-muted)' }}>No hay repuestos agregados a esta orden aún.</p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                      <th style={{ padding: '0.5rem' }}>Descripción</th>
+                      <th style={{ padding: '0.5rem' }}>Cantidad</th>
+                      <th style={{ padding: '0.5rem' }}>Precio Unitario</th>
+                      <th style={{ padding: '0.5rem' }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedOrder.items.map(item => (
+                      <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.5rem' }}>{item.description}</td>
+                        <td style={{ padding: '0.5rem' }}>{item.quantity}</td>
+                        <td style={{ padding: '0.5rem' }}>${item.unit_price}</td>
+                        <td style={{ padding: '0.5rem' }}>${(item.quantity * item.unit_price).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <h4>Añadir Repuesto/Servicio</h4>
+              <form onSubmit={handleAddItem} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 40%' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Descripción</label>
+                  <input type="text" className="input-field" style={{ width: '100%' }} required
+                    value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})}
+                  />
+                </div>
+                <div style={{ flex: '1 1 15%' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Cantidad</label>
+                  <input type="number" step="0.01" className="input-field" style={{ width: '100%' }} required
+                    value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})}
+                  />
+                </div>
+                <div style={{ flex: '1 1 20%' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Precio U.</label>
+                  <input type="number" step="0.01" className="input-field" style={{ width: '100%' }} required
+                    value={newItem.unit_price} onChange={e => setNewItem({...newItem, unit_price: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <button type="submit" className="btn" style={{ padding: '0.75rem 1.5rem' }}>Añadir</button>
+                </div>
+              </form>
+            </div>
+            
+          </div>
         </div>
       )}
     </div>
