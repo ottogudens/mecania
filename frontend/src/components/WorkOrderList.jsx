@@ -21,6 +21,20 @@ const WorkOrderList = () => {
     fetchOrders();
   }, []);
 
+  const handleNotifyClient = async (orderId) => {
+    try {
+      alert("Enviando notificación...");
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/operations/work-orders/${orderId}/notify_client/`, {}, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      alert("¡Cliente notificado por WhatsApp con éxito!");
+    } catch (err) {
+      console.error(err);
+      alert("Error al notificar al cliente. Verifique que el cliente tenga un número válido.");
+    }
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Órdenes de Trabajo...</div>;
   if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '2rem' }}>{error}</div>;
 
@@ -54,9 +68,16 @@ const WorkOrderList = () => {
                 <span>OT #{order.id}</span>
               </div>
               
-              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
-                <button className="btn btn-outline" style={{ flex: 1 }}>Ver Detalles</button>
-                <button className="btn" style={{ flex: 1 }}>Inspección</button>
+              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-outline" style={{ flex: 1 }}>Detalles</button>
+                <button className="btn btn-outline" style={{ flex: 1 }}>Inspección</button>
+                <button 
+                  className="btn" 
+                  style={{ flex: '1 1 100%', backgroundColor: '#25D366', color: 'white' }}
+                  onClick={() => handleNotifyClient(order.id)}
+                >
+                  <i className="fa-brands fa-whatsapp" style={{ marginRight: '8px' }}></i> Notificar WhatsApp
+                </button>
               </div>
             </div>
           ))}

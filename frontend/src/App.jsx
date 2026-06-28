@@ -8,6 +8,7 @@ import Login from './components/Login';
 
 import InventoryDashboard from './components/InventoryDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
+import ClientList from './components/ClientList';
 
 const AdminLayout = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('orders');
@@ -36,6 +37,12 @@ const AdminLayout = ({ onLogout }) => {
             📦 Inventario
           </button>
           <button 
+            className={`btn ${activeTab === 'clients' ? '' : 'btn-outline'}`}
+            onClick={() => setActiveTab('clients')}
+          >
+            👥 Clientes
+          </button>
+          <button 
             className={`btn ${activeTab === 'finance' ? '' : 'btn-outline'}`}
             onClick={() => setActiveTab('finance')}
           >
@@ -55,6 +62,7 @@ const AdminLayout = ({ onLogout }) => {
         {activeTab === 'orders' && <WorkOrderList />}
         {activeTab === 'inspection' && <VisualInspection />}
         {activeTab === 'inventory' && <InventoryDashboard />}
+        {activeTab === 'clients' && <ClientList />}
         {activeTab === 'finance' && <FinanceDashboard />}
       </main>
     </div>
