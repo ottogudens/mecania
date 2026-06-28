@@ -2,10 +2,17 @@ from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
-from .models import Vehicle, WorkOrder, VisualInspection
-from .serializers import VehicleSerializer, WorkOrderSerializer, VisualInspectionSerializer
+import requests
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection
+from .serializers import ClientSerializer, VehicleSerializer, WorkOrderSerializer, WorkOrderItemSerializer, VisualInspectionSerializer
+
+class ClientViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
 
 class VehicleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -16,6 +23,36 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = WorkOrder.objects.all()
     serializer_class = WorkOrderSerializer
+
+    @action(detail=True, methods=['post'])
+    def notify_client(self, request, pk=None):
+        work_order = self.get_object()
+        client = work_order.vehicle.client
+        
+        if not client or not client.phone:
+            return Response({'error': 'El vehículo no tiene un cliente asignado con teléfono válido.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        message = request.data.get('message', f"Hola {client.first_name}, tu vehículo {work_order.vehicle.license_plate} tiene una actualización. Estado: {work_order.get_status_display()}")
+        
+        try:
+            # Reemplazar con la URL real del microservicio en producción si es diferente
+            whatsapp_service_url = "http://localhost:3000/send" 
+            response = requests.post(whatsapp_service_url, json={
+                "phone": client.phone,
+                "message": message
+            })
+            
+            if response.status_code == 200:
+                return Response({'success': True, 'message': 'Notificación enviada vía WhatsApp.'})
+            else:
+                return Response({'error': 'Fallo al enviar notificación al microservicio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({'error': f'Error de conexión con microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class WorkOrderItemViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = WorkOrderItem.objects.all()
+    serializer_class = WorkOrderItemSerializer
 
 class VisualInspectionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -42,37 +79,31 @@ class CustomAuthToken(APIView):
             return Response({'error': 'Credenciales inválidas'}, status=status.HTTP_401_UNAUTHORIZED)
 
 class ClientAuthToken(APIView):
-    """
-    Authenticate clients using their phone number. 
-    In production, this would send a WhatsApp magic link instead of immediately logging them in.
-    """
     def post(self, request, *args, **kwargs):
         phone = request.data.get('phone')
         
-        # Check if any vehicle has this owner's phone number
-        vehicles = Vehicle.objects.filter(owner_phone=phone)
+        clients = Client.objects.filter(phone=phone)
         
-        if vehicles.exists():
-            # Simply return success for now to let frontend proceed
-            # In a real app, this would generate a one-time token and send it via Whatsapp
+        if clients.exists():
             return Response({
                 'success': True,
                 'message': 'Magic link sent',
                 'phone': phone
             })
         else:
-            return Response({'error': 'Número no encontrado en nuestros registros'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Número de teléfono no encontrado en nuestros registros'}, status=status.HTTP_404_NOT_FOUND)
 
 class ClientDataView(APIView):
-    """
-    Fetch a client's vehicles and active work orders based on their phone number.
-    """
     def get(self, request, *args, **kwargs):
         phone = request.query_params.get('phone')
         if not phone:
             return Response({"error": "Phone number required"}, status=status.HTTP_400_BAD_REQUEST)
             
-        vehicles = Vehicle.objects.filter(owner_phone=phone)
+        client = Client.objects.filter(phone=phone).first()
+        if not client:
+            return Response({"error": "Client not found"}, status=status.HTTP_404_NOT_FOUND)
+            
+        vehicles = client.vehicles.all()
         if not vehicles.exists():
             return Response({"error": "No vehicles found"}, status=status.HTTP_404_NOT_FOUND)
             
@@ -86,7 +117,6 @@ class ClientDataView(APIView):
                     'status': order.get_status_display(),
                     'raw_status': order.status,
                     'created_at': order.created_at,
-                    # We can assume a default service description since we don't have a services model yet
                     'service': 'Mantenimiento General'
                 })
                 
