@@ -51,7 +51,7 @@ Railway detectará automáticamente el código base, pero para aplicaciones mono
 1. Haz clic en **New** > **GitHub Repo** y selecciona este repositorio.
 2. Ve a **Settings** y cambia el **Root Directory** a `/frontend`.
 3. En **Variables**, añade:
-   - `VITE_API_URL`: `https://tu-dominio-backend.up.railway.app/api` (El dominio generado en el paso B).
+   - `   ` (El dominio generado en el paso B).
 4. **Builder / Comandos**: 
    - Railway detectará Node.js. 
    - Build Command: `npm run build`
