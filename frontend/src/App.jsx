@@ -5,6 +5,7 @@ import WorkOrderList from './components/WorkOrderList';
 import VisualInspection from './components/VisualInspection';
 import ClientPortal from './components/ClientPortal';
 import Login from './components/Login';
+import Settings from './components/Settings';
 
 import InventoryDashboard from './components/InventoryDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
@@ -48,6 +49,12 @@ const AdminLayout = ({ onLogout }) => {
           >
             💰 Finanzas
           </button>
+          <button 
+            className={`btn ${activeTab === 'settings' ? '' : 'btn-outline'}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            ⚙️ Configuración
+          </button>
           <Link to="/client" style={{ marginLeft: '2rem', color: 'var(--primary-color)' }}>Vista Cliente</Link>
           <button 
             className="btn btn-outline" 
@@ -64,6 +71,7 @@ const AdminLayout = ({ onLogout }) => {
         {activeTab === 'inventory' && <InventoryDashboard />}
         {activeTab === 'clients' && <ClientList />}
         {activeTab === 'finance' && <FinanceDashboard />}
+        {activeTab === 'settings' && <Settings />}
       </main>
     </div>
   );

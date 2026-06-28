@@ -137,6 +137,29 @@ const WorkOrderList = () => {
       setAiResponse("Hubo un error al contactar a MecanIA. Por favor, intenta de nuevo.");
     }
     setAiLoading(false);
+    setAiLoading(false);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!selectedOrder) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/generate_pdf/`, {
+        headers: { Authorization: `Token ${token}` },
+        responseType: 'blob' // Important for downloading files
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `OT_${selectedOrder.id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error(err);
+      alert("Error al generar PDF.");
+    }
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Órdenes de Trabajo...</div>;
@@ -245,7 +268,12 @@ const WorkOrderList = () => {
         }}>
           <div className="glass-card" style={{ width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
+                <button className="btn btn-outline" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', borderColor: '#3b82f6', color: '#3b82f6' }} onClick={handleDownloadPDF}>
+                  <i className="fa-solid fa-file-pdf"></i> Descargar PDF
+                </button>
+              </div>
               <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
             </div>
             

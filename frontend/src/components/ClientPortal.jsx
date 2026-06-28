@@ -186,6 +186,26 @@ const ClientPortal = () => {
                   })}
                 </div>
               )}
+
+              {data.past_orders && data.past_orders.length > 0 && (
+                <div style={{ marginTop: '2rem' }}>
+                  <h4 style={{ color: 'var(--text-muted)', marginBottom: '1rem', textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '1px' }}>
+                    <i className="fa-solid fa-clock-rotate-left" style={{ marginRight: '8px' }}></i>
+                    Historial de Reparaciones (Completadas)
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {data.past_orders.map(order => (
+                      <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
+                        <div>
+                          <span style={{ fontWeight: '500', display: 'block' }}>OT #{order.id} - {order.service}</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{new Date(order.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}>Ver Detalle</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

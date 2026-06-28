@@ -6,14 +6,24 @@ const ClientList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Modal state
+  // Modals state
   const [showModal, setShowModal] = useState(false);
+  const [showVehicleModal, setShowVehicleModal] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState(null);
+
   const [newClient, setNewClient] = useState({
     first_name: '',
     last_name: '',
     email: '',
     phone: '',
     address: ''
+  });
+
+  const [newVehicle, setNewVehicle] = useState({
+    license_plate: '',
+    make: '',
+    model: '',
+    year: ''
   });
 
   useEffect(() => {
@@ -59,6 +69,30 @@ const ClientList = () => {
     }
   };
 
+  const handleVehicleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/operations/vehicles/', {
+        ...newVehicle,
+        client: selectedClientId
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setShowVehicleModal(false);
+      setNewVehicle({ license_plate: '', make: '', model: '', year: '' });
+      alert("¡Vehículo registrado con éxito!");
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar vehículo.");
+    }
+  };
+
+  const openVehicleModal = (clientId) => {
+    setSelectedClientId(clientId);
+    setShowVehicleModal(true);
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Clientes...</div>;
   if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '2rem' }}>{error}</div>;
 
@@ -80,8 +114,9 @@ const ClientList = () => {
               <h3>{client.first_name} {client.last_name}</h3>
               <p style={{ color: 'var(--text-muted)' }}>📞 {client.phone}</p>
               <p style={{ color: 'var(--text-muted)' }}>✉️ {client.email || 'Sin correo'}</p>
-              <div style={{ marginTop: '1rem' }}>
-                <button className="btn btn-outline" style={{ width: '100%' }}>Ver Historial</button>
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-outline" style={{ flex: 1 }}>Ver Historial</button>
+                <button className="btn" style={{ flex: 1 }} onClick={() => openVehicleModal(client.id)}>+ Vehículo</button>
               </div>
             </div>
           ))}
@@ -136,6 +171,55 @@ const ClientList = () => {
               <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                 <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button type="submit" className="btn">Guardar Cliente</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for New Vehicle */}
+      {showVehicleModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
+          justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '500px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0 }}>Añadir Vehículo</h3>
+              <button 
+                onClick={() => setShowVehicleModal(false)} 
+                style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}
+              >
+                &times;
+              </button>
+            </div>
+            
+            <form onSubmit={handleVehicleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Patente (Placa)</label>
+                <input type="text" required value={newVehicle.license_plate} onChange={e => setNewVehicle({...newVehicle, license_plate: e.target.value})} className="input-field" style={{ width: '100%', textTransform: 'uppercase' }} placeholder="AB12CD" />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Marca</label>
+                  <input type="text" required value={newVehicle.make} onChange={e => setNewVehicle({...newVehicle, make: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="Toyota" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Modelo</label>
+                  <input type="text" required value={newVehicle.model} onChange={e => setNewVehicle({...newVehicle, model: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="Yaris" />
+                </div>
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Año</label>
+                <input type="number" value={newVehicle.year} onChange={e => setNewVehicle({...newVehicle, year: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="2020" />
+              </div>
+              
+              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowVehicleModal(false)}>Cancelar</button>
+                <button type="submit" className="btn">Guardar Vehículo</button>
               </div>
             </form>
           </div>

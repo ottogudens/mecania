@@ -9,6 +9,8 @@ app.use(cors());
 app.use(express.json());
 
 let sock = null;
+let currentQr = null;
+let connectionStatus = 'disconnected';
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -25,15 +27,21 @@ async function connectToWhatsApp() {
         if (qr) {
             console.log('\nScan this QR code with WhatsApp to link AutoMaster:');
             qrcode.generate(qr, { small: true });
+            currentQr = qr;
+            connectionStatus = 'qr_ready';
         }
         
         if (connection === 'close') {
+            connectionStatus = 'disconnected';
+            currentQr = null;
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
             if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {
+            connectionStatus = 'connected';
+            currentQr = null;
             console.log('AutoMaster WhatsApp service connected successfully!');
         }
     });
@@ -45,6 +53,14 @@ async function connectToWhatsApp() {
 connectToWhatsApp();
 
 // REST API for Django to call
+
+app.get('/api/status', (req, res) => {
+    res.json({
+        status: connectionStatus,
+        qr: currentQr
+    });
+});
+
 app.post('/api/send-message', async (req, res) => {
     try {
         const { number, text } = req.body;

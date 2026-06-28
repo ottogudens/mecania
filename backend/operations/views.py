@@ -5,6 +5,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.contrib.auth import authenticate
+from django.http import HttpResponse
+import io
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
 from rest_framework.authtoken.models import Token
 import requests
 import os
@@ -38,11 +43,10 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         message = request.data.get('message', f"Hola {client.first_name}, tu vehículo {work_order.vehicle.license_plate} tiene una actualización. Estado: {work_order.get_status_display()}")
         
         try:
-            # Reemplazar con la URL real del microservicio en producción si es diferente
-            whatsapp_service_url = "http://localhost:3000/send" 
+            whatsapp_service_url = "http://localhost:3001/api/send-message" 
             response = requests.post(whatsapp_service_url, json={
-                "phone": client.phone,
-                "message": message
+                "number": client.phone,
+                "text": message
             })
             
             if response.status_code == 200:
@@ -51,6 +55,69 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 return Response({'error': 'Fallo al enviar notificación al microservicio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             return Response({'error': f'Error de conexión con microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        work_order = self.get_object()
+        client = work_order.vehicle.client
+        vehicle = work_order.vehicle
+        items = WorkOrderItem.objects.filter(work_order=work_order)
+
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        
+        # Header
+        p.setFont("Helvetica-Bold", 24)
+        p.drawString(50, 750, "MecanIA")
+        p.setFont("Helvetica", 12)
+        p.drawString(50, 730, "Taller Automotriz Inteligente")
+        
+        # Title
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(50, 680, f"Orden de Trabajo #{work_order.id}")
+        
+        # Client and Vehicle Info
+        p.setFont("Helvetica", 12)
+        p.drawString(50, 650, f"Cliente: {client.first_name} {client.last_name}")
+        p.drawString(50, 630, f"Vehículo: {vehicle.make} {vehicle.model} - Patente: {vehicle.license_plate}")
+        p.drawString(50, 610, f"Estado: {work_order.get_status_display()}")
+        
+        # Table Header
+        y = 570
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(50, y, "Descripción")
+        p.drawString(300, y, "Cantidad")
+        p.drawString(400, y, "Precio Unitario")
+        p.drawString(500, y, "Total")
+        p.line(50, y-5, 550, y-5)
+        
+        # Items
+        y -= 25
+        p.setFont("Helvetica", 12)
+        total_amount = 0
+        for item in items:
+            item_total = item.quantity * item.unit_price
+            total_amount += item_total
+            p.drawString(50, y, str(item.description)[:35])
+            p.drawString(300, y, str(item.quantity))
+            p.drawString(400, y, f"${item.unit_price}")
+            p.drawString(500, y, f"${item_total}")
+            y -= 20
+        
+        # Total
+        p.line(50, y-5, 550, y-5)
+        y -= 25
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(400, y, "Total:")
+        p.drawString(500, y, f"${total_amount}")
+        
+        p.showPage()
+        p.save()
+        
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="OT_{work_order.id}.pdf"'
+        return response
 
 class WorkOrderItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -113,9 +180,21 @@ class ClientDataView(APIView):
         data = []
         for vehicle in vehicles:
             active_orders = WorkOrder.objects.filter(vehicle=vehicle).exclude(status='DELIVERED').order_by('-created_at')
+            past_orders = WorkOrder.objects.filter(vehicle=vehicle, status='DELIVERED').order_by('-created_at')
+            
             orders_data = []
             for order in active_orders:
                 orders_data.append({
+                    'id': order.id,
+                    'status': order.get_status_display(),
+                    'raw_status': order.status,
+                    'created_at': order.created_at,
+                    'service': 'Mantenimiento General'
+                })
+                
+            past_orders_data = []
+            for order in past_orders:
+                past_orders_data.append({
                     'id': order.id,
                     'status': order.get_status_display(),
                     'raw_status': order.status,
@@ -129,7 +208,8 @@ class ClientDataView(APIView):
                     'model': vehicle.model,
                     'license_plate': vehicle.license_plate
                 },
-                'active_orders': orders_data
+                'active_orders': orders_data,
+                'past_orders': past_orders_data
             })
             
             
