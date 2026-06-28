@@ -16,7 +16,7 @@ const Login = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/operations/login/', {
+      const response = await axios.post('/api/operations/login/', {
         username: email, // Using email state for username field
         password: password
       });

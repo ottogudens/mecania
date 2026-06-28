@@ -14,7 +14,7 @@ const ClientPortal = () => {
       setLoading(true);
       setError('');
       try {
-        await axios.post('http://localhost:8000/api/operations/client/login/', { phone });
+        await axios.post('/api/operations/client/login/', { phone });
         setAuthenticated(true);
         fetchClientData();
       } catch (err) {
@@ -27,7 +27,7 @@ const ClientPortal = () => {
 
   const fetchClientData = async () => {
     try {
-      const response = await axios.get(`http://localhost:8000/api/operations/client/data/?phone=${phone}`);
+      const response = await axios.get(`/api/operations/client/data/?phone=${phone}`);
       setClientData(response.data);
     } catch (err) {
       console.error("Error fetching client data:", err);

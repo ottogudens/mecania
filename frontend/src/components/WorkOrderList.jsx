@@ -9,7 +9,7 @@ const WorkOrderList = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/operations/work-orders/');
+        const response = await axios.get('/api/operations/work-orders/');
         setOrders(response.data);
         setLoading(false);
       } catch (err) {

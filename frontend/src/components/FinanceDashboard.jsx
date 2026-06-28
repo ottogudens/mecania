@@ -12,7 +12,7 @@ const FinanceDashboard = () => {
 
   const fetchInvoices = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/finance/invoices/');
+      const response = await axios.get('/api/finance/invoices/');
       setInvoices(response.data);
       setLoading(false);
     } catch (err) {
@@ -28,11 +28,11 @@ const FinanceDashboard = () => {
       const apiMethod = methodMap[method] || 'CASH';
       
       // Update invoice status to PAID
-      await axios.patch(`http://localhost:8000/api/finance/invoices/${id}/`, { status: 'PAID' });
+      await axios.patch(`/api/finance/invoices/${id}/`, { status: 'PAID' });
       
       // Record payment
       const invoice = invoices.find(i => i.id === id);
-      await axios.post('http://localhost:8000/api/finance/payments/', {
+      await axios.post('/api/finance/payments/', {
         invoice: id,
         amount: invoice.total_amount,
         method: apiMethod

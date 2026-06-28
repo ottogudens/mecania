@@ -12,7 +12,7 @@ const InventoryDashboard = () => {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/inventory/products/');
+      const response = await axios.get('/api/inventory/products/');
       setProducts(response.data);
       setLoading(false);
     } catch (err) {
@@ -27,7 +27,7 @@ const InventoryDashboard = () => {
       const newQuantity = product.stock_quantity + 5;
       
       // Update backend
-      await axios.patch(`http://localhost:8000/api/inventory/products/${id}/`, {
+      await axios.patch(`/api/inventory/products/${id}/`, {
         stock_quantity: newQuantity
       });
 

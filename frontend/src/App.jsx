@@ -75,6 +75,8 @@ const ClientLayout = () => {
   );
 };
 
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 function App() {
   const [authRole, setAuthRole] = useState(localStorage.getItem('role') || null);
   const [authToken, setAuthToken] = useState(localStorage.getItem('token') || null);

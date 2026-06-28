@@ -24,7 +24,7 @@ const VisualInspection = () => {
         const formData = new FormData();
         formData.append('audio', new Blob(['test'], { type: 'audio/webm' }));
         
-        const response = await axios.post('http://localhost:8000/api/ai/transcribe/', formData);
+        const response = await axios.post('/api/ai/transcribe/', formData);
         setAiNotes(prev => prev + ' ' + response.data.transcription);
       } catch (err) {
         console.error("Error transcribiendo audio:", err);
@@ -38,7 +38,7 @@ const VisualInspection = () => {
     if (!aiNotes) return;
     setLoadingAi(true);
     try {
-      const response = await axios.post('http://localhost:8000/api/ai/diagnose/', { notes: aiNotes });
+      const response = await axios.post('/api/ai/diagnose/', { notes: aiNotes });
       setAiDiagnosis(response.data.diagnosis);
     } catch (err) {
       console.error("Error generando diagnóstico:", err);
