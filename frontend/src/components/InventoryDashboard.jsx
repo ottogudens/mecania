@@ -12,16 +12,8 @@ const InventoryDashboard = () => {
 
   const fetchProducts = async () => {
     try {
-      // In a real app, this would hit the backend API
-      // const response = await axios.get('http://localhost:8000/api/inventory/products/');
-      // setProducts(response.data);
-      
-      // Mock data for UI demonstration
-      setProducts([
-        { id: 1, sku: 'OIL-5W30', name: 'Aceite Motor Sintético 5W-30', price: '25.00', stock_quantity: 45, low_stock_threshold: 10 },
-        { id: 2, sku: 'BRK-PAD-F', name: 'Pastillas de Freno Delanteras', price: '45.00', stock_quantity: 8, low_stock_threshold: 10 },
-        { id: 3, sku: 'FLT-AIR', name: 'Filtro de Aire Universal', price: '12.50', stock_quantity: 2, low_stock_threshold: 5 },
-      ]);
+      const response = await axios.get('http://localhost:8000/api/inventory/products/');
+      setProducts(response.data);
       setLoading(false);
     } catch (err) {
       setError("Error al cargar inventario.");
@@ -29,12 +21,24 @@ const InventoryDashboard = () => {
     }
   };
 
-  const handleQuickAddStock = (id) => {
-    // Optimistic UI update
-    setProducts(products.map(p => 
-      p.id === id ? { ...p, stock_quantity: p.stock_quantity + 5 } : p
-    ));
-    // Here we would do a PATCH/POST to the backend
+  const handleQuickAddStock = async (id) => {
+    try {
+      const product = products.find(p => p.id === id);
+      const newQuantity = product.stock_quantity + 5;
+      
+      // Update backend
+      await axios.patch(`http://localhost:8000/api/inventory/products/${id}/`, {
+        stock_quantity: newQuantity
+      });
+
+      // Optimistic UI update
+      setProducts(products.map(p => 
+        p.id === id ? { ...p, stock_quantity: newQuantity } : p
+      ));
+    } catch (err) {
+      console.error("Error updating stock:", err);
+      alert("Hubo un error al actualizar el stock.");
+    }
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando inventario...</div>;

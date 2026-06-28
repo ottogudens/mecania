@@ -12,12 +12,8 @@ const FinanceDashboard = () => {
 
   const fetchInvoices = async () => {
     try {
-      // Mock data for UI demonstration
-      setInvoices([
-        { id: 101, work_order: 'OT-1', total_amount: '150.00', status: 'BORRADOR', date: '2023-10-25' },
-        { id: 102, work_order: 'OT-2', total_amount: '320.50', status: 'PAGADO', date: '2023-10-24' },
-        { id: 103, work_order: 'OT-3', total_amount: '85.00', status: 'ENVIADO', date: '2023-10-26' },
-      ]);
+      const response = await axios.get('http://localhost:8000/api/finance/invoices/');
+      setInvoices(response.data);
       setLoading(false);
     } catch (err) {
       setError("Error al cargar finanzas.");
@@ -25,11 +21,32 @@ const FinanceDashboard = () => {
     }
   };
 
-  const handlePayment = (id, method) => {
-    setInvoices(invoices.map(i => 
-      i.id === id ? { ...i, status: 'PAGADO' } : i
-    ));
-    alert(`Pago de factura #${id} registrado vía ${method}`);
+  const handlePayment = async (id, method) => {
+    try {
+      // In English the backend expects CASH, CARD, TRANSFER
+      const methodMap = { 'Efectivo': 'CASH', 'Tarjeta': 'CARD', 'Transferencia': 'TRANSFER' };
+      const apiMethod = methodMap[method] || 'CASH';
+      
+      // Update invoice status to PAID
+      await axios.patch(`http://localhost:8000/api/finance/invoices/${id}/`, { status: 'PAID' });
+      
+      // Record payment
+      const invoice = invoices.find(i => i.id === id);
+      await axios.post('http://localhost:8000/api/finance/payments/', {
+        invoice: id,
+        amount: invoice.total_amount,
+        method: apiMethod
+      });
+      
+      // Update UI optimistically or refetch
+      setInvoices(invoices.map(i => 
+        i.id === id ? { ...i, status: 'PAID' } : i
+      ));
+      alert(`Pago de factura #${id} registrado vía ${method}`);
+    } catch (err) {
+      console.error("Error procesando pago:", err);
+      alert("Hubo un error al registrar el pago.");
+    }
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando finanzas...</div>;
@@ -40,8 +57,10 @@ const FinanceDashboard = () => {
         <h2>💰 Gestión Financiera</h2>
         <div style={{ display: 'flex', gap: '1rem' }}>
           <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ color: 'var(--text-muted)' }}>Ingresos del Mes:</span>
-            <span style={{ fontSize: '1.2rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>$3,450.00</span>
+            <span style={{ color: 'var(--text-muted)' }}>Total Facturado:</span>
+            <span style={{ fontSize: '1.2rem', color: 'var(--primary-color)', fontWeight: 'bold' }}>
+              ${invoices.reduce((sum, inv) => sum + parseFloat(inv.total_amount || 0), 0).toFixed(2)}
+            </span>
           </div>
         </div>
       </div>
