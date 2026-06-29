@@ -4,6 +4,7 @@ import axios from 'axios';
 const WorkOrderList = () => {
   const [orders, setOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [barcodeInput, setBarcodeInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -152,6 +153,38 @@ const WorkOrderList = () => {
     } catch (err) {
       console.error(err);
       alert("Error al añadir ítem.");
+    }
+  };
+
+  const handleScanBarcode = async (e) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    const p = catalogProducts.find(prod => prod.sku === barcodeInput.trim() || prod.id.toString() === barcodeInput.trim());
+    if (p) {
+      try {
+        const token = localStorage.getItem('token');
+        const payload = {
+          work_order: selectedOrder.id,
+          product: p.id,
+          description: p.name,
+          unit_price: p.price,
+          quantity: 1,
+          is_labor: false
+        };
+        await axios.post('/api/operations/work-order-items/', payload, {
+          headers: { Authorization: `Token ${token}` }
+        });
+        fetchData();
+        const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
+          headers: { Authorization: `Token ${token}` }
+        });
+        setSelectedOrder(response.data);
+        setBarcodeInput('');
+      } catch (err) {
+        alert("Error al agregar producto escaneado.");
+      }
+    } else {
+      alert("SKU no encontrado: " + barcodeInput);
     }
   };
 
@@ -386,6 +419,19 @@ const WorkOrderList = () => {
                     }}>{lbl}</button>
                 ))}
               </div>
+
+              <form onSubmit={handleScanBarcode} style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  className="glass-input" 
+                  placeholder="Escanear SKU con pistola lectora..." 
+                  value={barcodeInput} 
+                  onChange={e => setBarcodeInput(e.target.value)} 
+                  autoFocus 
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px' }} 
+                />
+                <button type="submit" className="btn btn-outline" style={{ padding: '0 1rem' }}>Escanear</button>
+              </form>
 
               <form onSubmit={handleAddItem} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 {/* selector de catálogo */}

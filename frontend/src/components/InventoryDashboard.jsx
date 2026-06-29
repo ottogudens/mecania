@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const InventoryDashboard = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchProducts();
@@ -44,13 +46,84 @@ const InventoryDashboard = () => {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/inventory/products/download_template/', {
+        headers: { Authorization: `Token ${token}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'plantilla_inventario.xlsx');
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      alert("Error al descargar la plantilla.");
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/inventory/products/bulk_upload/', formData, {
+        headers: { 
+          Authorization: `Token ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      const { products_created, services_created, errors } = response.data;
+      let msg = `Carga exitosa.\nProductos creados/actualizados: ${products_created}\nServicios creados/actualizados: ${services_created}`;
+      if (errors && errors.length > 0) {
+        msg += `\n\nErrores encontrados:\n` + errors.join('\n');
+      }
+      alert(msg);
+      fetchProducts();
+    } catch (err) {
+      console.error(err);
+      alert("Error al procesar el archivo Excel. Revisa el formato.");
+    } finally {
+      setUploading(false);
+      e.target.value = null; // reset input
+    }
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando inventario...</div>;
 
   return (
     <div className="work-orders">
-      <div className="header" style={{ marginBottom: '2rem' }}>
+      <div className="header" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between' }}>
         <h2>📦 Gestión de Inventario</h2>
-        <button className="btn">Añadir Nuevo Producto</button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button className="btn btn-outline" onClick={handleDownloadTemplate}>
+            📄 Descargar Plantilla
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            accept=".xls,.xlsx" 
+            style={{ display: 'none' }} 
+          />
+          <button 
+            className="btn btn-outline" 
+            style={{ borderColor: 'var(--status-green)', color: 'var(--status-green)' }}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? '⏳ Subiendo...' : '🔼 Carga Masiva (Excel)'}
+          </button>
+          <button className="btn">Añadir Nuevo Producto</button>
+        </div>
       </div>
 
       <div className="glass-card" style={{ padding: '0' }}>

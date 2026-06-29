@@ -272,6 +272,7 @@ const CounterSale = () => {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cartItems, setCart] = useState([]);
+  const [barcodeInput, setBarcodeInput] = useState('');
   const [method, setMethod] = useState('CASH');
   const [invoice, setInvoice] = useState(null);
   const [msg, setMsg] = useState(null);
@@ -297,6 +298,18 @@ const CounterSale = () => {
       if (ex) return prev.map(i => i === ex ? { ...i, qty: i.qty + 1 } : i);
       return [...prev, { type: 'product', id: p.id, name: p.name, price: parseFloat(p.price), qty: 1, stock: p.stock_quantity }];
     });
+  };
+
+  const handleScan = (e) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    const p = products.find(prod => prod.sku === barcodeInput.trim() || prod.id.toString() === barcodeInput.trim());
+    if (p) {
+      addProduct(p);
+      setBarcodeInput('');
+    } else {
+      alert("Producto/SKU no encontrado: " + barcodeInput);
+    }
   };
 
   const addService = (s) => {
@@ -363,6 +376,19 @@ const CounterSale = () => {
             }}>{lbl}</button>
           ))}
         </div>
+
+        <form onSubmit={handleScan} style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem' }}>
+          <input 
+            type="text" 
+            className="glass-input" 
+            placeholder="Escanear SKU con pistola lectora..." 
+            value={barcodeInput} 
+            onChange={e => setBarcodeInput(e.target.value)} 
+            autoFocus 
+            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px' }} 
+          />
+          <button type="submit" className="btn btn-outline" style={{ padding: '0 1rem' }}>Escanear</button>
+        </form>
 
         {tab === 'products' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
