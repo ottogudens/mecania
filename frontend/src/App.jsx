@@ -10,6 +10,7 @@ import Settings from './components/Settings';
 import InventoryDashboard from './components/InventoryDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import ClientList from './components/ClientList';
+import POSDashboard from './components/POSDashboard';
 
 const AdminLayout = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('orders');
@@ -50,6 +51,12 @@ const AdminLayout = ({ onLogout }) => {
             💰 Finanzas
           </button>
           <button 
+            className={`btn ${activeTab === 'pos' ? '' : 'btn-outline'}`}
+            onClick={() => setActiveTab('pos')}
+          >
+            🏪 Punto de Venta
+          </button>
+          <button 
             className={`btn ${activeTab === 'settings' ? '' : 'btn-outline'}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -70,6 +77,7 @@ const AdminLayout = ({ onLogout }) => {
         {activeTab === 'inventory' && <InventoryDashboard />}
         {activeTab === 'clients' && <ClientList />}
         {activeTab === 'finance' && <FinanceDashboard />}
+        {activeTab === 'pos' && <POSDashboard />}
         {activeTab === 'settings' && <Settings />}
       </main>
     </div>

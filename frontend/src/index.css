@@ -220,12 +220,18 @@ body {
   color: #fff;
   font-family: 'Outfit', sans-serif;
   transition: all 0.3s ease;
+  font-size: 0.9rem;
 }
 
 .glass-input:focus {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+}
+
+textarea.glass-input {
+  resize: vertical;
+  min-height: 80px;
 }
 
 /* Base Nav links (Desktop) */
