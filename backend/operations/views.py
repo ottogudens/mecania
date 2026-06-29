@@ -132,7 +132,8 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         
         # Client and Vehicle Info
         p.setFont("Helvetica", 12)
-        p.drawString(50, 650, f"Cliente: {client.first_name} {client.last_name}")
+        client_name = f"{client.first_name} {client.last_name}" if client else "Desconocido"
+        p.drawString(50, 650, f"Cliente: {client_name}")
         p.drawString(50, 630, f"Vehículo: {vehicle.make} {vehicle.model} - Patente: {vehicle.license_plate}")
         p.drawString(50, 610, f"Estado: {work_order.get_status_display()}")
         

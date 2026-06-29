@@ -26,6 +26,7 @@ const WorkOrderList = () => {
   const [newOrder, setNewOrder] = useState({
     vehicle_id: '',
     mileage: '',
+    fuel_level: 50,
     status: 'PENDING'
   });
 
@@ -107,7 +108,7 @@ const WorkOrderList = () => {
         headers: { Authorization: `Token ${token}` }
       });
       setShowNewModal(false);
-      setNewOrder({ vehicle_id: '', mileage: '', status: 'PENDING' });
+      setNewOrder({ vehicle_id: '', mileage: '', fuel_level: 50, status: 'PENDING' });
       fetchData();
       alert("OT creada exitosamente");
     } catch (err) {
@@ -302,6 +303,15 @@ const WorkOrderList = () => {
                   type="number" className="input-field" style={{ width: '100%' }} required
                   value={newOrder.mileage} 
                   onChange={(e) => setNewOrder({...newOrder, mileage: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Nivel de Combustible (%)</label>
+                <input 
+                  type="number" min="0" max="100" className="input-field" style={{ width: '100%' }} required
+                  value={newOrder.fuel_level} 
+                  onChange={(e) => setNewOrder({...newOrder, fuel_level: e.target.value})}
                 />
               </div>
 
