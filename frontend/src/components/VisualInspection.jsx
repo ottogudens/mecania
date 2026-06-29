@@ -44,7 +44,11 @@ const VisualInspection = () => {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      // Intentar soportar tipos MIME soportados por el navegador
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -55,8 +59,8 @@ const VisualInspection = () => {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await sendAudioForTranscription(audioBlob);
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        await sendAudioForTranscription(audioBlob, mimeType);
       };
 
       mediaRecorder.start();
@@ -76,12 +80,18 @@ const VisualInspection = () => {
     }
   };
 
-  const sendAudioForTranscription = async (audioBlob) => {
+  const sendAudioForTranscription = async (audioBlob, mimeType = 'audio/webm') => {
     setLoadingAi(true);
     try {
       const formData = new FormData();
+      
+      // Determinar extensión correcta según el navegador (Safari usa mp4)
+      let ext = 'webm';
+      if (mimeType.includes('mp4')) ext = 'mp4';
+      else if (mimeType.includes('ogg')) ext = 'ogg';
+      
       // Django necesita un archivo con extensión para pasarlo a OpenAI
-      formData.append('audio', audioBlob, 'nota_voz.webm');
+      formData.append('audio', audioBlob, `nota_voz.${ext}`);
       
       const token = localStorage.getItem('token');
       const response = await axios.post('/api/operations/ai-transcribe/', formData, {
