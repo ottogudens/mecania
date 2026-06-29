@@ -1,33 +1,25 @@
-from rest_framework import serializers, viewsets
-from .models import Invoice, Payment
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from rest_framework.permissions import IsAuthenticated
 
-class InvoiceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Invoice
-        fields = '__all__'
-
-class PaymentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Payment
-        fields = '__all__'
-
-class InvoiceViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    queryset = Invoice.objects.all()
-    serializer_class = InvoiceSerializer
-
-class PaymentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    queryset = Payment.objects.all()
-    serializer_class = PaymentSerializer
+from .views import (
+    InvoiceViewSet,
+    PaymentViewSet,
+    POSWorkOrderLookupView,
+    POSChargeView,
+    POSCancelInvoiceView,
+    POSCounterSaleView,
+    InvoicePDFView,
+)
 
 router = DefaultRouter()
 router.register(r'invoices', InvoiceViewSet)
 router.register(r'payments', PaymentViewSet)
 
 urlpatterns = [
+    path('pos/work-order-lookup/', POSWorkOrderLookupView.as_view(), name='pos-work-order-lookup'),
+    path('pos/charge/', POSChargeView.as_view(), name='pos-charge'),
+    path('pos/cancel-invoice/', POSCancelInvoiceView.as_view(), name='pos-cancel-invoice'),
+    path('pos/counter-sale/', POSCounterSaleView.as_view(), name='pos-counter-sale'),
+    path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
     path('', include(router.urls)),
 ]

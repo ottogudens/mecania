@@ -32,6 +32,7 @@ class WorkOrder(models.Model):
         ('IN_PROGRESS', 'En Progreso'),
         ('COMPLETED', 'Completado'),
         ('DELIVERED', 'Entregado'),
+        ('CANCELLED', 'Cancelado'),
     ]
 
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='work_orders')
@@ -48,6 +49,7 @@ class WorkOrder(models.Model):
 class WorkOrderItem(models.Model):
     work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey('inventory.Product', on_delete=models.RESTRICT, null=True, blank=True)
+    service = models.ForeignKey('inventory.Service', on_delete=models.SET_NULL, null=True, blank=True)
     description = models.CharField(max_length=255, help_text="Descripción del repuesto o servicio")
     quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -56,6 +58,14 @@ class WorkOrderItem(models.Model):
     @property
     def total_price(self):
         return self.quantity * self.unit_price
+
+    def save(self, *args, **kwargs):
+        if not self.description:
+            if self.product_id:
+                self.description = self.product.name
+            elif self.service_id:
+                self.description = self.service.name
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.quantity}x {self.description} (OT-{self.work_order.id})"

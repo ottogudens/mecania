@@ -1,3 +1,363 @@
-from django.shortcuts import render
+from decimal import Decimal, InvalidOperation
 
-# Create your views here.
+from rest_framework import viewsets, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from operations.models import WorkOrder
+from .models import Invoice, InvoiceLineItem, Payment
+from .serializers import InvoiceSerializer, PaymentSerializer
+from .services import (
+    POSError,
+    get_or_create_invoice_for_work_order,
+    charge_invoice,
+    cancel_invoice,
+    create_counter_sale,
+)
+
+
+class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Solo lectura: las facturas se crean y modifican exclusivamente a través
+    de los endpoints del POS (POSWorkOrderLookupView, POSChargeView,
+    POSCancelInvoiceView, POSCounterSaleView), nunca por create/update
+    genérico, para que toda la lógica de stock y totales pase siempre por
+    finance/services.py.
+    """
+    permission_classes = [IsAuthenticated]
+    queryset = Invoice.objects.all().order_by('-created_at')
+    serializer_class = InvoiceSerializer
+
+
+class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
+    """Solo lectura — los pagos se crean vía POSChargeView."""
+    permission_classes = [IsAuthenticated]
+    queryset = Payment.objects.all().order_by('-date')
+    serializer_class = PaymentSerializer
+
+
+class POSWorkOrderLookupView(APIView):
+    """
+    Punto de entrada del POS para cobrar una Orden de Trabajo existente.
+    Busca la OT por id o por patente del vehículo, y devuelve (creando si
+    no existe todavía) su factura actualizada, lista para cobrar o abonar.
+
+    GET /api/finance/pos/work-order-lookup/?work_order_id=12
+    GET /api/finance/pos/work-order-lookup/?license_plate=ABCD12
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        work_order_id = request.query_params.get('work_order_id')
+        license_plate = request.query_params.get('license_plate')
+
+        if work_order_id:
+            work_order = WorkOrder.objects.filter(id=work_order_id).first()
+        elif license_plate:
+            work_order = (
+                WorkOrder.objects.filter(vehicle__license_plate__iexact=license_plate)
+                .exclude(status='CANCELLED')
+                .order_by('-created_at')
+                .first()
+            )
+        else:
+            return Response(
+                {'error': "Debes indicar 'work_order_id' o 'license_plate'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not work_order:
+            return Response({'error': 'Orden de trabajo no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        invoice = get_or_create_invoice_for_work_order(work_order)
+        return Response(InvoiceSerializer(invoice).data)
+
+
+class POSChargeView(APIView):
+    """
+    Registra un cobro (total o parcial/abono) contra una factura existente.
+
+    POST /api/finance/pos/charge/
+    body: {"invoice_id": 5, "amount": 15000, "payment_method": "CASH", "reference_number": ""}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        invoice_id = request.data.get('invoice_id')
+        amount = request.data.get('amount')
+        payment_method = request.data.get('payment_method')
+
+        if not all([invoice_id, amount, payment_method]):
+            return Response(
+                {'error': "Se requieren 'invoice_id', 'amount' y 'payment_method'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            amount = Decimal(str(amount))
+        except InvalidOperation:
+            return Response({'error': "'amount' no es un número válido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            invoice, payment = charge_invoice(
+                invoice_id=invoice_id,
+                amount=amount,
+                payment_method=payment_method,
+                reference_number=request.data.get('reference_number', ''),
+                registered_by=request.user if request.user.is_authenticated else None,
+            )
+        except Invoice.DoesNotExist:
+            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        except POSError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'invoice': InvoiceSerializer(invoice).data,
+            'payment': PaymentSerializer(payment).data,
+        })
+
+
+class POSCancelInvoiceView(APIView):
+    """
+    Cancela una factura (OT o venta de mostrador). Si era venta de mostrador
+    con productos, revierte el stock descontado.
+
+    POST /api/finance/pos/cancel-invoice/
+    body: {"invoice_id": 5, "reason": "Cliente cambió de opinión"}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        invoice_id = request.data.get('invoice_id')
+        if not invoice_id:
+            return Response({'error': "Se requiere 'invoice_id'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            invoice = cancel_invoice(invoice_id=invoice_id, reason=request.data.get('reason', ''))
+        except Invoice.DoesNotExist:
+            return Response({'error': 'Factura no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        except POSError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(InvoiceSerializer(invoice).data)
+
+
+class POSCounterSaleView(APIView):
+    """
+    Crea una venta de mostrador (sin Orden de Trabajo), mezclando productos
+    de inventario y servicios del catálogo.
+
+    POST /api/finance/pos/counter-sale/
+    body: {
+        "client_id": 3,            # opcional
+        "items": [
+            {"product_id": 7, "quantity": 2},
+            {"service_id": 1, "quantity": 1, "unit_price": 9990}
+        ]
+    }
+    La venta queda creada con status 'SENT', lista para cobrar con
+    POSChargeView usando el invoice_id que se devuelve aquí.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        items = request.data.get('items')
+        if not items or not isinstance(items, list):
+            return Response(
+                {'error': "Se requiere 'items' como una lista de productos/servicios."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            invoice = create_counter_sale(
+                client_id=request.data.get('client_id'),
+                items=items,
+            )
+        except POSError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+
+
+class InvoicePDFView(APIView):
+    """
+    Genera un PDF de boleta/factura para cualquier Invoice (OT o mostrador).
+    GET /api/finance/invoices/<id>/pdf/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk=None):
+        from decimal import Decimal
+        import io
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+
+        try:
+            invoice = Invoice.objects.get(pk=pk)
+        except Invoice.DoesNotExist:
+            from rest_framework.response import Response
+            from rest_framework import status as drf_status
+            return Response({'error': 'Factura no encontrada.'}, status=drf_status.HTTP_404_NOT_FOUND)
+
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        W, H = letter  # 612 x 792 pts
+
+        # ── encabezado ──────────────────────────────────────────────────────
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.rect(0, H - 90, W, 90, fill=1, stroke=0)
+
+        p.setFillColorRGB(0.4, 0.98, 0.95)
+        p.setFont("Helvetica-Bold", 26)
+        p.drawString(45, H - 48, "MecanIA")
+
+        p.setFillColorRGB(0.77, 0.77, 0.78)
+        p.setFont("Helvetica", 10)
+        p.drawString(45, H - 66, "Taller Automotriz Inteligente")
+
+        # número de documento
+        doc_label = f"BOLETA #{invoice.id}"
+        p.setFillColorRGB(1, 1, 1)
+        p.setFont("Helvetica-Bold", 13)
+        p.drawRightString(W - 45, H - 42, doc_label)
+        p.setFont("Helvetica", 9)
+        p.setFillColorRGB(0.77, 0.77, 0.78)
+        p.drawRightString(W - 45, H - 58, invoice.created_at.strftime("%d/%m/%Y %H:%M"))
+
+        # ── origen ───────────────────────────────────────────────────────────
+        y = H - 115
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.rect(40, y - 8, W - 80, 26, fill=1, stroke=0)
+        p.setFillColorRGB(0.4, 0.98, 0.95)
+        p.setFont("Helvetica-Bold", 10)
+        origen = (
+            f"Orden de Trabajo #{invoice.work_order_id}"
+            if invoice.work_order_id
+            else "Venta de Mostrador"
+        )
+        p.drawString(50, y + 4, origen.upper())
+        if invoice.work_order_id:
+            plate = invoice.work_order.vehicle.license_plate if invoice.work_order else "–"
+            p.setFillColorRGB(0.77, 0.77, 0.78)
+            p.setFont("Helvetica", 9)
+            p.drawRightString(W - 50, y + 4, f"Patente: {plate}")
+
+        # ── cliente ──────────────────────────────────────────────────────────
+        y -= 40
+        p.setFillColorRGB(0.2, 0.2, 0.25)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(50, y, "CLIENTE")
+        p.setFillColorRGB(0.93, 0.93, 0.94)
+        p.setFont("Helvetica", 10)
+        client_name = "–"
+        if invoice.client_id:
+            c = invoice.client
+            client_name = f"{c.first_name} {c.last_name}"
+        elif invoice.work_order_id and invoice.work_order.vehicle.client_id:
+            c = invoice.work_order.vehicle.client
+            client_name = f"{c.first_name} {c.last_name}"
+        p.drawString(50, y - 14, client_name)
+
+        # ── separador ────────────────────────────────────────────────────────
+        y -= 40
+        p.setStrokeColorRGB(0.27, 0.64, 0.62)
+        p.setLineWidth(0.5)
+        p.line(40, y, W - 40, y)
+
+        # ── cabecera de tabla ─────────────────────────────────────────────────
+        y -= 18
+        p.setFillColorRGB(0.13, 0.16, 0.20)
+        p.rect(40, y - 6, W - 80, 20, fill=1, stroke=0)
+        p.setFillColorRGB(0.4, 0.98, 0.95)
+        p.setFont("Helvetica-Bold", 9)
+        cols = [(50, "DESCRIPCIÓN"), (330, "CANT."), (390, "P. UNITARIO"), (490, "TOTAL")]
+        for cx, lbl in cols:
+            p.drawString(cx, y + 2, lbl)
+
+        # ── ítems ─────────────────────────────────────────────────────────────
+        items = list(invoice.get_line_items())
+        y -= 22
+        p.setFont("Helvetica", 9)
+        row_fill = [(0.97, 0.97, 0.98), (1, 1, 1)]
+        for idx, item in enumerate(items):
+            row_h = 18
+            p.setFillColorRGB(*row_fill[idx % 2])
+            p.rect(40, y - 4, W - 80, row_h, fill=1, stroke=0)
+            p.setFillColorRGB(0.1, 0.1, 0.12)
+            desc = getattr(item, 'description', '') or ''
+            if not desc:
+                # WorkOrderItem: usa product o description
+                desc = getattr(item, 'description', str(item))
+            p.drawString(50, y + 2, str(desc)[:48])
+            qty = item.quantity if hasattr(item, 'quantity') else 1
+            up = item.unit_price
+            tot = item.total_price
+            p.drawString(335, y + 2, str(qty))
+            p.drawRightString(475, y + 2, f"${int(up):,}")
+            p.setFillColorRGB(0.07, 0.49, 0.47)
+            p.setFont("Helvetica-Bold", 9)
+            p.drawRightString(W - 48, y + 2, f"${int(tot):,}")
+            p.setFont("Helvetica", 9)
+            y -= row_h
+
+        # ── totales ───────────────────────────────────────────────────────────
+        y -= 14
+        p.setStrokeColorRGB(0.27, 0.64, 0.62)
+        p.line(40, y, W - 40, y)
+
+        totals = [
+            ("Subtotal", invoice.subtotal),
+            ("IVA (19%)", invoice.tax_amount),
+        ]
+        p.setFont("Helvetica", 10)
+        for lbl, val in totals:
+            y -= 18
+            p.setFillColorRGB(0.4, 0.4, 0.45)
+            p.drawRightString(W - 120, y, lbl)
+            p.setFillColorRGB(0.1, 0.1, 0.12)
+            p.drawRightString(W - 48, y, f"${int(val):,}")
+
+        y -= 6
+        p.setStrokeColorRGB(0.07, 0.07, 0.1)
+        p.setLineWidth(1)
+        p.line(W - 200, y, W - 40, y)
+        y -= 20
+        p.setFont("Helvetica-Bold", 13)
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.drawRightString(W - 120, y, "TOTAL")
+        p.setFillColorRGB(0.07, 0.49, 0.47)
+        p.drawRightString(W - 48, y, f"${int(invoice.total_amount):,}")
+
+        # ── estado de pago ────────────────────────────────────────────────────
+        if invoice.status == 'PAID':
+            y -= 28
+            p.setFillColorRGB(0.18, 0.78, 0.44)
+            p.roundRect(W - 160, y - 4, 118, 22, 6, fill=1, stroke=0)
+            p.setFillColorRGB(1, 1, 1)
+            p.setFont("Helvetica-Bold", 11)
+            p.drawCentredString(W - 101, y + 3, "✓ PAGADO")
+        elif invoice.status == 'PARTIALLY_PAID':
+            y -= 28
+            p.setFillColorRGB(0.94, 0.77, 0.06)
+            p.roundRect(W - 175, y - 4, 133, 22, 6, fill=1, stroke=0)
+            p.setFillColorRGB(0.1, 0.1, 0.1)
+            p.setFont("Helvetica-Bold", 10)
+            p.drawCentredString(W - 108, y + 3, f"ABONO: ${int(invoice.amount_paid):,}")
+
+        # ── pie ───────────────────────────────────────────────────────────────
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.rect(0, 0, W, 36, fill=1, stroke=0)
+        p.setFillColorRGB(0.4, 0.4, 0.45)
+        p.setFont("Helvetica", 8)
+        p.drawCentredString(W / 2, 14, "MecanIA — Taller Automotriz Inteligente | Documento generado electrónicamente")
+
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+
+        from django.http import HttpResponse
+        resp = HttpResponse(buffer, content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="Boleta_{invoice.id}.pdf"'
+        return resp

@@ -22,6 +22,8 @@ class VisualInspectionSerializer(serializers.ModelSerializer):
 
 class WorkOrderItemSerializer(serializers.ModelSerializer):
     total_price = serializers.ReadOnlyField()
+    product_name = serializers.CharField(source='product.name', read_only=True, default=None)
+    service_name = serializers.CharField(source='service.name', read_only=True, default=None)
     class Meta:
         model = WorkOrderItem
         fields = '__all__'

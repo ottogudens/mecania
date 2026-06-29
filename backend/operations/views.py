@@ -16,6 +16,7 @@ import os
 from openai import OpenAI
 from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection
 from .serializers import ClientSerializer, VehicleSerializer, WorkOrderSerializer, WorkOrderItemSerializer, VisualInspectionSerializer
+from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
 class ClientViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -31,6 +32,56 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = WorkOrder.objects.all()
     serializer_class = WorkOrderSerializer
+
+    def update(self, request, *args, **kwargs):
+        """
+        Bloquea el cambio directo de 'status' vía PUT/PATCH genérico. Todo
+        cambio de estado debe pasar por la acción change_status, que aplica
+        la validación de evidencia obligatoria y el descuento de inventario.
+        Otros campos (kilometraje, mecánico asignado, etc.) sí se pueden
+        editar normalmente por esta vía.
+        """
+        if 'status' in request.data:
+            return Response(
+                {
+                    'error': "No se puede cambiar 'status' directamente. "
+                             "Usa POST /api/operations/work-orders/{id}/change_status/ "
+                             "con {'status': '<nuevo_estado>'}."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().update(request, *args, **kwargs)
+
+    @action(detail=True, methods=['post'])
+    def change_status(self, request, pk=None):
+        """
+        Único endpoint autorizado para avanzar/cambiar el estado de una OT.
+        Aplica la regla de evidencia obligatoria en hallazgos críticos y,
+        al completar/entregar, descuenta inventario en una transacción
+        atómica (ver operations/services.py).
+        """
+        work_order = self.get_object()
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'error': "Debes indicar 'status'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            transition_work_order_status(work_order=work_order, new_status=new_status, user=request.user)
+        except WorkOrderTransitionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(WorkOrderSerializer(work_order).data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancela la OT (no aplica si ya fue entregada al cliente)."""
+        work_order = self.get_object()
+        reason = request.data.get('reason', '')
+        try:
+            cancel_work_order(work_order=work_order, reason=reason)
+        except WorkOrderTransitionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(WorkOrderSerializer(work_order).data)
 
     @action(detail=True, methods=['post'])
     def notify_client(self, request, pk=None):
