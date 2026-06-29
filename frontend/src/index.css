@@ -1,0 +1,303 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #0b0c10;
+  --surface-color: rgba(31, 40, 51, 0.6);
+  --border-color: rgba(69, 162, 158, 0.2);
+  --primary-color: #66fcf1;
+  --secondary-color: #45a29e;
+  --text-main: #ffffff;
+  --text-muted: #c5c6c7;
+  
+  --status-green: #2ecc71;
+  --status-yellow: #f1c40f;
+  --status-red: #e74c3c;
+  --status-pending: #95a5a6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Outfit', sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  background-image: radial-gradient(circle at 15% 50%, rgba(69, 162, 158, 0.1), transparent 25%),
+                    radial-gradient(circle at 85% 30%, rgba(102, 252, 241, 0.05), transparent 25%);
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-card {
+  background: var(--surface-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px 0 rgba(102, 252, 241, 0.1);
+  border-color: rgba(102, 252, 241, 0.3);
+}
+
+.btn {
+  background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+  color: #000;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Outfit', sans-serif;
+}
+
+.btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(102, 252, 241, 0.4);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+}
+
+.btn-outline:hover {
+  background: rgba(102, 252, 241, 0.1);
+  color: #fff;
+}
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.badge.pending { background: rgba(149, 165, 166, 0.2); color: var(--status-pending); border: 1px solid var(--status-pending); }
+.badge.green { background: rgba(46, 204, 113, 0.2); color: var(--status-green); border: 1px solid var(--status-green); }
+.badge.yellow { background: rgba(241, 196, 15, 0.2); color: var(--status-yellow); border: 1px solid var(--status-yellow); }
+.badge.red { background: rgba(231, 76, 60, 0.2); color: var(--status-red); border: 1px solid var(--status-red); }
+
+.ot-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.ot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.ot-header h3 {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.checklist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.status-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.status-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.status-btn:hover {
+  transform: scale(1.2);
+}
+
+.status-btn.green { background-color: var(--status-green); }
+.status-btn.yellow { background-color: var(--status-yellow); }
+.status-btn.red { background-color: var(--status-red); }
+
+.status-btn.active {
+  box-shadow: 0 0 10px 2px #fff;
+  border: 2px solid #fff;
+}
+
+/* Login Page Styles */
+.login-card {
+  width: 100%;
+  max-width: 450px;
+  padding: 3rem;
+  text-align: left;
+}
+
+.role-toggle-container {
+  display: flex;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  padding: 0.3rem;
+}
+
+.role-toggle-btn {
+  flex: 1;
+  text-align: center;
+  padding: 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.role-toggle-btn.active {
+  background: var(--surface-color);
+  color: var(--primary-color);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.glass-input {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: #fff;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.glass-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+}
+
+/* Base Nav links (Desktop) */
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+.client-link {
+  margin-left: 2rem;
+  color: var(--primary-color);
+}
+.logout-btn {
+  margin-left: 1rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+/* --- RESPONSIVE / MOBILE 100% --- */
+@media (max-width: 992px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  /* Hacemos que el menÃº sea scrolleable horizontalmente en mÃ³viles */
+  .nav-links {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 10px; /* para el scrollbar */
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch; /* Suavidad en iOS */
+  }
+  .nav-links::-webkit-scrollbar {
+    height: 6px;
+  }
+  .nav-links::-webkit-scrollbar-thumb {
+    background: var(--secondary-color);
+    border-radius: 4px;
+  }
+  .client-link {
+    margin-left: 0.5rem;
+  }
+  .logout-btn {
+    margin-left: 0.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 1rem;
+  }
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .glass-card {
+    padding: 1rem;
+  }
+  
+  /* En mÃ³viles, las tablas deben poder hacer scroll horizontal sin romper el layout */
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Hacer que el Canvas se adapte al contenedor */
+canvas {
+  max-width: 100%;
+  height: auto;
+}
