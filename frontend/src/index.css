@@ -308,3 +308,80 @@ canvas {
   max-width: 100%;
   height: auto;
 }
+/* --- Responsive Enhancements --- */
+
+/* Responsive Tables */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive table {
+  min-width: 600px; /* Force scroll on small screens */
+}
+
+/* Modals */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 1rem;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .header h1 {
+    font-size: 2rem;
+  }
+  
+  .glass-card {
+    padding: 1rem;
+  }
+  
+  .grid-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content {
+    width: 95% !important;
+    max-height: 95vh !important;
+    padding: 1.5rem !important;
+    overflow-y: auto;
+  }
+
+  /* Forms */
+  form[style*='display: flex'] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .btn {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+}
+
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .pos-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+.nav-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+

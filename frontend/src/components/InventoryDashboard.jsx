@@ -127,7 +127,8 @@ const InventoryDashboard = () => {
       </div>
 
       <div className="glass-card" style={{ padding: '0' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="table-responsive">
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
               <th style={{ padding: '1rem' }}>SKU</th>
@@ -165,7 +166,8 @@ const InventoryDashboard = () => {
               );
             })}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );

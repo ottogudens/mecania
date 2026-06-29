@@ -380,6 +380,7 @@ const WorkOrderList = () => {
               {(!selectedOrder.items || selectedOrder.items.length === 0) ? (
                 <p style={{ color: 'var(--text-muted)' }}>No hay repuestos agregados a esta orden aún.</p>
               ) : (
+                <div className="table-responsive">
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '1rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
@@ -400,6 +401,7 @@ const WorkOrderList = () => {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 

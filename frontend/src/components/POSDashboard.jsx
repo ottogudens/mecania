@@ -363,7 +363,7 @@ const CounterSale = () => {
   })).filter(c => c.items.length > 0);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.5rem', alignItems: 'start' }}>
+    <div className="pos-grid">
       {/* catálogo */}
       <div>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -724,9 +724,9 @@ const POSDashboard = () => {
 
       {/* tabs */}
       <div style={{
-        display: 'flex', gap: '0.5rem', marginBottom: '2rem',
+        display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap',
         background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: 12,
-        border: '1px solid var(--border-color)', width: 'fit-content'
+        border: '1px solid var(--border-color)'
       }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
