@@ -8,6 +8,7 @@ from .views import (
     POSChargeView,
     POSCancelInvoiceView,
     POSCounterSaleView,
+    InvoicePDFView,
 )
 
 router = DefaultRouter()
@@ -19,5 +20,6 @@ urlpatterns = [
     path('pos/charge/', POSChargeView.as_view(), name='pos-charge'),
     path('pos/cancel-invoice/', POSCancelInvoiceView.as_view(), name='pos-cancel-invoice'),
     path('pos/counter-sale/', POSCounterSaleView.as_view(), name='pos-counter-sale'),
+    path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
     path('', include(router.urls)),
 ]

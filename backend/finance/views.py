@@ -178,3 +178,186 @@ class POSCounterSaleView(APIView):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+
+
+class InvoicePDFView(APIView):
+    """
+    Genera un PDF de boleta/factura para cualquier Invoice (OT o mostrador).
+    GET /api/finance/invoices/<id>/pdf/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk=None):
+        from decimal import Decimal
+        import io
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+
+        try:
+            invoice = Invoice.objects.get(pk=pk)
+        except Invoice.DoesNotExist:
+            from rest_framework.response import Response
+            from rest_framework import status as drf_status
+            return Response({'error': 'Factura no encontrada.'}, status=drf_status.HTTP_404_NOT_FOUND)
+
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        W, H = letter  # 612 x 792 pts
+
+        # ── encabezado ──────────────────────────────────────────────────────
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.rect(0, H - 90, W, 90, fill=1, stroke=0)
+
+        p.setFillColorRGB(0.4, 0.98, 0.95)
+        p.setFont("Helvetica-Bold", 26)
+        p.drawString(45, H - 48, "MecanIA")
+
+        p.setFillColorRGB(0.77, 0.77, 0.78)
+        p.setFont("Helvetica", 10)
+        p.drawString(45, H - 66, "Taller Automotriz Inteligente")
+
+        # número de documento
+        doc_label = f"BOLETA #{invoice.id}"
+        p.setFillColorRGB(1, 1, 1)
+        p.setFont("Helvetica-Bold", 13)
+        p.drawRightString(W - 45, H - 42, doc_label)
+        p.setFont("Helvetica", 9)
+        p.setFillColorRGB(0.77, 0.77, 0.78)
+        p.drawRightString(W - 45, H - 58, invoice.created_at.strftime("%d/%m/%Y %H:%M"))
+
+        # ── origen ───────────────────────────────────────────────────────────
+        y = H - 115
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.rect(40, y - 8, W - 80, 26, fill=1, stroke=0)
+        p.setFillColorRGB(0.4, 0.98, 0.95)
+        p.setFont("Helvetica-Bold", 10)
+        origen = (
+            f"Orden de Trabajo #{invoice.work_order_id}"
+            if invoice.work_order_id
+            else "Venta de Mostrador"
+        )
+        p.drawString(50, y + 4, origen.upper())
+        if invoice.work_order_id:
+            plate = invoice.work_order.vehicle.license_plate if invoice.work_order else "–"
+            p.setFillColorRGB(0.77, 0.77, 0.78)
+            p.setFont("Helvetica", 9)
+            p.drawRightString(W - 50, y + 4, f"Patente: {plate}")
+
+        # ── cliente ──────────────────────────────────────────────────────────
+        y -= 40
+        p.setFillColorRGB(0.2, 0.2, 0.25)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(50, y, "CLIENTE")
+        p.setFillColorRGB(0.93, 0.93, 0.94)
+        p.setFont("Helvetica", 10)
+        client_name = "–"
+        if invoice.client_id:
+            c = invoice.client
+            client_name = f"{c.first_name} {c.last_name}"
+        elif invoice.work_order_id and invoice.work_order.vehicle.client_id:
+            c = invoice.work_order.vehicle.client
+            client_name = f"{c.first_name} {c.last_name}"
+        p.drawString(50, y - 14, client_name)
+
+        # ── separador ────────────────────────────────────────────────────────
+        y -= 40
+        p.setStrokeColorRGB(0.27, 0.64, 0.62)
+        p.setLineWidth(0.5)
+        p.line(40, y, W - 40, y)
+
+        # ── cabecera de tabla ─────────────────────────────────────────────────
+        y -= 18
+        p.setFillColorRGB(0.13, 0.16, 0.20)
+        p.rect(40, y - 6, W - 80, 20, fill=1, stroke=0)
+        p.setFillColorRGB(0.4, 0.98, 0.95)
+        p.setFont("Helvetica-Bold", 9)
+        cols = [(50, "DESCRIPCIÓN"), (330, "CANT."), (390, "P. UNITARIO"), (490, "TOTAL")]
+        for cx, lbl in cols:
+            p.drawString(cx, y + 2, lbl)
+
+        # ── ítems ─────────────────────────────────────────────────────────────
+        items = list(invoice.get_line_items())
+        y -= 22
+        p.setFont("Helvetica", 9)
+        row_fill = [(0.97, 0.97, 0.98), (1, 1, 1)]
+        for idx, item in enumerate(items):
+            row_h = 18
+            p.setFillColorRGB(*row_fill[idx % 2])
+            p.rect(40, y - 4, W - 80, row_h, fill=1, stroke=0)
+            p.setFillColorRGB(0.1, 0.1, 0.12)
+            desc = getattr(item, 'description', '') or ''
+            if not desc:
+                # WorkOrderItem: usa product o description
+                desc = getattr(item, 'description', str(item))
+            p.drawString(50, y + 2, str(desc)[:48])
+            qty = item.quantity if hasattr(item, 'quantity') else 1
+            up = item.unit_price
+            tot = item.total_price
+            p.drawString(335, y + 2, str(qty))
+            p.drawRightString(475, y + 2, f"${int(up):,}")
+            p.setFillColorRGB(0.07, 0.49, 0.47)
+            p.setFont("Helvetica-Bold", 9)
+            p.drawRightString(W - 48, y + 2, f"${int(tot):,}")
+            p.setFont("Helvetica", 9)
+            y -= row_h
+
+        # ── totales ───────────────────────────────────────────────────────────
+        y -= 14
+        p.setStrokeColorRGB(0.27, 0.64, 0.62)
+        p.line(40, y, W - 40, y)
+
+        totals = [
+            ("Subtotal", invoice.subtotal),
+            ("IVA (19%)", invoice.tax_amount),
+        ]
+        p.setFont("Helvetica", 10)
+        for lbl, val in totals:
+            y -= 18
+            p.setFillColorRGB(0.4, 0.4, 0.45)
+            p.drawRightString(W - 120, y, lbl)
+            p.setFillColorRGB(0.1, 0.1, 0.12)
+            p.drawRightString(W - 48, y, f"${int(val):,}")
+
+        y -= 6
+        p.setStrokeColorRGB(0.07, 0.07, 0.1)
+        p.setLineWidth(1)
+        p.line(W - 200, y, W - 40, y)
+        y -= 20
+        p.setFont("Helvetica-Bold", 13)
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.drawRightString(W - 120, y, "TOTAL")
+        p.setFillColorRGB(0.07, 0.49, 0.47)
+        p.drawRightString(W - 48, y, f"${int(invoice.total_amount):,}")
+
+        # ── estado de pago ────────────────────────────────────────────────────
+        if invoice.status == 'PAID':
+            y -= 28
+            p.setFillColorRGB(0.18, 0.78, 0.44)
+            p.roundRect(W - 160, y - 4, 118, 22, 6, fill=1, stroke=0)
+            p.setFillColorRGB(1, 1, 1)
+            p.setFont("Helvetica-Bold", 11)
+            p.drawCentredString(W - 101, y + 3, "✓ PAGADO")
+        elif invoice.status == 'PARTIALLY_PAID':
+            y -= 28
+            p.setFillColorRGB(0.94, 0.77, 0.06)
+            p.roundRect(W - 175, y - 4, 133, 22, 6, fill=1, stroke=0)
+            p.setFillColorRGB(0.1, 0.1, 0.1)
+            p.setFont("Helvetica-Bold", 10)
+            p.drawCentredString(W - 108, y + 3, f"ABONO: ${int(invoice.amount_paid):,}")
+
+        # ── pie ───────────────────────────────────────────────────────────────
+        p.setFillColorRGB(0.07, 0.07, 0.1)
+        p.rect(0, 0, W, 36, fill=1, stroke=0)
+        p.setFillColorRGB(0.4, 0.4, 0.45)
+        p.setFont("Helvetica", 8)
+        p.drawCentredString(W / 2, 14, "MecanIA — Taller Automotriz Inteligente | Documento generado electrónicamente")
+
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+
+        from django.http import HttpResponse
+        resp = HttpResponse(buffer, content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="Boleta_{invoice.id}.pdf"'
+        return resp

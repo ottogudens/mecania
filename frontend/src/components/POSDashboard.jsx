@@ -240,8 +240,19 @@ const ChargeWorkOrder = () => {
           )}
 
           {(isPaid) && (
-            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--status-green)', fontWeight: 600 }}>
-              ✅ Esta factura ya está completamente pagada.
+            <div style={{ textAlign: 'center', padding: '1rem' }}>
+              <p style={{ color: 'var(--status-green)', fontWeight: 600, marginBottom: '0.75rem' }}>
+                ✅ Esta factura ya está completamente pagada.
+              </p>
+              <button className="btn" onClick={async () => {
+                try {
+                  const res = await axios.get(`/api/finance/invoices/${invoice.id}/pdf/`, {
+                    headers: authHeader(), responseType: 'blob'
+                  });
+                  const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                  window.open(url, '_blank');
+                } catch { alert('Error al generar PDF.'); }
+              }}>🖨️ Ver / Imprimir Boleta</button>
             </div>
           )}
           {(isCancelled) && (

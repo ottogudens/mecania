@@ -18,6 +18,12 @@ const WorkOrderList = () => {
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
+  // Catálogo de servicios y productos para agregar a OT
+  const [catalogServices, setCatalogServices] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [itemSource, setItemSource] = useState('manual'); // 'manual' | 'service' | 'product'
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState(null);
+
   const [newOrder, setNewOrder] = useState({
     vehicle_id: '',
     mileage: '',
@@ -117,16 +123,26 @@ const WorkOrderList = () => {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.post('/api/operations/work-order-items/', {
-        ...newItem,
-        work_order: selectedOrder.id
-      }, {
-        headers: { Authorization: `Token ${token}` }
-      });
+      let payload = { ...newItem, work_order: selectedOrder.id };
+
+      // Si viene del catálogo, agregar referencia al servicio o producto
+      if (itemSource === 'service' && selectedCatalogItem) {
+        payload.service = selectedCatalogItem.id;
+        payload.description = selectedCatalogItem.name;
+        payload.unit_price = selectedCatalogItem.price;
+      } else if (itemSource === 'product' && selectedCatalogItem) {
+        payload.product = selectedCatalogItem.id;
+        payload.description = selectedCatalogItem.name;
+        payload.unit_price = selectedCatalogItem.price;
+      }
+
+      await axios.post('/api/operations/work-order-items/', payload, {
+        headers: { Authorization: `Token ${token}` }\n      });
       
       setNewItem({ description: '', quantity: 1, unit_price: 0 });
-      fetchData(); // Reload orders to update the items inside selectedOrder
-      // Update selected order with new data
+      setSelectedCatalogItem(null);
+      setItemSource('manual');
+      fetchData();
       const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
         headers: { Authorization: `Token ${token}` }
       });
@@ -141,6 +157,16 @@ const WorkOrderList = () => {
   const openDetails = (order) => {
     setSelectedOrder(order);
     setShowDetailsModal(true);
+    // Cargar catálogo al abrir el modal
+    const token = localStorage.getItem('token');
+    const h = { headers: { Authorization: `Token ${token}` } };
+    Promise.all([
+      axios.get('/api/inventory/services/?is_active=true', h),
+      axios.get('/api/inventory/products/', h),
+    ]).then(([s, p]) => {
+      setCatalogServices(s.data.results || s.data);
+      setCatalogProducts(p.data.results || p.data);
+    }).catch(() => {});
   };
 
   const openAiModal = (order) => {
@@ -335,17 +361,81 @@ const WorkOrderList = () => {
             </div>
 
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
-              <h4>Añadir Repuesto/Servicio</h4>
+              <h4>Añadir Repuesto / Servicio</h4>
+
+              {/* selector de fuente */}
+              <div style={{ display: 'flex', gap: '0.5rem', margin: '0.75rem 0', background: 'rgba(0,0,0,0.3)', padding: '0.3rem', borderRadius: 8, width: 'fit-content' }}>
+                {[['manual','✏️ Manual'], ['service','🔧 Del catálogo'], ['product','📦 Del inventario']].map(([val, lbl]) => (
+                  <button key={val} type="button"
+                    onClick={() => { setItemSource(val); setSelectedCatalogItem(null); setNewItem({ description: '', quantity: 1, unit_price: 0 }); }}
+                    style={{
+                      padding: '0.4rem 0.9rem', borderRadius: 6, border: 'none', cursor: 'pointer',
+                      background: itemSource === val ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                      color: itemSource === val ? '#000' : 'var(--text-muted)',
+                      fontWeight: itemSource === val ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.82rem',
+                    }}>{lbl}</button>
+                ))}
+              </div>
+
               <form onSubmit={handleAddItem} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 40%' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Descripción</label>
-                  <input type="text" className="input-field" style={{ width: '100%' }} required
-                    value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})}
-                  />
-                </div>
+                {/* selector de catálogo */}
+                {itemSource === 'service' && (
+                  <div style={{ flex: '1 1 40%' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Servicio del catálogo</label>
+                    <select
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '0.7rem', color: '#fff', fontFamily: 'Outfit, sans-serif' }}
+                      value={selectedCatalogItem?.id || ''}
+                      onChange={e => {
+                        const s = catalogServices.find(x => String(x.id) === e.target.value);
+                        setSelectedCatalogItem(s || null);
+                        if (s) setNewItem(n => ({ ...n, description: s.name, unit_price: s.price }));
+                      }}
+                      required
+                    >
+                      <option value="">Seleccionar servicio...</option>
+                      {catalogServices.map(s => (
+                        <option key={s.id} value={s.id}>{s.name} — ${Number(s.price).toLocaleString('es-CL')}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {itemSource === 'product' && (
+                  <div style={{ flex: '1 1 40%' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Producto del inventario</label>
+                    <select
+                      style={{ width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '0.7rem', color: '#fff', fontFamily: 'Outfit, sans-serif' }}
+                      value={selectedCatalogItem?.id || ''}
+                      onChange={e => {
+                        const p = catalogProducts.find(x => String(x.id) === e.target.value);
+                        setSelectedCatalogItem(p || null);
+                        if (p) setNewItem(n => ({ ...n, description: p.name, unit_price: p.price }));
+                      }}
+                      required
+                    >
+                      <option value="">Seleccionar producto...</option>
+                      {catalogProducts.map(p => (
+                        <option key={p.id} value={p.id} disabled={p.stock_quantity <= 0}>
+                          {p.name} ({p.sku}) — Stock: {p.stock_quantity} — ${Number(p.price).toLocaleString('es-CL')}
+                          {p.stock_quantity <= 0 ? ' ⚠️ Sin stock' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {itemSource === 'manual' && (
+                  <div style={{ flex: '1 1 40%' }}>
+                    <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Descripción</label>
+                    <input type="text" className="input-field" style={{ width: '100%' }} required
+                      value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})}
+                    />
+                  </div>
+                )}
+
                 <div style={{ flex: '1 1 15%' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Cantidad</label>
-                  <input type="number" step="0.01" className="input-field" style={{ width: '100%' }} required
+                  <input type="number" step="0.01" min="0.01" className="input-field" style={{ width: '100%' }} required
                     value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})}
                   />
                 </div>

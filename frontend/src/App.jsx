@@ -11,6 +11,7 @@ import InventoryDashboard from './components/InventoryDashboard';
 import FinanceDashboard from './components/FinanceDashboard';
 import ClientList from './components/ClientList';
 import POSDashboard from './components/POSDashboard';
+import SaleHistory from './components/SaleHistory';
 
 const AdminLayout = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('orders');
@@ -57,6 +58,12 @@ const AdminLayout = ({ onLogout }) => {
             🏪 Punto de Venta
           </button>
           <button 
+            className={`btn ${activeTab === 'history' ? '' : 'btn-outline'}`}
+            onClick={() => setActiveTab('history')}
+          >
+            📊 Caja / Historial
+          </button>
+          <button 
             className={`btn ${activeTab === 'settings' ? '' : 'btn-outline'}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -78,6 +85,7 @@ const AdminLayout = ({ onLogout }) => {
         {activeTab === 'clients' && <ClientList />}
         {activeTab === 'finance' && <FinanceDashboard />}
         {activeTab === 'pos' && <POSDashboard />}
+        {activeTab === 'history' && <SaleHistory />}
         {activeTab === 'settings' && <Settings />}
       </main>
     </div>
