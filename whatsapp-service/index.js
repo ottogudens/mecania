@@ -63,10 +63,10 @@ app.get('/api/status', (req, res) => {
 
 app.post('/api/send-message', async (req, res) => {
     try {
-        const { number, text } = req.body;
+        const { number, text, documentUrl, fileName } = req.body;
         
-        if (!number || !text) {
-            return res.status(400).json({ error: 'Number and text are required' });
+        if (!number || (!text && !documentUrl)) {
+            return res.status(400).json({ error: 'Number and either text or documentUrl are required' });
         }
         
         if (!sock) {
@@ -74,10 +74,18 @@ app.post('/api/send-message', async (req, res) => {
         }
 
         // Format number to JID
-        // In Baileys, standard phone numbers need @s.whatsapp.net
         const jid = `${number}@s.whatsapp.net`;
         
-        await sock.sendMessage(jid, { text: text });
+        if (documentUrl) {
+            await sock.sendMessage(jid, { 
+                document: { url: documentUrl }, 
+                mimetype: 'application/pdf', 
+                fileName: fileName || 'Documento.pdf',
+                caption: text || ''
+            });
+        } else {
+            await sock.sendMessage(jid, { text: text });
+        }
         
         return res.status(200).json({ success: true, message: 'Message sent successfully' });
     } catch (error) {

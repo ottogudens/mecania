@@ -5,14 +5,30 @@ import { QRCodeSVG } from 'qrcode.react';
 const Settings = () => {
   const [waStatus, setWaStatus] = useState('loading');
   const [qrCode, setQrCode] = useState(null);
+  
+  const [workshopSettings, setWorkshopSettings] = useState({
+    name: '', phone: '', address: '', email: '', website: '', logo_url: ''
+  });
+  const [logoFile, setLogoFile] = useState(null);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     fetchWhatsAppStatus();
+    fetchWorkshopSettings();
     
     // Poll every 5 seconds for status changes
     const interval = setInterval(fetchWhatsAppStatus, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchWorkshopSettings = async () => {
+    try {
+      const res = await axios.get('/api/operations/settings/');
+      setWorkshopSettings(res.data);
+    } catch (err) {
+      console.error("Error fetching workshop settings:", err);
+    }
+  };
 
   const fetchWhatsAppStatus = async () => {
     try {
@@ -26,6 +42,34 @@ const Settings = () => {
     }
   };
 
+  const handleSettingsSubmit = async (e) => {
+    e.preventDefault();
+    setSavingSettings(true);
+    const formData = new FormData();
+    formData.append('name', workshopSettings.name);
+    formData.append('phone', workshopSettings.phone);
+    formData.append('address', workshopSettings.address);
+    formData.append('email', workshopSettings.email);
+    formData.append('website', workshopSettings.website);
+    if (logoFile) {
+      formData.append('logo', logoFile);
+    }
+
+    try {
+      const res = await axios.put('/api/operations/settings/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setWorkshopSettings(res.data);
+      setLogoFile(null);
+      alert('Configuración guardada exitosamente.');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar configuración.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   return (
     <div className="settings-page" style={{ animation: 'fadeIn 0.5s ease-out' }}>
       <div className="header" style={{ marginBottom: '2rem' }}>
@@ -33,8 +77,48 @@ const Settings = () => {
         <p style={{ color: 'var(--text-muted)' }}>Gestiona integraciones y servicios externos.</p>
       </div>
 
-      <div className="grid-container">
+      <div className="grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
         
+        {/* Workshop Profile Config */}
+        <div className="glass-card">
+          <h3 style={{ marginBottom: '1rem' }}>Perfil del Taller (Logos y PDF)</h3>
+          <form onSubmit={handleSettingsSubmit} className="form-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Nombre del Taller</label>
+              <input type="text" value={workshopSettings.name} onChange={e => setWorkshopSettings({...workshopSettings, name: e.target.value})} required />
+            </div>
+            
+            <div className="form-group">
+              <label>Logo del Taller (Para PDFs)</label>
+              {workshopSettings.logo_url && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <img src={workshopSettings.logo_url} alt="Logo" style={{ maxHeight: '60px' }} />
+                </div>
+              )}
+              <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} />
+            </div>
+
+            <div className="form-group">
+              <label>Teléfono</label>
+              <input type="text" value={workshopSettings.phone} onChange={e => setWorkshopSettings({...workshopSettings, phone: e.target.value})} />
+            </div>
+
+            <div className="form-group">
+              <label>Dirección</label>
+              <input type="text" value={workshopSettings.address} onChange={e => setWorkshopSettings({...workshopSettings, address: e.target.value})} />
+            </div>
+
+            <div className="form-group">
+              <label>Email Correo</label>
+              <input type="email" value={workshopSettings.email} onChange={e => setWorkshopSettings({...workshopSettings, email: e.target.value})} />
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={savingSettings}>
+              {savingSettings ? 'Guardando...' : 'Guardar Perfil'}
+            </button>
+          </form>
+        </div>
+
         {/* WhatsApp Bot Config */}
         <div className="glass-card" style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>

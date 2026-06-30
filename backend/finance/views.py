@@ -361,3 +361,178 @@ class InvoicePDFView(APIView):
         resp = HttpResponse(buffer, content_type='application/pdf')
         resp['Content-Disposition'] = f'inline; filename="Boleta_{invoice.id}.pdf"'
         return resp
+
+
+from rest_framework.decorators import action
+from rest_framework import viewsets
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+from .models import Estimate, EstimateLineItem
+from .serializers import EstimateSerializer, EstimateLineItemSerializer
+from operations.models import WorkshopSettings
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+import io
+import requests
+
+class EstimateViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Estimate.objects.all().order_by('-created_at')
+    serializer_class = EstimateSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        estimate = Estimate.objects.create(
+            client_id=data['client_id'],
+            vehicle_id=data.get('vehicle_id'),
+            valid_until=data.get('valid_until')
+        )
+        
+        items_data = data.get('items', [])
+        for item_data in items_data:
+            EstimateLineItem.objects.create(
+                estimate=estimate,
+                product_id=item_data.get('product_id'),
+                service_id=item_data.get('service_id'),
+                description=item_data.get('description', ''),
+                quantity=item_data.get('quantity', 1),
+                unit_price=item_data.get('unit_price', 0)
+            )
+        
+        estimate.recalculate_totals()
+        return Response(EstimateSerializer(estimate).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    @transaction.atomic
+    def convert_to_work_order(self, request, pk=None):
+        estimate = self.get_object()
+        if estimate.status in ['ACCEPTED', 'REJECTED']:
+            return Response({'error': 'Estimate already processed'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not estimate.vehicle_id:
+            return Response({'error': 'Cannot convert estimate without a vehicle to a work order'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create WorkOrder
+        from operations.models import WorkOrder, WorkOrderItem
+        work_order = WorkOrder.objects.create(
+            vehicle=estimate.vehicle,
+            mileage=0,
+            fuel_level=0,
+            status='PENDING'
+        )
+
+        for item in estimate.items.all():
+            WorkOrderItem.objects.create(
+                work_order=work_order,
+                product=item.product,
+                service=item.service,
+                description=item.description,
+                quantity=item.quantity,
+                unit_price=item.unit_price,
+                is_labor=bool(item.service_id)
+            )
+        
+        estimate.status = 'ACCEPTED'
+        estimate.save(update_fields=['status'])
+        
+        return Response({'success': True, 'work_order_id': work_order.id})
+
+    @action(detail=True, methods=['post'])
+    def share_whatsapp(self, request, pk=None):
+        estimate = self.get_object()
+        if not estimate.client.phone:
+            return Response({'error': 'Client has no phone number'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        text = f"¡Hola {estimate.client.first_name}! Te compartimos el presupuesto PRE-{estimate.id} por un total de ${estimate.total_amount}. Puedes revisarlo en el documento adjunto."
+        
+        # Build absolute URL for the PDF
+        document_url = request.build_absolute_uri(f'/api/finance/estimates/{estimate.id}/pdf/')
+        
+        import os
+        base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+        whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+        
+        try:
+            resp = requests.post(whatsapp_service_url, json={
+                "number": estimate.client.phone,
+                "text": text,
+                "documentUrl": document_url,
+                "fileName": f"Presupuesto_{estimate.id}.pdf"
+            }, timeout=10)
+            if resp.status_code == 200:
+                estimate.status = 'SENT'
+                estimate.save(update_fields=['status'])
+                return Response({'success': True})
+            else:
+                return Response({'error': 'Failed to send via WhatsApp'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        estimate = self.get_object()
+        
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        
+        # Draw header with logo
+        settings = WorkshopSettings.load()
+        if settings.logo:
+            try:
+                p.drawImage(settings.logo.path, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
+            except Exception:
+                pass
+                
+        p.setFont("Helvetica-Bold", 24)
+        p.drawString(160, 750, settings.name)
+        p.setFont("Helvetica", 12)
+        p.drawString(160, 730, f"Teléfono: {settings.phone} | Email: {settings.email}")
+        p.drawString(160, 715, settings.address)
+        
+        p.setFont("Helvetica-Bold", 16)
+        p.drawString(50, 660, f"Presupuesto #{estimate.id}")
+        
+        p.setFont("Helvetica", 12)
+        p.drawString(50, 630, f"Cliente: {estimate.client.first_name} {estimate.client.last_name}")
+        if estimate.vehicle:
+            p.drawString(50, 610, f"Vehículo: {estimate.vehicle.make} {estimate.vehicle.model} - Patente: {estimate.vehicle.license_plate}")
+        p.drawString(400, 630, f"Fecha: {estimate.created_at.strftime('%Y-%m-%d')}")
+        
+        y = 570
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(50, y, "Descripción")
+        p.drawString(300, y, "Cantidad")
+        p.drawString(400, y, "Precio Unit.")
+        p.drawString(500, y, "Total")
+        p.line(50, y-5, 550, y-5)
+        
+        y -= 25
+        p.setFont("Helvetica", 12)
+        for item in estimate.items.all():
+            p.drawString(50, y, str(item.description)[:35])
+            p.drawString(300, y, str(item.quantity))
+            p.drawString(400, y, f"${item.unit_price}")
+            p.drawString(500, y, f"${item.total_price}")
+            y -= 20
+        
+        p.line(50, y-5, 550, y-5)
+        y -= 25
+        p.setFont("Helvetica-Bold", 14)
+        p.drawString(380, y, "Subtotal:")
+        p.drawString(500, y, f"${estimate.subtotal}")
+        y -= 20
+        p.drawString(380, y, "IVA (19%):")
+        p.drawString(500, y, f"${estimate.tax_amount}")
+        y -= 20
+        p.drawString(380, y, "Total:")
+        p.drawString(500, y, f"${estimate.total_amount}")
+        
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        
+        from django.http import HttpResponse
+        resp = HttpResponse(buffer, content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="Presupuesto_{estimate.id}.pdf"'
+        return resp

@@ -123,6 +123,58 @@ class InvoiceLineItem(models.Model):
         return f"{self.quantity}x {self.description} (FACT-{self.invoice_id})"
 
 
+class Estimate(models.Model):
+    client = models.ForeignKey('operations.Client', on_delete=models.CASCADE, related_name='estimates')
+    vehicle = models.ForeignKey('operations.Vehicle', on_delete=models.SET_NULL, null=True, blank=True)
+    STATUS_CHOICES = [
+        ('DRAFT', 'Borrador'),
+        ('SENT', 'Enviado'),
+        ('ACCEPTED', 'Aceptado'),
+        ('REJECTED', 'Rechazado'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    valid_until = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def recalculate_totals(self, tax_rate=Decimal('0.19')):
+        items = self.items.all()
+        subtotal = sum((item.total_price for item in items), Decimal('0'))
+        self.subtotal = subtotal
+        self.tax_amount = subtotal * tax_rate
+        self.total_amount = self.subtotal + self.tax_amount
+        self.save(update_fields=['subtotal', 'tax_amount', 'total_amount', 'updated_at'])
+
+    def __str__(self):
+        return f"PRE-{self.id} - {self.client}"
+
+class EstimateLineItem(models.Model):
+    estimate = models.ForeignKey(Estimate, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('inventory.Product', on_delete=models.SET_NULL, null=True, blank=True)
+    service = models.ForeignKey('inventory.Service', on_delete=models.SET_NULL, null=True, blank=True)
+    description = models.CharField(max_length=255, blank=True)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    @property
+    def total_price(self):
+        return self.quantity * self.unit_price
+
+    def save(self, *args, **kwargs):
+        if not self.description:
+            if self.product_id:
+                self.description = self.product.name
+            elif self.service_id:
+                self.description = self.service.name
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.quantity}x {self.description} (PRE-{self.estimate.id})"
+
+
 class Payment(models.Model):
     METHOD_CHOICES = [
         ('CASH', 'Efectivo'),

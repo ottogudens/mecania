@@ -1,5 +1,21 @@
 from rest_framework import serializers
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings
+from django.contrib.auth.models import User
+
+class WorkshopSettingsSerializer(serializers.ModelSerializer):
+    logo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkshopSettings
+        fields = ['name', 'logo', 'logo_url', 'phone', 'address', 'email', 'website']
+    
+    def get_logo_url(self, obj):
+        if obj.logo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.logo.url)
+            return obj.logo.url
+        return None
 
 class ClientSerializer(serializers.ModelSerializer):
     class Meta:

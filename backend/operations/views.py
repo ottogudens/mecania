@@ -14,8 +14,8 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection
-from .serializers import ClientSerializer, VehicleSerializer, WorkOrderSerializer, WorkOrderItemSerializer, VisualInspectionSerializer
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings
+from .serializers import ClientSerializer, VehicleSerializer, WorkOrderSerializer, WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
 class ClientViewSet(viewsets.ModelViewSet):
@@ -121,10 +121,19 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         p = canvas.Canvas(buffer, pagesize=letter)
         
         # Header
+        from operations.models import WorkshopSettings
+        settings = WorkshopSettings.load()
+        if settings.logo:
+            try:
+                p.drawImage(settings.logo.path, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
+            except:
+                pass
+        
         p.setFont("Helvetica-Bold", 24)
-        p.drawString(50, 750, "MecanIA")
+        p.drawString(160, 750, settings.name)
         p.setFont("Helvetica", 12)
-        p.drawString(50, 730, "Taller Automotriz Inteligente")
+        p.drawString(160, 730, f"Teléfono: {settings.phone} | Email: {settings.email}")
+        p.drawString(160, 715, settings.address)
         
         # Title
         p.setFont("Helvetica-Bold", 16)
@@ -206,6 +215,26 @@ class CustomAuthToken(APIView):
             })
         else:
             return Response({'error': 'Credenciales inválidas'}, status=status.HTTP_401_UNAUTHORIZED)
+
+class WorkshopSettingsView(APIView):
+    # Depending on requirements, we might want IsAuthenticated or public access
+    # Let's allow authenticated to read/write, or public to read
+    # We will just allow any for now for read, and auth for write, or just auth for both
+    # The requirement is just to use it for PDFs and show it in settings.
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        settings = WorkshopSettings.load()
+        serializer = WorkshopSettingsSerializer(settings, context={'request': request})
+        return Response(serializer.data)
+
+    def put(self, request):
+        settings = WorkshopSettings.load()
+        serializer = WorkshopSettingsSerializer(settings, data=request.data, context={'request': request}, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class ClientAuthToken(APIView):
     """Client portal login — public endpoint, identifies client by phone."""
