@@ -122,8 +122,16 @@ export default function EstimatesDashboard() {
       });
   };
 
-  const downloadPDF = (id) => {
-    window.open(`/api/finance/estimates/${id}/pdf/`, '_blank');
+  const downloadPDF = async (id) => {
+    try {
+      showToast("Generando PDF...", "info");
+      const res = await axios.get(`/api/finance/estimates/${id}/pdf/`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error("PDF Error:", err);
+      showToast("Error al generar PDF", "error");
+    }
   };
 
   const sendWhatsApp = (id) => {

@@ -127,7 +127,7 @@ const FinanceDashboard = () => {
               <button 
                 className="btn btn-outline" 
                 style={{ flex: 1, padding: '0.5rem' }}
-                onClick={() => window.open(`/api/finance/invoices/${invoice.id}/pdf/`, '_blank')}
+                onClick={() => downloadPDF(invoice.id)}
               >
                 Ver PDF
               </button>
