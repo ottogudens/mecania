@@ -40,7 +40,7 @@ class StockTransactionSerializer(serializers.ModelSerializer):
 
 class ServiceCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = ServiceCategory.objects.all()
+    queryset = ServiceCategory.objects.all().order_by('name')
     serializer_class = ServiceCategorySerializer
 
 
@@ -63,7 +63,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = Product.objects.all()
+    queryset = Product.objects.all().order_by('-id')
     serializer_class = ProductSerializer
 
     @action(detail=False, methods=['get'])

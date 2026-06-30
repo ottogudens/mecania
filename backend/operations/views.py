@@ -20,17 +20,17 @@ from .services import transition_work_order_status, cancel_work_order, WorkOrder
 
 class ClientViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = Client.objects.all()
+    queryset = Client.objects.all().order_by('-id')
     serializer_class = ClientSerializer
 
 class VehicleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = Vehicle.objects.all()
+    queryset = Vehicle.objects.all().order_by('-id')
     serializer_class = VehicleSerializer
 
 class WorkOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = WorkOrder.objects.all()
+    queryset = WorkOrder.objects.all().order_by('-created_at')
     serializer_class = WorkOrderSerializer
 
     def update(self, request, *args, **kwargs):
@@ -176,12 +176,12 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
 class WorkOrderItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = WorkOrderItem.objects.all()
+    queryset = WorkOrderItem.objects.all().order_by('id')
     serializer_class = WorkOrderItemSerializer
 
 class VisualInspectionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
-    queryset = VisualInspection.objects.all()
+    queryset = VisualInspection.objects.all().order_by('-created_at')
     serializer_class = VisualInspectionSerializer
 
 class CustomAuthToken(APIView):
