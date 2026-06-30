@@ -435,6 +435,13 @@ const WorkOrderList = () => {
               )}
             </div>
 
+            {['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(selectedOrder.status) ? (
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                <p style={{ color: 'var(--status-yellow)', fontSize: '0.9rem' }}>
+                  ⚠️ Esta Orden de Trabajo se encuentra cerrada o finalizada y no admite más modificaciones.
+                </p>
+              </div>
+            ) : (
             <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
               <h4>Añadir Repuesto / Servicio</h4>
 
@@ -538,6 +545,7 @@ const WorkOrderList = () => {
                 </div>
               </form>
             </div>
+            )}
             
           </div>
         </div>
