@@ -36,7 +36,7 @@ const ClientList = () => {
       const response = await axios.get('/api/operations/clients/', {
         headers: { Authorization: `Token ${token}` }
       });
-      setClients(response.data);
+      setClients(response.data.results || response.data);
       setLoading(false);
     } catch (err) {
       console.error(err);

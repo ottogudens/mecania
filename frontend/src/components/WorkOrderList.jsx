@@ -44,8 +44,8 @@ const WorkOrderList = () => {
 
     // WebSocket connection for real-time updates
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // If running via Vite proxy (port 5173), we need to connect directly to Django (port 8000) or Railway backend
-    const backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+    let backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+    backendHost = backendHost.replace(/^https?:\/\//, '');
     const wsUrl = `${wsProtocol}//${backendHost}/ws/work_orders/`;
     
     const socket = new WebSocket(wsUrl);
@@ -79,8 +79,8 @@ const WorkOrderList = () => {
         axios.get('/api/operations/work-orders/', { headers: { Authorization: `Token ${token}` } }),
         axios.get('/api/operations/vehicles/', { headers: { Authorization: `Token ${token}` } })
       ]);
-      setOrders(ordersRes.data);
-      setVehicles(vehiclesRes.data);
+      setOrders(ordersRes.data.results || ordersRes.data);
+      setVehicles(vehiclesRes.data.results || vehiclesRes.data);
       setLoading(false);
     } catch (err) {
       console.error(err);

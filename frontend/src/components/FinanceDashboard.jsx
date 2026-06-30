@@ -18,7 +18,7 @@ const FinanceDashboard = () => {
       const response = await axios.get('/api/finance/invoices/', {
         headers: { Authorization: `Token ${token}` }
       });
-      setInvoices(response.data);
+      setInvoices(response.data.results || response.data);
       setLoading(false);
     } catch (err) {
       setError("Error al cargar finanzas.");

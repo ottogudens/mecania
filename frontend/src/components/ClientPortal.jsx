@@ -46,7 +46,8 @@ const ClientPortal = () => {
   useEffect(() => {
     if (step === 'AUTHENTICATED') {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+      let backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+      backendHost = backendHost.replace(/^https?:\/\//, '');
       const wsUrl = `${wsProtocol}//${backendHost}/ws/work_orders/`;
       
       const socket = new WebSocket(wsUrl);

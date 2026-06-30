@@ -22,7 +22,7 @@ const InventoryDashboard = () => {
       const response = await axios.get('/api/inventory/products/', {
         headers: { Authorization: `Token ${token}` }
       });
-      setProducts(response.data);
+      setProducts(response.data.results || response.data);
       setLoading(false);
     } catch (err) {
       setError("Error al cargar inventario.");
