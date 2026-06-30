@@ -10,6 +10,8 @@ class Product(models.Model):
     barcode = models.CharField(max_length=100, blank=True, null=True, unique=True)
     supplier = models.CharField(max_length=200, blank=True)
     low_stock_threshold = models.IntegerField(default=5, validators=[MinValueValidator(0)])
+    image = models.ImageField(upload_to='products/', null=True, blank=True, verbose_name="Imagen del producto")
+    sales_count = models.IntegerField(default=0, help_text="Cantidad de veces que se ha vendido este producto")
 
     def __str__(self):
         return f"{self.name} ({self.sku})"
@@ -53,6 +55,11 @@ class Service(models.Model):
         default=True,
         help_text="Servicios inactivos no aparecen como opción nueva, pero se conservan en ventas históricas.",
     )
+    is_bundle = models.BooleanField(
+        default=False,
+        help_text="Si es verdadero, el precio y stock dependen de los productos asociados."
+    )
+    sales_count = models.IntegerField(default=0, help_text="Cantidad de veces que se ha vendido este servicio")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -63,6 +70,23 @@ class Service(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.category.name}) - ${self.price}"
+
+
+class ServiceBundleItem(models.Model):
+    """
+    Define un producto requerido para un servicio compuesto (bundle).
+    """
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="bundle_items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="bundle_usages")
+    quantity = models.IntegerField(default=1, validators=[MinValueValidator(1)])
+
+    class Meta:
+        verbose_name = "Item de Servicio Compuesto"
+        verbose_name_plural = "Items de Servicio Compuesto"
+        unique_together = ("service", "product")
+
+    def __str__(self):
+        return f"{self.quantity}x {self.product.name} (en {self.service.name})"
 
 
 class StockTransaction(models.Model):

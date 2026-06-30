@@ -292,43 +292,64 @@ const WorkOrderList = () => {
           </div>
         </div>
       ) : (
-        <div className="grid-container">
-          {orders.map(order => (
-            <div key={order.id} className="glass-card interactive">
-              <div className="ot-header">
-                <span className="ot-plate">{order.vehicle?.license_plate || 'N/A'}</span>
-                <span className={`badge ${STATUS_BADGE_CLASS[order.status] || 'PENDING'}`}>
-                  {order.status?.replace('_', ' ') || 'PENDIENTE'}
-                </span>
-              </div>
-              <p className="ot-vehicle">
-                {order.vehicle?.make} {order.vehicle?.model}
-              </p>
-              <div className="ot-meta">
-                <span>{order.mileage?.toLocaleString('es-CL')} km</span>
-                <span style={{ color: 'var(--text-tertiary)' }}>OT #{order.id}</span>
-              </div>
-              <div className="ot-actions">
-                <div className="ot-actions-row">
-                  <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
-                  <button
-                    className="btn"
-                    style={{ flex: 1, background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }}
-                    onClick={() => openAiModal(order)}
-                  >
-                    🤖 MecanIA
-                  </button>
+        <div>
+          {[
+            { key: 'PENDING', label: 'Pendientes' },
+            { key: 'IN_PROGRESS', label: 'En Progreso' },
+            { key: 'DELIVERED', label: 'Entregadas' },
+            { key: 'COMPLETED', label: 'Completadas' },
+            { key: 'PAID', label: 'Pagadas' },
+            { key: 'CANCELLED', label: 'Canceladas' }
+          ].map(group => {
+            const groupOrders = orders.filter(o => o.status === group.key);
+            if (groupOrders.length === 0) return null;
+            
+            return (
+              <div key={group.key} style={{ marginBottom: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  {group.label} <span style={{ fontSize: '0.9rem', marginLeft: '0.5rem', opacity: 0.7 }}>({groupOrders.length})</span>
+                </h3>
+                <div className="grid-container">
+                  {groupOrders.map(order => (
+                    <div key={order.id} className="glass-card interactive">
+                      <div className="ot-header">
+                        <span className="ot-plate">{order.vehicle?.license_plate || 'N/A'}</span>
+                        <span className={`badge ${STATUS_BADGE_CLASS[order.status] || 'PENDING'}`}>
+                          {order.status?.replace('_', ' ') || 'PENDIENTE'}
+                        </span>
+                      </div>
+                      <p className="ot-vehicle">
+                        {order.vehicle?.make} {order.vehicle?.model}
+                      </p>
+                      <div className="ot-meta">
+                        <span>{order.mileage?.toLocaleString('es-CL')} km</span>
+                        <span style={{ color: 'var(--text-tertiary)' }}>OT #{order.id}</span>
+                      </div>
+                      <div className="ot-actions">
+                        <div className="ot-actions-row">
+                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
+                          <button
+                            className="btn"
+                            style={{ flex: 1, background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }}
+                            onClick={() => openAiModal(order)}
+                          >
+                            🤖 MecanIA
+                          </button>
+                        </div>
+                        <button
+                          className="btn btn-whatsapp"
+                          style={{ width: '100%' }}
+                          onClick={() => handleNotifyClient(order.id)}
+                        >
+                          💬 Notificar por WhatsApp
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <button
-                  className="btn btn-whatsapp"
-                  style={{ width: '100%' }}
-                  onClick={() => handleNotifyClient(order.id)}
-                >
-                  💬 Notificar por WhatsApp
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -4,7 +4,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from .models import Product, Service, ServiceCategory, StockTransaction
+from .models import Product, Service, ServiceCategory, StockTransaction, ServiceBundleItem
 
 
 class ServiceCategorySerializer(serializers.ModelSerializer):
@@ -13,21 +13,75 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
 
 
+class ServiceBundleItemSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_price = serializers.DecimalField(source='product.price', max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = ServiceBundleItem
+        fields = ['id', 'product', 'product_name', 'product_price', 'quantity']
+
+
 class ServiceSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    bundle_items = ServiceBundleItemSerializer(many=True, read_only=True)
+    bundle_items_data = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
 
     class Meta:
         model = Service
         fields = [
             'id', 'name', 'category', 'category_name', 'price',
-            'description', 'is_active', 'created_at', 'updated_at',
+            'description', 'is_active', 'is_bundle', 'sales_count', 'bundle_items', 'bundle_items_data',
+            'created_at', 'updated_at',
         ]
+        read_only_fields = ['sales_count']
+
+    def create(self, validated_data):
+        bundle_items_data = validated_data.pop('bundle_items_data', [])
+        service = super().create(validated_data)
+        
+        for item_data in bundle_items_data:
+            ServiceBundleItem.objects.create(
+                service=service,
+                product_id=item_data['product_id'],
+                quantity=item_data.get('quantity', 1)
+            )
+        
+        # If it's a bundle, price might be dynamic, but for now we keep the base price 
+        # or calculate it if needed based on frontend input.
+        return service
+
+    def update(self, instance, validated_data):
+        bundle_items_data = validated_data.pop('bundle_items_data', None)
+        service = super().update(instance, validated_data)
+
+        if bundle_items_data is not None:
+            service.bundle_items.all().delete()
+            for item_data in bundle_items_data:
+                ServiceBundleItem.objects.create(
+                    service=service,
+                    product_id=item_data['product_id'],
+                    quantity=item_data.get('quantity', 1)
+                )
+
+        return service
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = '__all__'
+        read_only_fields = ['sales_count']
+
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return None
 
 
 class StockTransactionSerializer(serializers.ModelSerializer):
@@ -53,11 +107,16 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
 
     def get_queryset(self):
-        qs = Service.objects.select_related('category').all()
+        qs = Service.objects.select_related('category').prefetch_related('bundle_items__product').all()
         # Por defecto solo activos, salvo que se pida explícitamente todo
         # el histórico (útil en pantallas administrativas).
         if self.request.query_params.get('include_inactive') != 'true':
             qs = qs.filter(is_active=True)
+            
+        # Optional sorting by sales
+        if self.request.query_params.get('popular') == 'true':
+            qs = qs.order_by('-sales_count', 'name')
+            
         return qs
 
 
@@ -65,6 +124,12 @@ class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Product.objects.all().order_by('-id')
     serializer_class = ProductSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.query_params.get('popular') == 'true':
+            qs = qs.order_by('-sales_count', '-id')
+        return qs
 
     @action(detail=False, methods=['get'])
     def download_template(self, request):

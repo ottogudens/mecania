@@ -9,6 +9,7 @@ const InventoryDashboard = () => {
   const [uploading, setUploading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
+  const [imageFile, setImageFile] = useState(null);
   const fileInputRef = useRef(null);
   const toast = useToast();
 
@@ -104,12 +105,22 @@ const InventoryDashboard = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.post('/api/inventory/products/', newProduct, {
-        headers: { Authorization: `Token ${token}` }
+      const formData = new FormData();
+      Object.keys(newProduct).forEach(key => formData.append(key, newProduct[key]));
+      if (imageFile) {
+        formData.append('image', imageFile);
+      }
+      
+      await axios.post('/api/inventory/products/', formData, {
+        headers: { 
+          Authorization: `Token ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
       toast({ title: 'Producto Creado', message: 'El producto se agregó al inventario exitosamente.', type: 'success' });
       setShowModal(false);
       setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
+      setImageFile(null);
       fetchProducts();
     } catch (err) {
       console.error(err);
@@ -208,6 +219,15 @@ const InventoryDashboard = () => {
                   value={newProduct.name} 
                   onChange={e => setNewProduct({...newProduct, name: e.target.value})} 
                   required 
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Imagen del Producto (Opcional)</label>
+                <input 
+                  type="file" 
+                  className="input-field" 
+                  accept="image/*"
+                  onChange={e => setImageFile(e.target.files[0])} 
                 />
               </div>
               <div className="input-group">

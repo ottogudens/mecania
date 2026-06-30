@@ -282,8 +282,8 @@ const CounterSale = () => {
   useEffect(() => {
     const h = { headers: authHeader() };
     Promise.all([
-      axios.get('/api/inventory/products/', h),
-      axios.get('/api/inventory/services/', h),
+      axios.get('/api/inventory/products/?popular=true', h),
+      axios.get('/api/inventory/services/?popular=true', h),
       axios.get('/api/inventory/service-categories/', h),
     ]).then(([p, s, c]) => {
       setProducts(p.data.results || p.data);
@@ -316,7 +316,13 @@ const CounterSale = () => {
     setCart(prev => {
       const ex = prev.find(i => i.type === 'service' && i.id === s.id);
       if (ex) return prev.map(i => i === ex ? { ...i, qty: i.qty + 1 } : i);
-      return [...prev, { type: 'service', id: s.id, name: s.name, price: parseFloat(s.price), qty: 1 }];
+      
+      let calculatedPrice = parseFloat(s.price);
+      if (s.is_bundle && s.bundle_items) {
+        calculatedPrice += s.bundle_items.reduce((acc, item) => acc + (parseFloat(item.product_price) * item.quantity), 0);
+      }
+      
+      return [...prev, { type: 'service', id: s.id, name: s.name, price: calculatedPrice, qty: 1 }];
     });
   };
 
@@ -393,8 +399,11 @@ const CounterSale = () => {
         {tab === 'products' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
             {products.map(p => (
-              <div key={p.id} className="glass-card" style={{ padding: '1rem', cursor: 'pointer' }}
+              <div key={p.id} className="glass-card" style={{ padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
                 onClick={() => p.stock_quantity > 0 && addProduct(p)}>
+                {p.image_url && (
+                  <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '6px', marginBottom: '0.75rem' }} />
+                )}
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{p.name}</div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 8 }}>SKU: {p.sku}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -533,7 +542,8 @@ const CounterSale = () => {
 const ServiceCatalog = () => {
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState({ name: '', category: '', price: '', description: '' });
+  const [products, setProducts] = useState([]);
+  const [form, setForm] = useState({ name: '', category: '', price: '', description: '', is_bundle: false, bundle_items_data: [] });
   const [catForm, setCatForm] = useState({ name: '', description: '' });
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -541,12 +551,14 @@ const ServiceCatalog = () => {
 
   const reload = useCallback(async () => {
     const h = { headers: authHeader() };
-    const [s, c] = await Promise.all([
+    const [s, c, p] = await Promise.all([
       axios.get('/api/inventory/services/', h),
       axios.get('/api/inventory/service-categories/', h),
+      axios.get('/api/inventory/products/', h),
     ]);
     setServices(s.data.results || s.data);
     setCategories(c.data.results || c.data);
+    setProducts(p.data.results || p.data);
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
@@ -559,7 +571,7 @@ const ServiceCatalog = () => {
     setLoading(true); setMsg(null);
     try {
       await axios.post('/api/inventory/services/', { ...form, price: parseFloat(form.price), is_active: true }, { headers: authHeader() });
-      setForm({ name: '', category: '', price: '', description: '' });
+      setForm({ name: '', category: '', price: '', description: '', is_bundle: false, bundle_items_data: [] });
       setMsg({ type: 'ok', text: '✅ Servicio creado correctamente.' });
       reload();
     } catch (e) {
@@ -681,6 +693,41 @@ const ServiceCatalog = () => {
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               style={{ width: '100%', height: 80, resize: 'vertical' }} />
           </div>
+          
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <input type="checkbox" checked={form.is_bundle} onChange={e => setForm(f => ({ ...f, is_bundle: e.target.checked }))} />
+              Es un servicio combinado (Ej. Cambio de Aceite que incluye productos)
+            </label>
+          </div>
+
+          {form.is_bundle && (
+            <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: 8, border: '1px dashed var(--border-color)' }}>
+              <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.75rem', fontSize: '0.9rem' }}>Productos Incluidos</h4>
+              {form.bundle_items_data.map((bi, idx) => {
+                const prod = products.find(p => p.id === parseInt(bi.product_id));
+                return (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.85rem' }}>
+                    <span>{bi.quantity}x {prod ? prod.name : ''}</span>
+                    <button onClick={() => setForm(f => ({ ...f, bundle_items_data: f.bundle_items_data.filter((_, i) => i !== idx) }))} style={{ background: 'none', border: 'none', color: 'var(--status-red)', cursor: 'pointer' }}>✕</button>
+                  </div>
+                );
+              })}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <select id="bundle-product-select" style={{ flex: 1, background: 'rgba(0,0,0,0.4)', color: '#fff', border: '1px solid var(--border-color)', borderRadius: 4, padding: '4px' }}>
+                  <option value="">Selecciona un producto...</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} - {fmt(p.price)}</option>)}
+                </select>
+                <button type="button" onClick={() => {
+                  const sel = document.getElementById('bundle-product-select');
+                  if (!sel.value) return;
+                  setForm(f => ({ ...f, bundle_items_data: [...f.bundle_items_data, { product_id: sel.value, quantity: 1 }] }));
+                  sel.value = '';
+                }} className="btn btn-outline" style={{ padding: '0.2rem 0.5rem' }}>Añadir</button>
+              </div>
+            </div>
+          )}
+
           <button className="btn" onClick={saveService} disabled={loading} style={{ width: '100%' }}>
             {loading ? 'Guardando...' : '✅ Crear Servicio'}
           </button>
