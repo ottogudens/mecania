@@ -5,7 +5,10 @@ class Product(models.Model):
     name = models.CharField(max_length=200)
     sku = models.CharField(max_length=50, unique=True)
     stock_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)])
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio de Venta (IVA incluido)")
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Costo Neto")
+    barcode = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    supplier = models.CharField(max_length=200, blank=True)
     low_stock_threshold = models.IntegerField(default=5, validators=[MinValueValidator(0)])
 
     def __str__(self):

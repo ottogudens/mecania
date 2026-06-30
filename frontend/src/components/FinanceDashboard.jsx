@@ -80,7 +80,7 @@ const FinanceDashboard = () => {
             </p>
             
             <div style={{ margin: '1rem 0', fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--primary)' }}>
-              ${parseFloat(invoice.total_amount).toLocaleString('es-CL')}
+              {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(invoice.total_amount)}
             </div>
             
             <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem' }}>

@@ -71,6 +71,13 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 400ms ease;
+
+  /* Aliases for inline styles */
+  --primary-color: var(--primary);
+  --secondary-color: var(--secondary);
+  --text-muted: var(--text-secondary);
+  --border-color: var(--border-subtle);
+  --bg-color: var(--bg-primary);
 }
 
 /* ===== RESET ===== */

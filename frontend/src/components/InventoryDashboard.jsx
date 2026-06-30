@@ -8,7 +8,7 @@ const InventoryDashboard = () => {
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [newProduct, setNewProduct] = useState({ name: '', sku: '', price: '', stock_quantity: 0, low_stock_threshold: 5 });
+  const [newProduct, setNewProduct] = useState({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
   const fileInputRef = useRef(null);
   const toast = useToast();
 
@@ -109,7 +109,7 @@ const InventoryDashboard = () => {
       });
       toast({ title: 'Producto Creado', message: 'El producto se agregó al inventario exitosamente.', type: 'success' });
       setShowModal(false);
-      setNewProduct({ name: '', sku: '', price: '', stock_quantity: 0, low_stock_threshold: 5 });
+      setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
       fetchProducts();
     } catch (err) {
       console.error(err);
@@ -166,7 +166,7 @@ const InventoryDashboard = () => {
                 <tr key={product.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                   <td style={{ padding: '1rem', fontFamily: 'monospace' }}>{product.sku}</td>
                   <td style={{ padding: '1rem', fontWeight: '500' }}>{product.name}</td>
-                  <td style={{ padding: '1rem' }}>${product.price}</td>
+                  <td style={{ padding: '1rem' }}>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(product.price)}</td>
                   <td style={{ padding: '1rem' }}>
                     <span className={`badge ${isLowStock ? 'red' : 'green'}`} style={{ fontSize: '0.9rem' }}>
                       {product.stock_quantity} und.
@@ -222,7 +222,38 @@ const InventoryDashboard = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="input-group">
-                  <label className="input-label">Precio Unitario ($)</label>
+                  <label className="input-label">Código de Barras</label>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    value={newProduct.barcode} 
+                    onChange={e => setNewProduct({...newProduct, barcode: e.target.value})} 
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Proveedor</label>
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    value={newProduct.supplier} 
+                    onChange={e => setNewProduct({...newProduct, supplier: e.target.value})} 
+                  />
+                </div>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Costo Neto ($)</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    value={newProduct.cost_price} 
+                    onChange={e => setNewProduct({...newProduct, cost_price: e.target.value})} 
+                    min="0"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Precio Venta (IVA 19%)</label>
                   <input 
                     type="number" 
                     className="input-field" 
