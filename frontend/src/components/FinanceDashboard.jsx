@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from './Toast';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 const FinanceDashboard = () => {
   const [invoices, setInvoices] = useState([]);
@@ -65,6 +66,45 @@ const FinanceDashboard = () => {
           </div>
         </div>
       </div>
+      
+      {/* Analytics Charts */}
+      {invoices.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+          <div className="glass-card" style={{ padding: '1rem', height: '300px' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Estado de Facturas</h3>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Pagado', value: invoices.filter(i => i.status === 'PAID').length },
+                    { name: 'Pendiente', value: invoices.filter(i => i.status === 'PENDING').length },
+                    { name: 'Cancelado', value: invoices.filter(i => i.status === 'CANCELLED').length }
+                  ].filter(d => d.value > 0)}
+                  cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}
+                  dataKey="value"
+                >
+                  <Cell key="cell-0" fill="var(--status-green)" />
+                  <Cell key="cell-1" fill="var(--status-yellow)" />
+                  <Cell key="cell-2" fill="var(--status-red)" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div className="glass-card" style={{ padding: '1rem', height: '300px' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Facturación por OT / Venta</h3>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={invoices.slice(0, 10).map(i => ({ name: `Fact #${i.id}`, total: parseFloat(i.total_amount) }))}>
+                <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={12} />
+                <YAxis stroke="var(--text-secondary)" fontSize={12} />
+                <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: 'var(--bg-card)', border: 'none', borderRadius: '8px' }} />
+                <Bar dataKey="total" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       <div className="grid-container">
         {invoices.map(invoice => (

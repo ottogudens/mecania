@@ -79,7 +79,12 @@ const WorkOrderList = () => {
         axios.get('/api/operations/work-orders/', { headers: { Authorization: `Token ${token}` } }),
         axios.get('/api/operations/vehicles/', { headers: { Authorization: `Token ${token}` } })
       ]);
-      setOrders(ordersRes.data.results || ordersRes.data);
+      const data = ordersRes.data.results || ordersRes.data;
+      // Sort orders so PENDING and IN_PROGRESS are first
+      const statusOrder = { 'PENDING': 1, 'IN_PROGRESS': 2, 'COMPLETED': 3, 'DELIVERED': 4, 'PAID': 5, 'CANCELLED': 6 };
+      data.sort((a, b) => (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
+      
+      setOrders(data);
       setVehicles(vehiclesRes.data.results || vehiclesRes.data);
       setLoading(false);
     } catch (err) {

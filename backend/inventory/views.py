@@ -73,11 +73,11 @@ class ProductViewSet(viewsets.ModelViewSet):
         from django.http import HttpResponse
 
         # Crear un DataFrame con las columnas esperadas
-        df = pd.DataFrame(columns=['Tipo', 'SKU', 'Nombre', 'Precio', 'Stock', 'Categoría'])
+        df = pd.DataFrame(columns=['Tipo', 'SKU', 'Código de Barras', 'Nombre', 'Precio', 'Costo Neto', 'Stock', 'Proveedor', 'Categoría'])
         
         # Añadir algunos datos de ejemplo
-        df.loc[0] = ['Producto', 'FILT-001', 'Filtro de Aceite', 15000, 10, '']
-        df.loc[1] = ['Servicio', '', 'Alineación', 20000, '', 'Mantenimiento']
+        df.loc[0] = ['Producto', 'FILT-001', '7891000315507', 'Filtro de Aceite', 15000, 10000, 10, 'AutoParts SA', '']
+        df.loc[1] = ['Servicio', '', '', 'Alineación', 20000, 0, '', '', 'Mantenimiento']
 
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -138,13 +138,27 @@ class ProductViewSet(viewsets.ModelViewSet):
                 try:
                     if tipo == 'producto':
                         sku = str(row.get('sku', '')).strip()
+                        barcode = str(row.get('código de barras', row.get('codigo de barras', ''))).strip()
+                        if barcode == 'nan': barcode = ''
                         stock = int(row.get('stock', 0) if pd.notna(row.get('stock')) else 0)
+                        cost_price = float(row.get('costo neto', 0) if pd.notna(row.get('costo neto')) else 0)
+                        supplier = str(row.get('proveedor', '')).strip()
+                        if supplier == 'nan': supplier = ''
+                        
                         if not sku or sku == 'nan':
                             errors.append(f'Fila {index+2}: SKU vacío para producto "{nombre}".')
                             continue
+                            
                         Product.objects.update_or_create(
                             sku=sku,
-                            defaults={'name': nombre, 'price': precio, 'stock_quantity': stock}
+                            defaults={
+                                'name': nombre, 
+                                'price': precio, 
+                                'stock_quantity': stock,
+                                'barcode': barcode,
+                                'cost_price': cost_price,
+                                'supplier': supplier
+                            }
                         )
                         products_created += 1
                     elif tipo == 'servicio':
