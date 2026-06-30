@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useToast } from './Toast';
+
+function GearIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.85)" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
 
 const Login = ({ onLogin }) => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const [error, setError] = useState('');
+  const toast = useToast();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -16,72 +25,119 @@ const Login = ({ onLogin }) => {
 
     try {
       const response = await axios.post('/api/operations/login/', {
-        username: email, // Using email state for username field
-        password: password
+        username,
+        password,
       });
 
-      const { token, role: backendRole } = response.data;
-      
-      // Store token and role
+      const { token, role: backendRole, username: backendUsername } = response.data;
+
       localStorage.setItem('token', token);
       localStorage.setItem('role', backendRole);
-      
-      onLogin(backendRole, token);
-      navigate('/');
+      localStorage.setItem('username', backendUsername || username);
+
+      toast({
+        title: '¡Bienvenido!',
+        message: `Sesión iniciada como ${backendUsername || username}`,
+        type: 'success',
+      });
+
+      onLogin(backendRole, token, backendUsername || username);
     } catch (err) {
-      setError('Credenciales inválidas. Por favor intente de nuevo.');
-      console.error('Login error:', err);
+      const msg = err.response?.data?.error || 'Credenciales inválidas. Intente de nuevo.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', margin: 0 }}>
-      <div className="glass-card login-card">
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <h2 style={{ fontSize: '2rem', color: 'var(--primary-color)' }}>AutoMaster ERP</h2>
-          <p style={{ color: 'var(--text-muted)' }}>Bienvenido al sistema de gestión</p>
+    <div className="login-wrapper">
+      <div className="login-card animate-fade-up">
+        {/* Logo */}
+        <div className="login-logo">
+          <div className="login-logo-icon">
+            <GearIcon />
+          </div>
+          <div className="login-brand">MecanIA</div>
+          <div className="login-tagline">Sistema de Gestión para Talleres Automotrices</div>
         </div>
 
-
-
+        {/* Error */}
         {error && (
-          <div style={{ color: '#ff4c4c', background: 'rgba(255, 76, 76, 0.1)', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', textAlign: 'center' }}>
+          <div className="login-error">
+            <span>⚠</span>
             {error}
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Form */}
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div className="input-group">
-            <label style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Usuario / Email</label>
-            <input 
-              type="text" 
-              className="glass-input" 
-              placeholder="usuario / email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <label className="input-label" htmlFor="login-username">Usuario</label>
+            <input
+              id="login-username"
+              type="text"
+              className="glass-input"
+              placeholder="nombre de usuario"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               required
+              autoComplete="username"
+              autoFocus
             />
           </div>
 
           <div className="input-group">
-            <label style={{ color: 'var(--text-muted)', marginBottom: '0.5rem', display: 'block' }}>Contraseña</label>
-            <input 
-              type="password" 
-              className="glass-input" 
+            <label className="input-label" htmlFor="login-password">Contraseña</label>
+            <input
+              id="login-password"
+              type="password"
+              className="glass-input"
               placeholder="••••••••"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
             />
           </div>
 
-          <button type="submit" className="btn" style={{ marginTop: '1rem', width: '100%' }} disabled={loading}>
-            {loading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
+          <button
+            type="submit"
+            className="btn btn-lg"
+            style={{ marginTop: '0.5rem', width: '100%' }}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+                Iniciando sesión...
+              </>
+            ) : 'Iniciar Sesión'}
           </button>
         </form>
+
+        {/* Footer */}
+        <p style={{
+          textAlign: 'center',
+          marginTop: '2rem',
+          fontSize: '0.75rem',
+          color: 'var(--text-tertiary)',
+          lineHeight: '1.6'
+        }}>
+          MecanIA v2.0 — Taller Automotriz Inteligente<br />
+          <span style={{ color: 'var(--primary)', opacity: 0.6 }}>Powered by AI</span>
+        </p>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };

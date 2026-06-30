@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from './Toast';
 
 const WorkOrderList = () => {
   const [orders, setOrders] = useState([]);
@@ -7,6 +8,7 @@ const WorkOrderList = () => {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const toast = useToast();
 
   // Modals state
   const [showNewModal, setShowNewModal] = useState(false);
@@ -89,15 +91,14 @@ const WorkOrderList = () => {
 
   const handleNotifyClient = async (orderId) => {
     try {
-      alert("Enviando notificación...");
       const token = localStorage.getItem('token');
       await axios.post(`/api/operations/work-orders/${orderId}/notify_client/`, {}, {
         headers: { Authorization: `Token ${token}` }
       });
-      alert("¡Cliente notificado por WhatsApp con éxito!");
+      toast({ title: '¡Notificado!', message: 'Cliente notificado por WhatsApp con éxito.', type: 'success' });
     } catch (err) {
       console.error(err);
-      alert("Error al notificar al cliente. Verifique que el cliente tenga un número válido.");
+      toast({ title: 'Error', message: 'No se pudo notificar. Verifica que el cliente tenga un número válido.', type: 'error' });
     }
   };
 
@@ -111,10 +112,11 @@ const WorkOrderList = () => {
       setShowNewModal(false);
       setNewOrder({ vehicle_id: '', mileage: '', fuel_level: 50, status: 'PENDING' });
       fetchData();
-      alert("OT creada exitosamente");
+      toast({ title: 'OT Creada', message: 'La orden de trabajo fue creada exitosamente.', type: 'success' });
     } catch (err) {
       console.error(err);
-      alert("Error al crear OT.");
+      const msg = err.response?.data?.detail || 'No se pudo crear la OT. Revisa los datos.';
+      toast({ title: 'Error', message: msg, type: 'error' });
     }
   };
 
@@ -152,7 +154,7 @@ const WorkOrderList = () => {
       
     } catch (err) {
       console.error(err);
-      alert("Error al añadir ítem.");
+      toast({ title: 'Error', message: 'No se pudo agregar el ítem a la OT.', type: 'error' });
     }
   };
 
@@ -184,7 +186,7 @@ const WorkOrderList = () => {
         alert("Error al agregar producto escaneado.");
       }
     } else {
-      alert("SKU no encontrado: " + barcodeInput);
+      toast({ title: 'SKU no encontrado', message: `No existe ningún producto con SKU: ${barcodeInput}`, type: 'warning' });
     }
   };
 
@@ -226,7 +228,6 @@ const WorkOrderList = () => {
       setAiResponse("Hubo un error al contactar a MecanIA. Por favor, intenta de nuevo.");
     }
     setAiLoading(false);
-    setAiLoading(false);
   };
 
   const handleDownloadPDF = async () => {
@@ -251,50 +252,74 @@ const WorkOrderList = () => {
     }
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Órdenes de Trabajo...</div>;
-  if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '2rem' }}>{error}</div>;
+  if (loading) return (
+    <div className="grid-container">
+      {[1,2,3,4,5,6].map(i => (
+        <div key={i} className="glass-card skeleton-card skeleton" />
+      ))}
+    </div>
+  );
+  if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '3rem' }}>{error}</div>;
+
+  const STATUS_BADGE_CLASS = {
+    PENDING:     'PENDING',
+    IN_PROGRESS: 'IN_PROGRESS',
+    COMPLETED:   'COMPLETED',
+    DELIVERED:   'DELIVERED',
+    CANCELLED:   'CANCELLED',
+  };
 
   return (
-    <div className="work-orders">
-      <div className="header" style={{ marginBottom: '2rem' }}>
-        <h2>Órdenes de Trabajo Digitales (OT)</h2>
-        <button className="btn" onClick={() => setShowNewModal(true)}>Crear Nueva OT</button>
+    <div>
+      <div className="section-header">
+        <div>
+          <div className="section-title">Gestión de OTs</div>
+        </div>
+        <button className="btn" onClick={() => setShowNewModal(true)}>+ Nueva OT</button>
       </div>
-      
+
       {orders.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center' }}>
-          <p>No se encontraron órdenes de trabajo. ¡Crea una para comenzar!</p>
+        <div className="glass-card">
+          <div className="empty-state">
+            <div className="empty-state-icon">📋</div>
+            <div className="empty-state-title">Sin órdenes de trabajo</div>
+            <p className="empty-state-text">Crea la primera OT para comenzar.</p>
+          </div>
         </div>
       ) : (
         <div className="grid-container">
           {orders.map(order => (
-            <div key={order.id} className="glass-card">
+            <div key={order.id} className="glass-card interactive">
               <div className="ot-header">
-                <h3>{order.vehicle?.license_plate || 'N/A'}</h3>
-                <span className={`badge ${order.status?.toLowerCase() || 'pending'}`}>
-                  {order.status ? order.status.replace('_', ' ') : 'PENDIENTE'}
+                <span className="ot-plate">{order.vehicle?.license_plate || 'N/A'}</span>
+                <span className={`badge ${STATUS_BADGE_CLASS[order.status] || 'PENDING'}`}>
+                  {order.status?.replace('_', ' ') || 'PENDIENTE'}
                 </span>
               </div>
-              <p style={{ margin: '0.5rem 0', fontWeight: '500' }}>
+              <p className="ot-vehicle">
                 {order.vehicle?.make} {order.vehicle?.model}
               </p>
-              
               <div className="ot-meta">
-                <span>Kilometraje: {order.mileage?.toLocaleString()} km</span>
-                <span>OT #{order.id}</span>
+                <span>{order.mileage?.toLocaleString('es-CL')} km</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>OT #{order.id}</span>
               </div>
-              
-              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
-                <button className="btn btn-outline" style={{ flex: 1, backgroundColor: 'rgba(59,130,246,0.1)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => openAiModal(order)}>
-                  🤖 Consultar MecanIA
-                </button>
-                <button 
-                  className="btn" 
-                  style={{ flex: '1 1 100%', backgroundColor: '#25D366', color: 'white' }}
+              <div className="ot-actions">
+                <div className="ot-actions-row">
+                  <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
+                  <button
+                    className="btn"
+                    style={{ flex: 1, background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }}
+                    onClick={() => openAiModal(order)}
+                  >
+                    🤖 MecanIA
+                  </button>
+                </div>
+                <button
+                  className="btn btn-whatsapp"
+                  style={{ width: '100%' }}
                   onClick={() => handleNotifyClient(order.id)}
                 >
-                  <i className="fa-brands fa-whatsapp" style={{ marginRight: '8px' }}></i> Notificar WhatsApp
+                  💬 Notificar por WhatsApp
                 </button>
               </div>
             </div>

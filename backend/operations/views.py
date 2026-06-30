@@ -185,6 +185,10 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
     serializer_class = VisualInspectionSerializer
 
 class CustomAuthToken(APIView):
+    """Login endpoint — public, no authentication required."""
+    permission_classes = []
+    authentication_classes = []
+
     def post(self, request, *args, **kwargs):
         username = request.data.get('username')
         password = request.data.get('password')
@@ -204,6 +208,10 @@ class CustomAuthToken(APIView):
             return Response({'error': 'Credenciales inválidas'}, status=status.HTTP_401_UNAUTHORIZED)
 
 class ClientAuthToken(APIView):
+    """Client portal login — public endpoint, identifies client by phone."""
+    permission_classes = []
+    authentication_classes = []
+
     def post(self, request, *args, **kwargs):
         phone = request.data.get('phone')
         
@@ -219,6 +227,10 @@ class ClientAuthToken(APIView):
             return Response({'error': 'Número de teléfono no encontrado en nuestros registros'}, status=status.HTTP_404_NOT_FOUND)
 
 class ClientDataView(APIView):
+    """Client portal data — public endpoint, data scoped to a single phone number."""
+    permission_classes = []
+    authentication_classes = []
+
     def get(self, request, *args, **kwargs):
         phone = request.query_params.get('phone')
         if not phone:

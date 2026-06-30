@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { useToast } from './Toast';
 
 const InventoryDashboard = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [newProduct, setNewProduct] = useState({ name: '', sku: '', price: '', stock_quantity: 0, low_stock_threshold: 5 });
   const fileInputRef = useRef(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetchProducts();
@@ -42,7 +46,7 @@ const InventoryDashboard = () => {
       ));
     } catch (err) {
       console.error("Error updating stock:", err);
-      alert("Hubo un error al actualizar el stock.");
+      toast({ title: 'Error', message: 'Hubo un error al actualizar el stock.', type: 'error' });
     }
   };
 
@@ -60,7 +64,7 @@ const InventoryDashboard = () => {
       document.body.appendChild(link);
       link.click();
     } catch (err) {
-      alert("Error al descargar la plantilla.");
+      toast({ title: 'Error', message: 'Error al descargar la plantilla.', type: 'error' });
     }
   };
 
@@ -81,19 +85,36 @@ const InventoryDashboard = () => {
         }
       });
       
-      const { products_created, services_created, errors } = response.data;
-      let msg = `Carga exitosa.\nProductos creados/actualizados: ${products_created}\nServicios creados/actualizados: ${services_created}`;
+      let msg = `Productos creados/actualizados: ${products_created}\nServicios creados/actualizados: ${services_created}`;
       if (errors && errors.length > 0) {
-        msg += `\n\nErrores encontrados:\n` + errors.join('\n');
+        msg += `\n\nErrores:\n` + errors.join('\n');
       }
-      alert(msg);
+      toast({ title: 'Carga completada', message: msg, type: errors && errors.length ? 'warning' : 'success' });
       fetchProducts();
     } catch (err) {
       console.error(err);
-      alert("Error al procesar el archivo Excel. Revisa el formato.");
+      toast({ title: 'Error de Carga', message: 'Error al procesar el archivo Excel. Revisa el formato.', type: 'error' });
     } finally {
       setUploading(false);
       e.target.value = null; // reset input
+    }
+  };
+
+  const handleCreateProduct = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/inventory/products/', newProduct, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Producto Creado', message: 'El producto se agregó al inventario exitosamente.', type: 'success' });
+      setShowModal(false);
+      setNewProduct({ name: '', sku: '', price: '', stock_quantity: 0, low_stock_threshold: 5 });
+      fetchProducts();
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.sku ? 'Ya existe un producto con ese SKU.' : 'No se pudo crear el producto.';
+      toast({ title: 'Error', message: msg, type: 'error' });
     }
   };
 
@@ -122,7 +143,7 @@ const InventoryDashboard = () => {
           >
             {uploading ? '⏳ Subiendo...' : '🔼 Carga Masiva (Excel)'}
           </button>
-          <button className="btn">Añadir Nuevo Producto</button>
+          <button className="btn" onClick={() => setShowModal(true)}>+ Añadir Producto</button>
         </div>
       </div>
 
@@ -169,6 +190,69 @@ const InventoryDashboard = () => {
           </table>
         </div>
       </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Nuevo Producto</h3>
+              <button className="modal-close" onClick={() => setShowModal(false)}>&times;</button>
+            </div>
+            
+            <form onSubmit={handleCreateProduct} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="input-group">
+                <label className="input-label">Nombre del Producto</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={newProduct.name} 
+                  onChange={e => setNewProduct({...newProduct, name: e.target.value})} 
+                  required 
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">SKU (Código Interno)</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={newProduct.sku} 
+                  onChange={e => setNewProduct({...newProduct, sku: e.target.value})} 
+                  required 
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Precio Unitario ($)</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    value={newProduct.price} 
+                    onChange={e => setNewProduct({...newProduct, price: e.target.value})} 
+                    required 
+                    min="0"
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Stock Inicial</label>
+                  <input 
+                    type="number" 
+                    className="input-field" 
+                    value={newProduct.stock_quantity} 
+                    onChange={e => setNewProduct({...newProduct, stock_quantity: e.target.value})} 
+                    required 
+                    min="0"
+                  />
+                </div>
+              </div>
+              
+              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-success">Guardar Producto</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

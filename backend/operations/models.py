@@ -1,11 +1,16 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
 
 class Client(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(unique=True, null=True, blank=True)
-    phone = models.CharField(max_length=20, unique=True)
+    phone = models.CharField(
+        max_length=20,
+        unique=True,
+        validators=[RegexValidator(r'^\+?[\d\s\-]{7,20}$', 'Ingrese un número de teléfono válido.')]
+    )
     address = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -18,10 +23,6 @@ class Vehicle(models.Model):
     model = models.CharField(max_length=50)
     year = models.IntegerField()
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='vehicles', null=True, blank=True)
-    
-    # Legacy fields (will be removed later or ignored)
-    owner_name = models.CharField(max_length=100, default='Desconocido')
-    owner_phone = models.CharField(max_length=20, default='0000000000')
 
     def __str__(self):
         return f"{self.license_plate} - {self.make} {self.model}"
@@ -37,8 +38,11 @@ class WorkOrder(models.Model):
 
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='work_orders')
     mechanic = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_work_orders')
-    mileage = models.IntegerField()
-    fuel_level = models.IntegerField(help_text="Porcentaje de nivel de combustible (0-100)")
+    mileage = models.IntegerField(validators=[MinValueValidator(0)])
+    fuel_level = models.IntegerField(
+        help_text="Porcentaje de nivel de combustible (0-100)",
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
