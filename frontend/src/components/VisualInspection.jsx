@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import { useToast } from './Toast';
 
 const VisualInspection = () => {
   const [markers, setMarkers] = useState([]);
@@ -13,6 +14,7 @@ const VisualInspection = () => {
   // Audio recording refs
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const toast = useToast();
 
   const handleSvgClick = (e) => {
     // Solo permitir añadir marcadores si no hay uno seleccionado
@@ -65,9 +67,10 @@ const VisualInspection = () => {
 
       mediaRecorder.start();
       setIsRecording(true);
+      toast({ title: 'Grabando...', message: 'Habla ahora para registrar tu nota de voz.', type: 'info' });
     } catch (err) {
       console.error("Error accediendo al micrófono:", err);
-      alert("No se pudo acceder al micrófono. Verifica los permisos.");
+      toast({ title: 'Error de Micrófono', message: 'No se pudo acceder al micrófono. Verifica los permisos de tu navegador.', type: 'error' });
     }
   };
 
@@ -103,15 +106,16 @@ const VisualInspection = () => {
       
       // Añadir la transcripción a las notas
       setAiNotes(prev => prev + (prev ? ' ' : '') + response.data.transcription);
+      toast({ title: 'Transcripción completada', message: 'La nota de voz se convirtió a texto.', type: 'success' });
     } catch (err) {
       console.error("Error transcribiendo audio:", err);
-      alert("Error al transcribir el audio usando Inteligencia Artificial.");
+      toast({ title: 'Error', message: 'Error al transcribir el audio usando Inteligencia Artificial.', type: 'error' });
     }
     setLoadingAi(false);
   };
 
   const saveInspection = async () => {
-    alert("Inspección Guardada con Éxito (Demo)");
+    toast({ title: 'Guardado', message: 'Inspección Guardada con Éxito (Demo)', type: 'success' });
   };
 
   return (
@@ -196,11 +200,11 @@ const VisualInspection = () => {
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 
                     onClick={() => updateMarker(selectedMarkerIndex, 'type', 'red')}
-                    style={{ flex: 1, padding: '0.5rem', border: 'none', borderRadius: '4px', background: markers[selectedMarkerIndex].type === 'red' ? '#ef4444' : 'rgba(239,68,68,0.2)', color: 'white', cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '0.5rem', border: 'none', borderRadius: '4px', background: markers[selectedMarkerIndex].type === 'red' ? '#ef4444' : 'rgba(239,68,68,0.2)', color: markers[selectedMarkerIndex].type === 'red' ? '#ffffff' : '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}
                   >Crítico</button>
                   <button 
                     onClick={() => updateMarker(selectedMarkerIndex, 'type', 'yellow')}
-                    style={{ flex: 1, padding: '0.5rem', border: 'none', borderRadius: '4px', background: markers[selectedMarkerIndex].type === 'yellow' ? '#f59e0b' : 'rgba(245,158,11,0.2)', color: 'white', cursor: 'pointer' }}
+                    style={{ flex: 1, padding: '0.5rem', border: 'none', borderRadius: '4px', background: markers[selectedMarkerIndex].type === 'yellow' ? '#f59e0b' : 'rgba(245,158,11,0.2)', color: markers[selectedMarkerIndex].type === 'yellow' ? '#000000' : '#f59e0b', fontWeight: 'bold', cursor: 'pointer' }}
                   >Leve</button>
                 </div>
               </div>
@@ -257,21 +261,14 @@ const VisualInspection = () => {
 
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button 
-              className="btn" 
-              style={{ 
-                flex: 1, 
-                backgroundColor: isRecording ? '#ef4444' : '#10b981', 
-                color: 'white' 
-              }}
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onTouchStart={startRecording}
-              onTouchEnd={stopRecording}
+              className={`btn ${isRecording ? 'btn-danger' : 'btn-success'}`} 
+              style={{ flex: 1, height: '48px', fontSize: '1rem' }}
+              onClick={isRecording ? stopRecording : startRecording}
             >
               {isRecording ? (
-                <span><i className="fa-solid fa-circle-stop"></i> Soltar para Detener</span>
+                <span><i className="fa-solid fa-circle-stop"></i> Detener Grabación</span>
               ) : (
-                <span><i className="fa-solid fa-microphone"></i> Mantener para Hablar</span>
+                <span><i className="fa-solid fa-microphone"></i> Iniciar Nota de Voz</span>
               )}
             </button>
           </div>
