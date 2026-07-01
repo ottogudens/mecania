@@ -403,6 +403,35 @@ class EstimateViewSet(viewsets.ModelViewSet):
         estimate.recalculate_totals()
         return Response(EstimateSerializer(estimate).data, status=status.HTTP_201_CREATED)
 
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        estimate = self.get_object()
+        data = request.data
+        
+        estimate.client_id = data.get('client_id', estimate.client_id)
+        estimate.vehicle_id = data.get('vehicle_id', estimate.vehicle_id)
+        estimate.valid_until = data.get('valid_until', estimate.valid_until)
+        if 'status' in data:
+            estimate.status = data.get('status')
+        estimate.save()
+        
+        if 'items' in data:
+            # Delete old items and recreate
+            estimate.items.all().delete()
+            items_data = data.get('items', [])
+            for item_data in items_data:
+                EstimateLineItem.objects.create(
+                    estimate=estimate,
+                    product_id=item_data.get('product_id'),
+                    service_id=item_data.get('service_id'),
+                    description=item_data.get('description', ''),
+                    quantity=item_data.get('quantity', 1),
+                    unit_price=item_data.get('unit_price', 0)
+                )
+        
+        estimate.recalculate_totals()
+        return Response(EstimateSerializer(estimate).data)
+
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def convert_to_work_order(self, request, pk=None):

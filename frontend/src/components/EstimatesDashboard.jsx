@@ -83,10 +83,42 @@ export default function EstimatesDashboard() {
     }
   };
 
+  const [editingId, setEditingId] = useState(null);
+
   const handleRemoveItem = (index) => {
     const newItems = [...newEstimate.items];
     newItems.splice(index, 1);
     setNewEstimate({ ...newEstimate, items: newItems });
+  };
+
+  const handleEditEstimate = (estimate) => {
+    setEditingId(estimate.id);
+    setNewEstimate({
+      client_id: String(estimate.client),
+      vehicle_id: estimate.vehicle ? String(estimate.vehicle) : '',
+      valid_until: estimate.valid_until || '',
+      items: estimate.items.map(item => ({
+        type: item.product ? 'product' : 'service',
+        id: item.product || item.service,
+        name: item.description,
+        price: parseFloat(item.unit_price),
+        qty: parseInt(item.quantity)
+      }))
+    });
+    setViewState('new');
+  };
+
+  const handleDeleteEstimate = (id) => {
+    if (!window.confirm("¿Está seguro de eliminar este presupuesto?")) return;
+    axios.delete(`/api/finance/estimates/${id}/`)
+      .then(() => {
+        toast({ title: "Presupuesto eliminado exitosamente", type: "success" });
+        fetchEstimates();
+      })
+      .catch(err => {
+        console.error(err);
+        toast({ title: "Error al eliminar presupuesto", type: "error" });
+      });
   };
 
   const handleSaveEstimate = (e) => {
@@ -109,17 +141,32 @@ export default function EstimatesDashboard() {
       }))
     };
 
-    axios.post('/api/finance/estimates/', payload)
-      .then(res => {
-        toast({ title: "Presupuesto creado exitosamente", type: "success" });
-        setViewState('list');
-        setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] });
-        fetchEstimates();
-      })
-      .catch(err => {
-        console.error(err);
-        toast({ title: "Error al crear presupuesto", type: "error" });
-      });
+    if (editingId) {
+      axios.put(`/api/finance/estimates/${editingId}/`, payload)
+        .then(res => {
+          toast({ title: "Presupuesto actualizado exitosamente", type: "success" });
+          setViewState('list');
+          setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] });
+          setEditingId(null);
+          fetchEstimates();
+        })
+        .catch(err => {
+          console.error(err);
+          toast({ title: "Error al actualizar presupuesto", type: "error" });
+        });
+    } else {
+      axios.post('/api/finance/estimates/', payload)
+        .then(res => {
+          toast({ title: "Presupuesto creado exitosamente", type: "success" });
+          setViewState('list');
+          setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] });
+          fetchEstimates();
+        })
+        .catch(err => {
+          console.error(err);
+          toast({ title: "Error al crear presupuesto", type: "error" });
+        });
+    }
   };
 
   const downloadPDF = async (id) => {
@@ -182,8 +229,8 @@ export default function EstimatesDashboard() {
     return (
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2>Nuevo Presupuesto</h2>
-          <button className="btn btn-secondary" onClick={() => setViewState('list')}>Volver</button>
+          <h2>{editingId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h2>
+          <button className="btn btn-secondary" onClick={() => { setViewState('list'); setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] }); setEditingId(null); }}>Volver</button>
         </div>
         <form onSubmit={handleSaveEstimate} className="form-grid">
           <div className="form-group">
@@ -263,7 +310,9 @@ export default function EstimatesDashboard() {
               )}
             </table>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '1rem' }}>Guardar Presupuesto</button>
+              <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '1rem' }}>
+                {editingId ? 'Actualizar Presupuesto' : 'Guardar Presupuesto'}
+              </button>
             </div>
           </div>
         </form>
@@ -305,6 +354,12 @@ export default function EstimatesDashboard() {
                 <td style={{ display: 'flex', gap: '0.5rem' }}>
                   <button className="btn" onClick={() => downloadPDF(e.id)} title="Descargar PDF">📄</button>
                   <button className="btn" onClick={() => sendWhatsApp(e.id)} style={{ color: '#16a34a' }} title="Enviar por WhatsApp">💬</button>
+                  {e.status !== 'ACCEPTED' && (
+                    <button className="btn" onClick={() => handleEditEstimate(e)} title="Editar Presupuesto">✏️</button>
+                  )}
+                  {e.status !== 'ACCEPTED' && (
+                    <button className="btn" onClick={() => handleDeleteEstimate(e.id)} style={{ color: 'red' }} title="Eliminar Presupuesto">🗑️</button>
+                  )}
                   {e.status !== 'ACCEPTED' && e.vehicle && (
                     <button className="btn btn-secondary" onClick={() => convertToWorkOrder(e.id)} title="Convertir a Orden de Trabajo">➡️ OT</button>
                   )}

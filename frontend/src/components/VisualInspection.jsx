@@ -373,6 +373,8 @@ const VisualInspection = () => {
       const payload = {
         vehicle_id: selectedInspection.vehicle_id,
         status: 'PENDING',
+        mileage: 0,
+        fuel_level: 0,
         symptoms: `Generado desde Inspección Visual #${selectedInspection.id}`,
         visit_reason: 'Cotización / Presupuesto post-inspección'
       };
