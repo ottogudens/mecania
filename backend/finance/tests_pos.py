@@ -211,3 +211,30 @@ class POSWorkOrderFlowTests(TestCase):
         self.wo.save()
         with self.assertRaises(WorkOrderTransitionError):
             cancel_work_order(work_order=self.wo, reason="tarde")
+
+    def test_pos_lookup_only_active_work_orders(self):
+        from django.contrib.auth.models import User
+        from rest_framework.test import APIClient
+        
+        user = User.objects.create_user(username="testuser", password="password")
+        client = APIClient()
+        client.force_authenticate(user=user)
+        
+        # Test delivered OT
+        self.wo.status = "DELIVERED"
+        self.wo.save()
+        res = client.get(f"/api/finance/pos/work-order-lookup/?work_order_id={self.wo.id}")
+        self.assertEqual(res.status_code, 404)
+        
+        # Test cancelled OT
+        self.wo.status = "CANCELLED"
+        self.wo.save()
+        res2 = client.get(f"/api/finance/pos/work-order-lookup/?work_order_id={self.wo.id}")
+        self.assertEqual(res2.status_code, 404)
+
+        # Test active (IN_PROGRESS) OT
+        self.wo.status = "IN_PROGRESS"
+        self.wo.save()
+        res3 = client.get(f"/api/finance/pos/work-order-lookup/?work_order_id={self.wo.id}")
+        self.assertEqual(res3.status_code, 200)
+

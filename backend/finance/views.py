@@ -53,11 +53,11 @@ class POSWorkOrderLookupView(APIView):
         license_plate = request.query_params.get('license_plate')
 
         if work_order_id:
-            work_order = WorkOrder.objects.filter(id=work_order_id).first()
+            work_order = WorkOrder.objects.filter(id=work_order_id).exclude(status__in=['DELIVERED', 'CANCELLED']).first()
         elif license_plate:
             work_order = (
                 WorkOrder.objects.filter(vehicle__license_plate__iexact=license_plate)
-                .exclude(status='CANCELLED')
+                .exclude(status__in=['DELIVERED', 'CANCELLED'])
                 .order_by('-created_at')
                 .first()
             )
@@ -68,7 +68,7 @@ class POSWorkOrderLookupView(APIView):
             )
 
         if not work_order:
-            return Response({'error': 'Orden de trabajo no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Orden de trabajo activa no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
         invoice = get_or_create_invoice_for_work_order(work_order)
         return Response(InvoiceSerializer(invoice).data)
