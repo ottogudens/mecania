@@ -11,7 +11,7 @@ def validate_license_plate(value):
 
 class WorkshopSettings(models.Model):
     name = models.CharField(max_length=100, default="MecanIA")
-    logo = models.ImageField(upload_to='workshop_logo/', null=True, blank=True)
+    logo = models.TextField(blank=True, null=True, help_text="Logo del taller en formato Base64")
     phone = models.CharField(max_length=20, blank=True)
     address = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True)

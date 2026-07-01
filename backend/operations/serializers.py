@@ -10,12 +10,7 @@ class WorkshopSettingsSerializer(serializers.ModelSerializer):
         fields = ['name', 'logo', 'logo_url', 'phone', 'address', 'email', 'website', 'google_maps_link']
     
     def get_logo_url(self, obj):
-        if obj.logo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.logo.url)
-            return obj.logo.url
-        return None
+        return obj.logo
 
 class ClientSerializer(serializers.ModelSerializer):
     vehicle_count = serializers.SerializerMethodField()

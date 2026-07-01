@@ -171,9 +171,16 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         settings = WorkshopSettings.load()
         if settings.logo:
             try:
+                import base64
+                import io
                 from reportlab.lib.utils import ImageReader
-                img = ImageReader(settings.logo)
-                p.drawImage(img, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
+                
+                # Check if it is a base64 data URL
+                if settings.logo.startswith('data:image'):
+                    header, data = settings.logo.split(';base64,')
+                    decoded = base64.b64decode(data)
+                    img = ImageReader(io.BytesIO(decoded))
+                    p.drawImage(img, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
             except Exception as e:
                 print("PDF Logo drawing failed:", e)
         

@@ -42,26 +42,35 @@ const Settings = () => {
     }
   };
 
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setWorkshopSettings(prev => ({
+        ...prev,
+        logo: reader.result,
+        logo_url: reader.result
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
     setSavingSettings(true);
-    const formData = new FormData();
-    formData.append('name', workshopSettings.name);
-    formData.append('phone', workshopSettings.phone);
-    formData.append('address', workshopSettings.address);
-    formData.append('email', workshopSettings.email);
-    formData.append('website', workshopSettings.website || '');
-    formData.append('google_maps_link', workshopSettings.google_maps_link || '');
-    if (logoFile) {
-      formData.append('logo', logoFile);
-    }
 
     try {
-      const res = await axios.put('/api/operations/settings/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const res = await axios.put('/api/operations/settings/', {
+        name: workshopSettings.name,
+        phone: workshopSettings.phone,
+        address: workshopSettings.address,
+        email: workshopSettings.email,
+        website: workshopSettings.website || '',
+        google_maps_link: workshopSettings.google_maps_link || '',
+        logo: workshopSettings.logo || null
       });
       setWorkshopSettings(res.data);
-      setLogoFile(null);
       alert('Configuración guardada exitosamente.');
     } catch (err) {
       console.error(err);
@@ -81,45 +90,45 @@ const Settings = () => {
       <div className="grid-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
         
         {/* Workshop Profile Config */}
-        <div className="glass-card">
-          <h3 style={{ marginBottom: '1rem' }}>Perfil del Taller (Logos y PDF)</h3>
-          <form onSubmit={handleSettingsSubmit} className="form-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="form-group">
-              <label>Nombre del Taller</label>
-              <input type="text" value={workshopSettings.name} onChange={e => setWorkshopSettings({...workshopSettings, name: e.target.value})} required />
+        <div className="glass-card" style={{ border: '1px solid var(--border-color)' }}>
+          <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Perfil del Taller (Logos y PDF)</h3>
+          <form onSubmit={handleSettingsSubmit} className="form-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nombre del Taller</label>
+              <input className="input-field" type="text" value={workshopSettings.name} onChange={e => setWorkshopSettings({...workshopSettings, name: e.target.value})} required />
             </div>
             
-            <div className="form-group">
-              <label>Logo del Taller (Para PDFs)</label>
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Logo del Taller (Para PDFs)</label>
               {workshopSettings.logo_url && (
-                <div style={{ marginBottom: '0.5rem' }}>
-                  <img src={workshopSettings.logo_url} alt="Logo" style={{ maxHeight: '60px' }} />
+                <div style={{ marginBottom: '0.5rem', display: 'inline-block', padding: '0.5rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px' }}>
+                  <img src={workshopSettings.logo_url} alt="Logo" style={{ maxHeight: '60px', display: 'block' }} />
                 </div>
               )}
-              <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files[0])} />
+              <input className="input-field" type="file" accept="image/*" onChange={handleLogoChange} style={{ background: 'rgba(0,0,0,0.2)' }} />
             </div>
 
-            <div className="form-group">
-              <label>Teléfono</label>
-              <input type="text" value={workshopSettings.phone} onChange={e => setWorkshopSettings({...workshopSettings, phone: e.target.value})} />
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Teléfono</label>
+              <input className="input-field" type="text" value={workshopSettings.phone} onChange={e => setWorkshopSettings({...workshopSettings, phone: e.target.value})} />
             </div>
 
-            <div className="form-group">
-              <label>Dirección</label>
-              <input type="text" value={workshopSettings.address} onChange={e => setWorkshopSettings({...workshopSettings, address: e.target.value})} />
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Dirección</label>
+              <input className="input-field" type="text" value={workshopSettings.address} onChange={e => setWorkshopSettings({...workshopSettings, address: e.target.value})} />
             </div>
 
-            <div className="form-group">
-              <label>Enlace Google Maps</label>
-              <input type="url" placeholder="https://maps.google.com/..." value={workshopSettings.google_maps_link || ''} onChange={e => setWorkshopSettings({...workshopSettings, google_maps_link: e.target.value})} />
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Enlace Google Maps</label>
+              <input className="input-field" type="url" placeholder="https://maps.google.com/..." value={workshopSettings.google_maps_link || ''} onChange={e => setWorkshopSettings({...workshopSettings, google_maps_link: e.target.value})} />
             </div>
 
-            <div className="form-group">
-              <label>Email Correo</label>
-              <input type="email" value={workshopSettings.email} onChange={e => setWorkshopSettings({...workshopSettings, email: e.target.value})} />
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Email Correo</label>
+              <input className="input-field" type="email" value={workshopSettings.email} onChange={e => setWorkshopSettings({...workshopSettings, email: e.target.value})} />
             </div>
 
-            <button type="submit" className="btn btn-primary" disabled={savingSettings}>
+            <button type="submit" className="btn" style={{ width: '100%', marginTop: '0.5rem', backgroundColor: 'var(--primary)' }} disabled={savingSettings}>
               {savingSettings ? 'Guardando...' : 'Guardar Perfil'}
             </button>
           </form>
