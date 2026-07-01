@@ -86,6 +86,7 @@ const InventoryDashboard = () => {
         }
       });
       
+      const { products_created, services_created, errors } = response.data;
       let msg = `Productos creados/actualizados: ${products_created}\nServicios creados/actualizados: ${services_created}`;
       if (errors && errors.length > 0) {
         msg += `\n\nErrores:\n` + errors.join('\n');

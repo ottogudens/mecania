@@ -10,6 +10,7 @@ const ClientList = () => {
   const [showModal, setShowModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [newClient, setNewClient] = useState({
     first_name: '',
@@ -75,7 +76,7 @@ const ClientList = () => {
       const token = localStorage.getItem('token');
       await axios.post('/api/operations/vehicles/', {
         ...newVehicle,
-        client: selectedClientId
+        client_id: selectedClientId
       }, {
         headers: { Authorization: `Token ${token}` }
       });
@@ -93,27 +94,42 @@ const ClientList = () => {
     setShowVehicleModal(true);
   };
 
+  const filteredClients = clients.filter(c => 
+    (c.first_name + ' ' + c.last_name).toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (c.phone && c.phone.includes(searchQuery))
+  );
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando Clientes...</div>;
   if (error) return <div style={{ color: 'var(--status-red)', textAlign: 'center', padding: '2rem' }}>{error}</div>;
 
   return (
     <div className="client-list">
-      <div className="header" style={{ marginBottom: '2rem' }}>
+      <div className="header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2>Directorio de Clientes</h2>
-        <button className="btn" onClick={() => setShowModal(true)}>Nuevo Cliente</button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <input 
+            type="text" 
+            className="glass-input" 
+            placeholder="Buscar por nombre o teléfono..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button className="btn" onClick={() => setShowModal(true)}>Nuevo Cliente</button>
+        </div>
       </div>
 
-      {clients.length === 0 ? (
+      {filteredClients.length === 0 ? (
         <div className="glass-card" style={{ textAlign: 'center' }}>
           <p>No hay clientes registrados.</p>
         </div>
       ) : (
         <div className="grid-container">
-          {clients.map(client => (
+          {filteredClients.map(client => (
             <div key={client.id} className="glass-card">
               <h3>{client.first_name} {client.last_name}</h3>
               <p style={{ color: 'var(--text-muted)' }}>📞 {client.phone}</p>
               <p style={{ color: 'var(--text-muted)' }}>✉️ {client.email || 'Sin correo'}</p>
+              <p style={{ color: 'var(--text-muted)' }}>🚗 {client.vehicle_count || 0} Vehículos</p>
               <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                 <button className="btn btn-outline" style={{ flex: 1 }}>Ver Historial</button>
                 <button className="btn" style={{ flex: 1 }} onClick={() => openVehicleModal(client.id)}>+ Vehículo</button>

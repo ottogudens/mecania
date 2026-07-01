@@ -5,7 +5,7 @@ import { useToast } from './Toast';
 export default function EstimatesDashboard() {
   const [estimates, setEstimates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { showToast } = useToast();
+  const toast = useToast();
 
   const [viewState, setViewState] = useState('list'); // 'list' or 'new'
   const [clients, setClients] = useState([]);
@@ -32,7 +32,7 @@ export default function EstimatesDashboard() {
     setLoading(true);
     axios.get('/api/finance/estimates/')
       .then(res => setEstimates(res.data.results || res.data))
-      .catch(err => showToast("Error al cargar presupuestos", "error"))
+      .catch(err => toast({ title: "Error al cargar presupuestos", type: "error" }))
       .finally(() => setLoading(false));
   };
 
@@ -92,7 +92,7 @@ export default function EstimatesDashboard() {
   const handleSaveEstimate = (e) => {
     e.preventDefault();
     if (!newEstimate.client_id || newEstimate.items.length === 0) {
-      showToast("Seleccione un cliente y añada ítems", "error");
+      toast({ title: "Seleccione un cliente y añada ítems", type: "error" });
       return;
     }
 
@@ -111,39 +111,39 @@ export default function EstimatesDashboard() {
 
     axios.post('/api/finance/estimates/', payload)
       .then(res => {
-        showToast("Presupuesto creado exitosamente", "success");
+        toast({ title: "Presupuesto creado exitosamente", type: "success" });
         setViewState('list');
         setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] });
         fetchEstimates();
       })
       .catch(err => {
         console.error(err);
-        showToast("Error al crear presupuesto", "error");
+        toast({ title: "Error al crear presupuesto", type: "error" });
       });
   };
 
   const downloadPDF = async (id) => {
     try {
-      showToast("Generando PDF...", "info");
+      toast({ title: "Generando PDF...", type: "info" });
       const res = await axios.get(`/api/finance/estimates/${id}/pdf/`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       window.open(url, '_blank');
     } catch (err) {
       console.error("PDF Error:", err);
-      showToast("Error al generar PDF", "error");
+      toast({ title: "Error al generar PDF", type: "error" });
     }
   };
 
   const sendWhatsApp = (id) => {
-    showToast("Enviando por WhatsApp...", "info");
+    toast({ title: "Enviando por WhatsApp...", type: "info" });
     axios.post(`/api/finance/estimates/${id}/share_whatsapp/`)
       .then(res => {
-        showToast("Mensaje enviado exitosamente", "success");
+        toast({ title: "Mensaje enviado exitosamente", type: "success" });
         fetchEstimates();
       })
       .catch(err => {
         console.error(err);
-        showToast("Error al enviar WhatsApp. Asegúrese de que el cliente tiene teléfono y el servicio WA está activo.", "error");
+        toast({ title: "Error al enviar WhatsApp. Asegúrese de que el cliente tiene teléfono y el servicio WA está activo.", type: "error" });
       });
   };
   
@@ -151,11 +151,11 @@ export default function EstimatesDashboard() {
     if (!window.confirm("¿Convertir este presupuesto a una Orden de Trabajo?")) return;
     axios.post(`/api/finance/estimates/${id}/convert_to_work_order/`)
       .then(res => {
-        showToast(`Orden de Trabajo OT-${res.data.work_order_id} creada!`, "success");
+        toast({ title: `Orden de Trabajo OT-${res.data.work_order_id} creada!`, type: "success" });
         fetchEstimates();
       })
       .catch(err => {
-        showToast(err.response?.data?.error || "Error al convertir a OT", "error");
+        toast({ title: err.response?.data?.error || "Error al convertir a OT", type: "error" });
       });
   };
 

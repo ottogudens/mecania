@@ -18,9 +18,13 @@ class WorkshopSettingsSerializer(serializers.ModelSerializer):
         return None
 
 class ClientSerializer(serializers.ModelSerializer):
+    vehicle_count = serializers.SerializerMethodField()
     class Meta:
         model = Client
         fields = '__all__'
+        
+    def get_vehicle_count(self, obj):
+        return obj.vehicles.count()
 
 class VehicleSerializer(serializers.ModelSerializer):
     client = ClientSerializer(read_only=True)

@@ -26,15 +26,20 @@ def notify_client_on_status_change(sender, instance, created, **kwargs):
         print(f"Error sending WebSocket update: {str(e)}")
 
     # Only notify WhatsApp if we have the owner's phone number and specific status
-    phone = instance.vehicle.owner_phone
+    # The client might be None, so we need to check safely
+    client = instance.vehicle.client if hasattr(instance.vehicle, 'client') else None
+    if not client:
+        return
+        
+    phone = client.phone
     if not phone or phone == '0000000000':
         return
 
     # Check if status has changed.
     if instance.status == 'COMPLETED':
-        message = f"¡Hola {instance.vehicle.owner_name}! Tu vehículo {instance.vehicle.make} {instance.vehicle.model} (Placa: {instance.vehicle.license_plate}) ya está listo para ser retirado. ¡Gracias por confiar en AutoMaster!"
+        message = f"¡Hola {client.first_name}! Tu vehículo {instance.vehicle.make} {instance.vehicle.model} (Placa: {instance.vehicle.license_plate}) ya está listo para ser retirado. ¡Gracias por confiar en AutoMaster!"
     elif instance.status == 'IN_PROGRESS':
-        message = f"¡Hola {instance.vehicle.owner_name}! Hemos comenzado a trabajar en tu vehículo {instance.vehicle.make} {instance.vehicle.model}. Te mantendremos informado."
+        message = f"¡Hola {client.first_name}! Hemos comenzado a trabajar en tu vehículo {instance.vehicle.make} {instance.vehicle.model}. Te mantendremos informado."
     else:
         return
 

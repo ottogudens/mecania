@@ -43,6 +43,7 @@ class Vehicle(models.Model):
     make = models.CharField(max_length=50)
     model = models.CharField(max_length=50)
     year = models.IntegerField()
+    color = models.CharField(max_length=30, blank=True, null=True, help_text="Color del vehículo")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='vehicles', null=True, blank=True)
 
     def __str__(self):

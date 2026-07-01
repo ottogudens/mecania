@@ -51,6 +51,21 @@ const FinanceDashboard = () => {
     }
   };
 
+  const downloadPDF = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`/api/finance/invoices/${id}/pdf/`, { 
+        headers: { Authorization: `Token ${token}` },
+        responseType: 'blob' 
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+    } catch (err) {
+      console.error("PDF Error:", err);
+      toast({ title: 'Error', message: 'Error al generar PDF', type: 'error' });
+    }
+  };
+
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando finanzas...</div>;
 
   return (
@@ -77,8 +92,8 @@ const FinanceDashboard = () => {
                 <Pie
                   data={[
                     { name: 'Pagado', value: invoices.filter(i => i.status === 'PAID').length },
-                    { name: 'Pendiente', value: invoices.filter(i => i.status === 'PENDING').length },
-                    { name: 'Cancelado', value: invoices.filter(i => i.status === 'CANCELLED').length }
+                    { name: 'Pendiente', value: invoices.filter(i => ['DRAFT', 'SENT', 'PARTIALLY_PAID'].includes(i.status)).length },
+                    { name: 'Cancelado', value: invoices.filter(i => ['CANCELLED', 'VOID'].includes(i.status)).length }
                   ].filter(d => d.value > 0)}
                   cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}
                   dataKey="value"
