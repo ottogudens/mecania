@@ -1,13 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from './Toast';
 
+const VEHICLE_PARTS = [
+  { id: 'engine', name: 'Motor', icon: '🔧', desc: 'Nivel de aceite, mangueras, fugas y batería.' },
+  { id: 'brakes', name: 'Frenos', icon: '🛑', desc: 'Pastillas, discos y líquido de frenos.' },
+  { id: 'suspension', name: 'Suspensión', icon: '↕️', desc: 'Amortiguadores, bandejas y rótulas.' },
+  { id: 'tires', name: 'Neumáticos', icon: '🛞', desc: 'Desgaste, presión y estado de llantas.' },
+  { id: 'lights', name: 'Luces', icon: '💡', desc: 'Focos del., traseros, intermitentes.' },
+  { id: 'bodywork', name: 'Carrocería', icon: '🚗', desc: 'Rayones, abolladuras, golpes exteriores.' },
+  { id: 'interior', name: 'Interior', icon: '💺', desc: 'Cinturones, aire acondicionado, tablero.' },
+  { id: 'exhaust', name: 'Escape', icon: '💨', desc: 'Fugas de humo, catalizador y silenciador.' }
+];
+
 const MechanicPortal = ({ onLogout }) => {
-  const [orders, setOrders] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
   const [assignedOrders, setAssignedOrders] = useState([]);
   
+  // Visual Inspection States
+  const [pendingInspections, setPendingInspections] = useState([]);
+  const [assignedInspections, setAssignedInspections] = useState([]);
+  
+  const [portalTab, setPortalTab] = useState('orders'); // orders, inspections
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -18,11 +33,23 @@ const MechanicPortal = ({ onLogout }) => {
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
 
-  // Details Modal State
+  // Details Modal State (Work Orders)
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [mechanicFinding, setMechanicFinding] = useState('');
   const [savingFinding, setSavingFinding] = useState(false);
+
+  // Active Inspection Modal State
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [selectedInspection, setSelectedInspection] = useState(null);
+  const [selectedPartId, setSelectedPartId] = useState('engine');
+  const [activeItemsData, setActiveItemsData] = useState({});
+
+  // Audio recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [loadingAi, setLoadingAi] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const toast = useToast();
 
@@ -32,33 +59,38 @@ const MechanicPortal = ({ onLogout }) => {
         setError("Acceso denegado. Este portal es de uso exclusivo para mecánicos.");
         setLoading(false);
       } else {
-        fetchOrders();
+        fetchAllData();
       }
     } else {
       setLoading(false);
     }
   }, [token, role]);
 
-  const fetchOrders = async () => {
+  const fetchAllData = async () => {
     setLoading(true);
     try {
       const currentToken = localStorage.getItem('token');
-      const response = await axios.get('/api/operations/work-orders/', {
+      
+      // Fetch OTs
+      const ordersRes = await axios.get('/api/operations/work-orders/', {
         headers: { Authorization: `Token ${currentToken}` }
       });
-      const data = response.data.results || response.data;
+      const ordersData = ordersRes.data.results || ordersRes.data;
+      setPendingOrders(ordersData.filter(ot => ot.status === 'PENDING' && !ot.mechanic));
+      setAssignedOrders(ordersData.filter(ot => ot.mechanic_name === username));
+
+      // Fetch Inspections
+      const insRes = await axios.get('/api/operations/inspections/', {
+        headers: { Authorization: `Token ${currentToken}` }
+      });
+      const insData = insRes.data.results || insRes.data;
+      setPendingInspections(insData.filter(ins => ins.status === 'PENDING'));
+      setAssignedInspections(insData.filter(ins => ins.mechanic_username === username));
       
-      // Filter pending orders (no mechanic assigned and status PENDING)
-      const pending = data.filter(ot => ot.status === 'PENDING' && !ot.mechanic);
-      // Filter assigned to this user
-      const assigned = data.filter(ot => ot.mechanic_name === username);
-      
-      setPendingOrders(pending);
-      setAssignedOrders(assigned);
       setError(null);
     } catch (err) {
       console.error(err);
-      setError("Error al cargar las órdenes de trabajo.");
+      setError("Error al cargar las tareas asignadas.");
     } finally {
       setLoading(false);
     }
@@ -82,11 +114,10 @@ const MechanicPortal = ({ onLogout }) => {
       setRole(data.role);
       setUsername(data.username);
       if (onLogout) {
-        // Just trigger logout/auth state update in parent with correct state
         onLogout(); 
       }
     } catch (err) {
-      setLoginError("Credenciales incorrectas o problema de conexión.");
+      setLoginError("Credenciales incorrectas.");
     }
   };
 
@@ -103,6 +134,7 @@ const MechanicPortal = ({ onLogout }) => {
     }
   };
 
+  // Work Orders status and taking
   const handleTakeOrder = async (orderId) => {
     try {
       const currentToken = localStorage.getItem('token');
@@ -110,10 +142,10 @@ const MechanicPortal = ({ onLogout }) => {
         headers: { Authorization: `Token ${currentToken}` }
       });
       toast({ title: 'Orden Tomada', message: 'La OT ha sido asignada a tu lista de trabajo.', type: 'success' });
-      fetchOrders();
+      fetchAllData();
     } catch (err) {
       console.error(err);
-      toast({ title: 'Error', message: 'No se pudo tomar la orden de trabajo.', type: 'error' });
+      toast({ title: 'Error', message: 'No se pudo tomar la orden.', type: 'error' });
     }
   };
 
@@ -126,13 +158,13 @@ const MechanicPortal = ({ onLogout }) => {
         headers: { Authorization: `Token ${currentToken}` }
       });
       toast({ title: 'Estado Actualizado', message: `Orden pasada a ${newStatus}`, type: 'success' });
-      fetchOrders();
+      fetchAllData();
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder(res.data);
       }
     } catch (err) {
       console.error(err);
-      const msg = err.response?.data?.error || 'No se pudo cambiar el estado.';
+      const msg = err.response?.data?.error || 'Error de cambio de estado.';
       toast({ title: 'Error', message: msg, type: 'error' });
     }
   };
@@ -147,14 +179,163 @@ const MechanicPortal = ({ onLogout }) => {
       }, {
         headers: { Authorization: `Token ${currentToken}` }
       });
-      toast({ title: 'Hallazgo Guardado', message: 'Detalle ingresado correctamente.', type: 'success' });
+      toast({ title: 'Hallazgo Guardado', message: 'Detalle registrado.', type: 'success' });
       setSelectedOrder(res.data);
-      fetchOrders();
+      fetchAllData();
     } catch (err) {
       console.error(err);
-      toast({ title: 'Error', message: 'No se pudo registrar el hallazgo.', type: 'error' });
+      toast({ title: 'Error', message: 'No se pudo registrar.', type: 'error' });
     } finally {
       setSavingFinding(false);
+    }
+  };
+
+  // Inspections taking & management
+  const handleTakeInspection = async (id) => {
+    try {
+      const currentToken = localStorage.getItem('token');
+      const res = await axios.post(`/api/operations/inspections/${id}/take_inspection/`, {}, {
+        headers: { Authorization: `Token ${currentToken}` }
+      });
+      toast({ title: 'Inspección Tomada', message: 'Iniciada con éxito.', type: 'success' });
+      
+      const inspection = res.data;
+      setSelectedInspection(inspection);
+      setActiveItemsData(inspection.items_json || {});
+      setShowInspectionModal(true);
+      fetchAllData();
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo tomar la inspección.', type: 'error' });
+    }
+  };
+
+  const openInspectionAudit = (ins) => {
+    setSelectedInspection(ins);
+    setActiveItemsData(ins.items_json || {});
+    setShowInspectionModal(true);
+  };
+
+  const handleUpdatePart = (partId, key, value) => {
+    setActiveItemsData(prev => {
+      const updated = {
+        ...prev,
+        [partId]: {
+          ...prev[partId],
+          [key]: value
+        }
+      };
+      saveInspectionProgress(updated);
+      return updated;
+    });
+  };
+
+  const saveInspectionProgress = async (items) => {
+    if (!selectedInspection) return;
+    try {
+      const currentToken = localStorage.getItem('token');
+      await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, {
+        items_json: items
+      }, {
+        headers: { Authorization: `Token ${currentToken}` }
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Image upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      handleUpdatePart(selectedPartId, 'image', reader.result);
+      toast({ title: 'Foto Adjunta', message: 'Cargada con éxito.', type: 'success' });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Voice recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        await sendAudioForTranscription(audioBlob, mimeType);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast({ title: 'Grabando...', message: 'Habla ahora...', type: 'info' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error de micrófono', message: 'No se pudo acceder al micrófono.', type: 'error' });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const sendAudioForTranscription = async (audioBlob, mimeType) => {
+    setLoadingAi(true);
+    try {
+      const formData = new FormData();
+      let ext = 'webm';
+      if (mimeType.includes('mp4')) ext = 'mp4';
+      formData.append('audio', audioBlob, `nota_voz.${ext}`);
+      
+      const currentToken = localStorage.getItem('token');
+      const response = await axios.post('/api/operations/ai-transcribe/', formData, {
+        headers: { 
+          'Authorization': `Token ${currentToken}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      const transText = response.data.transcription;
+      const existingNote = activeItemsData[selectedPartId]?.note || '';
+      handleUpdatePart(selectedPartId, 'note', existingNote ? `${existingNote} ${transText}` : transText);
+      toast({ title: 'Transcripción completada', message: 'Texto ingresado.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo transcribir con la IA.', type: 'error' });
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const handleCompleteInspection = async () => {
+    if (!selectedInspection) return;
+    try {
+      const currentToken = localStorage.getItem('token');
+      await axios.post(`/api/operations/inspections/${selectedInspection.id}/complete_inspection/`, {}, {
+        headers: { Authorization: `Token ${currentToken}` }
+      });
+      toast({ title: 'Inspección Finalizada', message: 'Inspección completada con éxito.', type: 'success' });
+      setShowInspectionModal(false);
+      setSelectedInspection(null);
+      fetchAllData();
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo completar la inspección.', type: 'error' });
     }
   };
 
@@ -176,27 +357,14 @@ const MechanicPortal = ({ onLogout }) => {
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.9rem' }}>Usuario</label>
-              <input 
-                type="text" 
-                required 
-                className="input-field" 
-                value={loginData.username} 
-                onChange={e => setLoginData({...loginData, username: e.target.value})} 
-              />
+              <input type="text" required className="input-field" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} />
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.9rem' }}>Contraseña</label>
-              <input 
-                type="password" 
-                required 
-                className="input-field" 
-                value={loginData.password} 
-                onChange={e => setLoginData({...loginData, password: e.target.value})} 
-              />
+              <input type="password" required className="input-field" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} />
             </div>
             <button type="submit" className="btn" style={{ width: '100%', marginTop: '0.5rem' }}>Iniciar Sesión</button>
           </form>
-
           <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', flex: 1 }}></span>
@@ -232,148 +400,283 @@ const MechanicPortal = ({ onLogout }) => {
         <button className="btn btn-outline" onClick={handleLogout}>Cerrar Sesión</button>
       </div>
 
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
+        <button className={`btn ${portalTab === 'orders' ? '' : 'btn-outline'}`} onClick={() => setPortalTab('orders')}>
+          📋 Órdenes de Trabajo (OT)
+        </button>
+        <button className={`btn ${portalTab === 'inspections' ? '' : 'btn-outline'}`} onClick={() => setPortalTab('inspections')}>
+          🔍 Inspecciones Visuales
+        </button>
+      </div>
+
       {loading ? (
-        <p>Cargando órdenes de trabajo...</p>
+        <p>Cargando tareas pendientes...</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-          
-          {/* OTs Disponibles (PENDING) */}
-          <div>
-            <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>📋 Órdenes de Trabajo Pendientes (Disponibles)</h3>
-            {pendingOrders.length === 0 ? (
-              <div className="glass-card" style={{ textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-muted)' }}>No hay nuevas órdenes de trabajo disponibles en este momento.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-                {pendingOrders.map(ot => (
-                  <div key={ot.id} className="glass-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase' }}>🚗 {ot.vehicle?.license_plate}</span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>OT #{ot.id}</span>
-                    </div>
-                    <p style={{ margin: '0.2rem 0' }}>{ot.vehicle?.make} {ot.vehicle?.model} ({ot.vehicle?.year})</p>
-                    {ot.symptoms && (
-                      <div style={{ marginTop: '0.5rem', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px', fontSize: '0.9rem' }}>
-                        <strong>Síntomas:</strong> {ot.symptoms}
+        <div>
+          {portalTab === 'orders' ? (
+            /* Work Orders view */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+              {/* OTs Disponibles (PENDING) */}
+              <div>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>📋 OTs Pendientes Disponibles</h3>
+                {pendingOrders.length === 0 ? (
+                  <div className="glass-card" style={{ textAlign: 'center' }}>
+                    <p style={{ color: 'var(--text-muted)' }}>No hay nuevas OTs disponibles en este momento.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                    {pendingOrders.map(ot => (
+                      <div key={ot.id} className="glass-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase' }}>🚗 {ot.vehicle?.license_plate}</span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>OT #{ot.id}</span>
+                        </div>
+                        <p style={{ margin: '0.2rem 0' }}>{ot.vehicle?.make} {ot.vehicle?.model} ({ot.vehicle?.year})</p>
+                        <button className="btn" style={{ width: '100%', marginTop: '1rem' }} onClick={() => handleTakeOrder(ot.id)}>
+                          🛠️ Iniciar Servicio
+                        </button>
                       </div>
-                    )}
-                    <button 
-                      className="btn" 
-                      style={{ width: '100%', marginTop: '1rem', backgroundColor: 'var(--primary)' }}
-                      onClick={() => handleTakeOrder(ot.id)}
-                    >
-                      🛠️ Tomar OT (Iniciar Trabajo)
-                    </button>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Mis OTs asignadas */}
-          <div>
-            <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>🩺 Mi Historial y Trabajo Asignado</h3>
-            {assignedOrders.length === 0 ? (
-              <div className="glass-card" style={{ textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-muted)' }}>Aún no has tomado ninguna orden de trabajo.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                {assignedOrders.map(ot => (
-                  <div key={ot.id} className="glass-card" style={{ borderLeft: ot.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <span style={{ fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase' }}>🚗 {ot.vehicle?.license_plate}</span>
-                      <span className={`badge ${ot.status}`}>{ot.status}</span>
-                    </div>
-                    <p style={{ margin: '0.2rem 0' }}>{ot.vehicle?.make} {ot.vehicle?.model} ({ot.vehicle?.year})</p>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                      <div>OT #{ot.id} | {new Date(ot.created_at).toLocaleDateString()}</div>
-                      <div>Kilometraje: {ot.mileage?.toLocaleString()} km</div>
-                    </div>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ width: '100%', marginTop: '1rem' }}
-                      onClick={() => openDetails(ot)}
-                    >
-                      ✏️ Ver Detalles / Actualizar
-                    </button>
+              {/* Mis OTs asignadas */}
+              <div>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>🩺 Mis OTs Activas y Completadas</h3>
+                {assignedOrders.length === 0 ? (
+                  <div className="glass-card" style={{ textAlign: 'center' }}>
+                    <p style={{ color: 'var(--text-muted)' }}>Aún no tienes órdenes de trabajo asignadas.</p>
                   </div>
-                ))}
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                    {assignedOrders.map(ot => (
+                      <div key={ot.id} className="glass-card" style={{ borderLeft: ot.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase' }}>🚗 {ot.vehicle?.license_plate}</span>
+                          <span className={`badge ${ot.status}`}>{ot.status}</span>
+                        </div>
+                        <p style={{ margin: '0.2rem 0' }}>{ot.vehicle?.make} {ot.vehicle?.model} ({ot.vehicle?.year})</p>
+                        <button className="btn btn-outline" style={{ width: '100%', marginTop: '1rem' }} onClick={() => openDetails(ot)}>
+                          ✏️ Ver Detalles / Actualizar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            /* Inspections view */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+              
+              {/* Inspecciones Pendientes (PENDING) */}
+              <div>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>📋 Inspecciones Pendientes Disponibles</h3>
+                {pendingInspections.length === 0 ? (
+                  <div className="glass-card" style={{ textAlign: 'center' }}>
+                    <p style={{ color: 'var(--text-muted)' }}>No hay inspecciones visuales pendientes en este momento.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                    {pendingInspections.map(ins => (
+                      <div key={ins.id} className="glass-card">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase' }}>🚗 {ins.vehicle_plate}</span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Inspección #{ins.id}</span>
+                        </div>
+                        <p style={{ margin: '0.2rem 0' }}>{ins.vehicle_make} {ins.vehicle_model}</p>
+                        <button className="btn" style={{ width: '100%', marginTop: '1rem' }} onClick={() => handleTakeInspection(ins.id)}>
+                          🔍 Iniciar Inspección
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
+              {/* Mis Inspecciones asignadas */}
+              <div>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)' }}>🩺 Mis Inspecciones Activas y Completadas</h3>
+                {assignedInspections.length === 0 ? (
+                  <div className="glass-card" style={{ textAlign: 'center' }}>
+                    <p style={{ color: 'var(--text-muted)' }}>Aún no has tomado ninguna inspección visual.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                    {assignedInspections.map(ins => (
+                      <div key={ins.id} className="glass-card" style={{ borderLeft: ins.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.1rem', fontWeight: 'bold', textTransform: 'uppercase' }}>🚗 {ins.vehicle_plate}</span>
+                          <span className={`badge ${ins.status}`}>{ins.status}</span>
+                        </div>
+                        <p style={{ margin: '0.2rem 0' }}>{ins.vehicle_make} {ins.vehicle_model}</p>
+                        <button className="btn btn-outline" style={{ width: '100%', marginTop: '1rem' }} onClick={() => openInspectionAudit(ins)}>
+                          ✏️ Realizar / Ver Inspección
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
         </div>
       )}
 
-      {/* Details Modal */}
+      {/* Details Modal (Work Orders) */}
       {showDetailsModal && selectedOrder && (
-        <div className="modal-overlay" style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
-          justifyContent: 'center', alignItems: 'center', zIndex: 1000
-        }}>
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div className="glass-card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
               <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
             </div>
-
+            {/* OT content */}
             <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.95rem' }}>
               <div><strong>Auto:</strong> {selectedOrder.vehicle?.make} {selectedOrder.vehicle?.model}</div>
               <div><strong>Año:</strong> {selectedOrder.vehicle?.year}</div>
-              <div><strong>Transmisión:</strong> {selectedOrder.vehicle?.transmission_type}</div>
-              <div><strong>Combustible:</strong> {selectedOrder.vehicle?.fuel_type}</div>
             </div>
-
-            {selectedOrder.symptoms && (
-              <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
-                <strong>Síntomas Reportados:</strong>
-                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.9rem' }}>{selectedOrder.symptoms}</p>
-              </div>
-            )}
-
-            {/* Status Control */}
-            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-              <h4 style={{ margin: '0 0 0.8rem 0', color: 'var(--secondary)' }}>Acciones de Estado</h4>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <span>Estado: <span className="badge">{selectedOrder.status}</span></span>
-                {selectedOrder.status === 'IN_PROGRESS' && (
-                  <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={() => handleStatusChange(selectedOrder.id, 'COMPLETED')}>
-                    ✓ Terminar Servicio (Completado)
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Findings */}
+            {/* Status action buttons */}
             {selectedOrder.status === 'IN_PROGRESS' && (
-              <div style={{ marginBottom: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
-                <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>⚠️ Detalle o Hallazgo Encontrado</h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Si detectas algún problema extra que requiera revisión, regístralo aquí:</p>
-                <textarea 
-                  className="input-field"
-                  style={{ width: '100%', minHeight: '80px' }}
-                  placeholder="Describa el problema extra encontrado..."
-                  value={mechanicFinding}
-                  onChange={e => setMechanicFinding(e.target.value)}
-                />
-                <button className="btn" style={{ marginTop: '0.5rem' }} onClick={handleSaveFindings} disabled={savingFinding}>
-                  {savingFinding ? 'Guardando...' : 'Guardar Hallazgo'}
-                </button>
-              </div>
+              <button className="btn" style={{ backgroundColor: '#10b981', width: '100%', marginBottom: '1rem' }} onClick={() => handleStatusChange(selectedOrder.id, 'COMPLETED')}>
+                ✓ Terminar OT
+              </button>
             )}
-
-            {selectedOrder.additional_findings && (
-              <div style={{ padding: '0.8rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', borderRadius: '6px', borderLeft: '4px solid var(--status-red)' }}>
-                <div><strong>Problema extra reportado:</strong> "{selectedOrder.additional_findings}"</div>
-                <div>Aprobación del cliente: <strong>{selectedOrder.findings_approved ? 'APROBADO ✓' : 'PENDIENTE'}</strong></div>
-              </div>
-            )}
-
             <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setShowDetailsModal(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Inspection Modal (Audit Checklist) */}
+      {showInspectionModal && selectedInspection && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
+              <h3 style={{ margin: 0 }}>Inspección #{selectedInspection.id} - {selectedInspection.vehicle_plate}</h3>
+              <button onClick={() => setShowInspectionModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>{selectedInspection.vehicle_make} {selectedInspection.vehicle_model} | Mecánico: {selectedInspection.mechanic_username}</p>
+              {selectedInspection.status === 'IN_PROGRESS' && (
+                <button className="btn btn-sm" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
+                  ✓ Finalizar Inspección
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap-reverse' }}>
+              
+              {/* Checklist selector */}
+              <div style={{ flex: '1 1 250px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
+                  {VEHICLE_PARTS.map(part => {
+                    const data = activeItemsData[part.id] || { status: 'OK' };
+                    const isSelected = part.id === selectedPartId;
+
+                    let statusBorder = 'transparent';
+                    if (data.status === 'WARNING') statusBorder = 'var(--secondary)';
+                    else if (data.status === 'CRITICAL') statusBorder = 'var(--status-red)';
+                    else if (data.status === 'OK') statusBorder = 'var(--status-green)';
+
+                    return (
+                      <button
+                        key={part.id}
+                        onClick={() => setSelectedPartId(part.id)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          border: isSelected ? `2px solid var(--primary)` : `1px solid ${statusBorder}`,
+                          background: isSelected ? 'rgba(255, 206, 0, 0.08)' : 'rgba(255,255,255,0.02)',
+                          cursor: 'pointer',
+                          color: 'white'
+                        }}
+                      >
+                        <span style={{ fontSize: '1.5rem' }}>{part.icon}</span>
+                        <span style={{ fontWeight: 'bold', fontSize: '0.8rem' }}>{part.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Checklist Editor */}
+              {selectedPartId && (
+                <div className="glass-card" style={{ flex: '2 1 350px', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border-color)', padding: '1rem' }}>
+                  <h4 style={{ margin: 0, color: 'var(--primary)' }}>
+                    {VEHICLE_PARTS.find(p => p.id === selectedPartId)?.icon} {VEHICLE_PARTS.find(p => p.id === selectedPartId)?.name}
+                  </h4>
+                  
+                  {selectedInspection.status === 'IN_PROGRESS' ? (
+                    <>
+                      {/* Status selectors */}
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeItemsData[selectedPartId]?.status === 'OK' ? '#10b981' : 'rgba(16,185,129,0.1)', color: activeItemsData[selectedPartId]?.status === 'OK' ? 'black' : '#10b981' }}
+                          onClick={() => handleUpdatePart(selectedPartId, 'status', 'OK')}
+                        >Todo OK</button>
+                        <button
+                          style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeItemsData[selectedPartId]?.status === 'WARNING' ? '#f59e0b' : 'rgba(245,158,11,0.1)', color: activeItemsData[selectedPartId]?.status === 'WARNING' ? 'black' : '#f59e0b' }}
+                          onClick={() => handleUpdatePart(selectedPartId, 'status', 'WARNING')}
+                        >Advertencia</button>
+                        <button
+                          style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeItemsData[selectedPartId]?.status === 'CRITICAL' ? '#ef4444' : 'rgba(239,68,68,0.1)', color: activeItemsData[selectedPartId]?.status === 'CRITICAL' ? 'white' : '#ef4444' }}
+                          onClick={() => handleUpdatePart(selectedPartId, 'status', 'CRITICAL')}
+                        >Crítico</button>
+                      </div>
+
+                      {/* Recording and Camera */}
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button className={`btn btn-sm ${isRecording ? 'btn-danger' : 'btn-outline'}`} style={{ flex: 1 }} onClick={isRecording ? stopRecording : startRecording}>
+                          {isRecording ? '🔴 Parar' : '🎤 Grabar Voz'}
+                        </button>
+                        <input type="file" accept="image/*" capture="environment" id="mech-camera" style={{ display: 'none' }} onChange={handleImageUpload} />
+                        <button className="btn btn-outline btn-sm" style={{ flex: 1 }} onClick={() => document.getElementById('mech-camera').click()}>
+                          📷 Foto
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* Read-Only State badge */
+                    <div>
+                      Estado: <span className="badge">{activeItemsData[selectedPartId]?.status || 'OK'}</span>
+                    </div>
+                  )}
+
+                  {/* Preview & Note */}
+                  <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+                    {activeItemsData[selectedPartId]?.image && (
+                      <div style={{ position: 'relative', width: '120px', height: '90px', borderRadius: '6px', overflow: 'hidden' }}>
+                        <img src={activeItemsData[selectedPartId].image} alt="Evidencia" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        {selectedInspection.status === 'IN_PROGRESS' && (
+                          <button onClick={() => handleUpdatePart(selectedPartId, 'image', null)} style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.7)', border: 'none', color: 'white', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer' }}>&times;</button>
+                        )}
+                      </div>
+                    )}
+                    <textarea
+                      className="input-field"
+                      style={{ width: '100%', minHeight: '85px' }}
+                      value={activeItemsData[selectedPartId]?.note || ''}
+                      onChange={(e) => selectedInspection.status === 'IN_PROGRESS' && handleUpdatePart(selectedPartId, 'note', e.target.value)}
+                      readOnly={selectedInspection.status !== 'IN_PROGRESS'}
+                      placeholder="Sin observaciones."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+              <button className="btn btn-outline" onClick={() => setShowInspectionModal(false)}>Cerrar</button>
             </div>
           </div>
         </div>
