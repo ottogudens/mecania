@@ -216,7 +216,10 @@ class ProductViewSet(viewsets.ModelViewSet):
                     if tipo == 'producto':
                         sku = str(row.get('sku', '')).strip()
                         barcode = str(row.get('código de barras', row.get('codigo de barras', ''))).strip()
-                        if barcode == 'nan': barcode = ''
+                        if not barcode or barcode == 'nan' or barcode.strip() == '':
+                            barcode = None
+                        else:
+                            barcode = barcode.strip()
                         stock = int(row.get('stock', 0) if pd.notna(row.get('stock')) else 0)
                         cost_price = float(row.get('costo neto', 0) if pd.notna(row.get('costo neto')) else 0)
                         supplier = str(row.get('proveedor', '')).strip()
@@ -226,6 +229,16 @@ class ProductViewSet(viewsets.ModelViewSet):
                             errors.append(f'Fila {index+2}: SKU vacío para producto "{nombre}".')
                             continue
                             
+                        # Verificar si existe el SKU
+                        product_by_sku = Product.objects.filter(sku=sku).first()
+                        
+                        # Si existe otro producto con el mismo barcode (no vacío/nulo), arrojar error descriptivo
+                        if barcode:
+                            duplicate_barcode_prod = Product.objects.filter(barcode=barcode).exclude(sku=sku).first()
+                            if duplicate_barcode_prod:
+                                errors.append(f'Fila {index+2}: El código de barras "{barcode}" ya está en uso por el producto "{duplicate_barcode_prod.name}" (SKU: {duplicate_barcode_prod.sku}).')
+                                continue
+
                         Product.objects.update_or_create(
                             sku=sku,
                             defaults={
