@@ -3,26 +3,26 @@
 /* ===== DESIGN TOKENS ===== */
 :root {
   /* Colors */
-  --bg-primary: #060810;
-  --bg-secondary: #0d1117;
-  --surface-1: rgba(255, 255, 255, 0.03);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --surface-hover: rgba(255, 255, 255, 0.09);
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-muted: rgba(255, 255, 255, 0.12);
-  --border-accent: rgba(102, 252, 241, 0.25);
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --surface-1: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --surface-hover: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-muted: rgba(255, 255, 255, 0.15);
+  --border-accent: rgba(239, 68, 68, 0.35);
 
   /* Brand */
-  --primary: #66fcf1;
-  --primary-dim: rgba(102, 252, 241, 0.12);
-  --primary-glow: rgba(102, 252, 241, 0.35);
-  --secondary: #45a29e;
-  --secondary-dim: rgba(69, 162, 158, 0.15);
+  --primary: #ef4444;
+  --primary-dim: rgba(239, 68, 68, 0.12);
+  --primary-glow: rgba(239, 68, 68, 0.35);
+  --secondary: #eab308;
+  --secondary-dim: rgba(234, 179, 8, 0.15);
 
   /* Text */
-  --text-primary: #f0f4f8;
-  --text-secondary: #8b9ab2;
-  --text-tertiary: #4a5568;
+  --text-primary: #ffffff;
+  --text-secondary: #d4d4d4;
+  --text-tertiary: #737373;
   --text-accent: var(--primary);
 
   /* Status */
@@ -61,11 +61,11 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.8);
   --shadow-glow: 0 0 20px var(--primary-glow);
-  --shadow-glow-sm: 0 0 10px rgba(102, 252, 241, 0.2);
+  --shadow-glow-sm: 0 0 10px rgba(239, 68, 68, 0.2);
 
   /* Transitions */
   --transition-fast: 150ms ease;
@@ -101,8 +101,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-image:
-    radial-gradient(ellipse 80% 50% at 15% -10%, rgba(69, 162, 158, 0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 85% 110%, rgba(102, 252, 241, 0.04) 0%, transparent 50%);
+    radial-gradient(ellipse 80% 50% at 15% -10%, rgba(239, 68, 68, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 85% 110%, rgba(234, 179, 8, 0.03) 0%, transparent 50%);
 }
 
 /* ===== APP LAYOUT ===== */
