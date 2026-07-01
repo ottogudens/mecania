@@ -248,6 +248,23 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
     queryset = VisualInspection.objects.all().order_by('-created_at')
     serializer_class = VisualInspectionSerializer
 
+    @action(detail=True, methods=['post'])
+    def take_inspection(self, request, pk=None):
+        inspection = self.get_object()
+        if inspection.status != 'PENDING':
+            return Response({'error': 'La inspección ya no está pendiente.'}, status=status.HTTP_400_BAD_REQUEST)
+        inspection.mechanic = request.user
+        inspection.status = 'IN_PROGRESS'
+        inspection.save()
+        return Response(VisualInspectionSerializer(inspection).data)
+
+    @action(detail=True, methods=['post'])
+    def complete_inspection(self, request, pk=None):
+        inspection = self.get_object()
+        inspection.status = 'COMPLETED'
+        inspection.save()
+        return Response(VisualInspectionSerializer(inspection).data)
+
 class CustomAuthToken(APIView):
     """Login endpoint — public, no authentication required."""
     permission_classes = []

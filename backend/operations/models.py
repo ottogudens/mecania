@@ -151,17 +151,25 @@ class WorkOrderItem(models.Model):
 
 class VisualInspection(models.Model):
     STATUS_CHOICES = [
-        ('GREEN', 'Bien (Verde)'),
-        ('YELLOW', 'Advertencia (Amarillo)'),
-        ('RED', 'Crítico (Rojo)'),
+        ('PENDING', 'Pendiente'),
+        ('IN_PROGRESS', 'En Proceso'),
+        ('COMPLETED', 'Completada'),
     ]
 
-    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='inspections')
-    category = models.CharField(max_length=100, help_text="Ej., Frenos, Neumáticos, Motor")
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='visual_inspections', null=True, blank=True)
+    mechanic = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='inspections')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    notes = models.TextField(blank=True)
+    items_json = models.JSONField(default=dict, blank=True, help_text="Resultados de la inspección por partes en formato JSON")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Legacy compatibility fields
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='inspections', null=True, blank=True)
+    category = models.CharField(max_length=100, null=True, blank=True, help_text="Ej., Frenos, Neumáticos, Motor")
     evidence_file = models.FileField(upload_to='inspections/evidence/', null=True, blank=True)
     observations = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.category} - {self.status} (OT-{self.work_order.id})"
+        plate = self.vehicle.license_plate if self.vehicle else "S/P"
+        return f"Inspección {plate} - {self.get_status_display()}"
