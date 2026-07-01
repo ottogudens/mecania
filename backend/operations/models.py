@@ -173,3 +173,103 @@ class VisualInspection(models.Model):
     def __str__(self):
         plate = self.vehicle.license_plate if self.vehicle else "S/P"
         return f"Inspección {plate} - {self.get_status_display()}"
+
+
+class VehiclePart(models.Model):
+    """Registro de partes y repuestos instalados en un vehículo con número OEM."""
+    CATEGORY_CHOICES = [
+        ('FILTER', 'Filtro'),
+        ('BELT', 'Correa'),
+        ('BRAKE', 'Frenos'),
+        ('SUSPENSION', 'Suspensión'),
+        ('ENGINE', 'Motor'),
+        ('ELECTRICAL', 'Eléctrico'),
+        ('BODY', 'Carrocería'),
+        ('COOLING', 'Refrigeración'),
+        ('TRANSMISSION', 'Transmisión'),
+        ('OTHER', 'Otro'),
+    ]
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='parts')
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name='installed_parts')
+    name = models.CharField(max_length=200, help_text="Nombre de la parte (ej: Filtro de aceite)")
+    oem_number = models.CharField(max_length=100, help_text="Número OEM del fabricante")
+    brand = models.CharField(max_length=100, blank=True, help_text="Marca del repuesto (ej: Mann-Filter)")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='OTHER')
+    installed_at = models.DateField(help_text="Fecha de instalación")
+    installed_mileage = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)], help_text="Kilometraje al momento de instalar")
+    notes = models.TextField(blank=True, help_text="Observaciones adicionales")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Parte de Vehículo"
+        verbose_name_plural = "Partes de Vehículos"
+        ordering = ['-installed_at']
+
+    def __str__(self):
+        return f"{self.name} (OEM: {self.oem_number}) - {self.vehicle.license_plate}"
+
+
+MAINTENANCE_TYPE_CHOICES = [
+    ('OIL_CHANGE', 'Cambio de Aceite'),
+    ('FILTER_CHANGE', 'Cambio de Filtros'),
+    ('BELT_CHANGE', 'Cambio de Correas'),
+    ('BRAKE_SERVICE', 'Servicio de Frenos'),
+    ('TIRE_ROTATION', 'Rotación de Neumáticos'),
+    ('COOLANT_FLUSH', 'Cambio de Refrigerante'),
+    ('TRANSMISSION_SERVICE', 'Servicio de Transmisión'),
+    ('SPARK_PLUGS', 'Cambio de Bujías'),
+    ('TIMING_BELT', 'Correa de Distribución'),
+    ('GENERAL_SERVICE', 'Servicio General'),
+    ('OTHER', 'Otro'),
+]
+
+
+class MaintenanceRecord(models.Model):
+    """Historial de mantenciones realizadas a un vehículo."""
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='maintenance_records')
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name='maintenance_records')
+    maintenance_type = models.CharField(max_length=30, choices=MAINTENANCE_TYPE_CHOICES, default='GENERAL_SERVICE')
+    description = models.TextField(help_text="Descripción de lo realizado")
+    mileage = models.IntegerField(validators=[MinValueValidator(0)], help_text="Kilometraje al momento de la mantención")
+    date_performed = models.DateField(help_text="Fecha de la mantención")
+    product_details = models.TextField(blank=True, help_text="Detalles del producto usado (marca, especificación, viscosidad, etc.)")
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Costo de la mantención")
+    performed_by = models.CharField(max_length=100, blank=True, help_text="Quién realizó el trabajo")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Registro de Mantención"
+        verbose_name_plural = "Registros de Mantención"
+        ordering = ['-date_performed']
+
+    def __str__(self):
+        return f"{self.get_maintenance_type_display()} - {self.vehicle.license_plate} ({self.date_performed})"
+
+
+class ScheduledMaintenance(models.Model):
+    """Próximas mantenciones programadas para un vehículo."""
+    STATUS_CHOICES = [
+        ('PENDING', 'Pendiente'),
+        ('NOTIFIED', 'Notificado'),
+        ('COMPLETED', 'Completado'),
+        ('OVERDUE', 'Vencido'),
+    ]
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='scheduled_maintenance')
+    maintenance_type = models.CharField(max_length=30, choices=MAINTENANCE_TYPE_CHOICES, default='GENERAL_SERVICE')
+    description = models.CharField(max_length=255, help_text="Descripción breve (ej: Próximo cambio de aceite)")
+    due_mileage = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)], help_text="Kilometraje al que se debe realizar")
+    due_date = models.DateField(null=True, blank=True, help_text="Fecha límite para realizar")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    notified_at = models.DateTimeField(null=True, blank=True, help_text="Cuándo se notificó al cliente")
+    notes = models.TextField(blank=True, help_text="Notas adicionales")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Mantención Programada"
+        verbose_name_plural = "Mantenciones Programadas"
+        ordering = ['due_date', 'due_mileage']
+
+    def __str__(self):
+        return f"{self.get_maintenance_type_display()} - {self.vehicle.license_plate} ({self.get_status_display()})"

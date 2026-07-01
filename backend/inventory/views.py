@@ -26,15 +26,27 @@ class ServiceSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     bundle_items = ServiceBundleItemSerializer(many=True, read_only=True)
     bundle_items_data = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+    computed_bundle_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Service
         fields = [
             'id', 'name', 'category', 'category_name', 'price',
-            'description', 'is_active', 'is_bundle', 'sales_count', 'bundle_items', 'bundle_items_data',
+            'description', 'is_active', 'is_bundle', 'sales_count',
+            'bundle_items', 'bundle_items_data', 'computed_bundle_price',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['sales_count']
+
+    def get_computed_bundle_price(self, obj):
+        """For bundle services, calculate the total price from bundle items."""
+        if obj.is_bundle:
+            total = sum(
+                item.product.price * item.quantity
+                for item in obj.bundle_items.select_related('product').all()
+            )
+            return float(total)
+        return float(obj.price)
 
     def create(self, validated_data):
         bundle_items_data = validated_data.pop('bundle_items_data', [])

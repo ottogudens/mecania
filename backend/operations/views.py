@@ -14,8 +14,12 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings
-from .serializers import ClientSerializer, VehicleSerializer, WorkOrderSerializer, WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance
+from .serializers import (
+    ClientSerializer, VehicleSerializer, WorkOrderSerializer,
+    WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer,
+    VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer
+)
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
 class ClientViewSet(viewsets.ModelViewSet):
@@ -27,6 +31,23 @@ class VehicleViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Vehicle.objects.all().order_by('-id')
     serializer_class = VehicleSerializer
+
+    @action(detail=True, methods=['get'])
+    def full_record(self, request, pk=None):
+        """Devuelve la ficha completa del vehículo: datos + partes + mantenciones + programadas."""
+        vehicle = self.get_object()
+        parts = VehiclePart.objects.filter(vehicle=vehicle)
+        maintenance_records = MaintenanceRecord.objects.filter(vehicle=vehicle)
+        scheduled = ScheduledMaintenance.objects.filter(vehicle=vehicle)
+        work_orders = WorkOrder.objects.filter(vehicle=vehicle).order_by('-created_at')
+
+        return Response({
+            'vehicle': VehicleSerializer(vehicle).data,
+            'parts': VehiclePartSerializer(parts, many=True).data,
+            'maintenance_records': MaintenanceRecordSerializer(maintenance_records, many=True).data,
+            'scheduled_maintenance': ScheduledMaintenanceSerializer(scheduled, many=True).data,
+            'work_orders': WorkOrderSerializer(work_orders, many=True).data,
+        })
 
 class WorkOrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -601,3 +622,131 @@ class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = User.objects.all().order_by('-id')
     serializer_class = UserSerializer
+
+
+# ── ViewSets para Ficha del Vehículo ──
+
+class VehiclePartViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = VehiclePartSerializer
+
+    def get_queryset(self):
+        qs = VehiclePart.objects.select_related('vehicle', 'work_order').all()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            qs = qs.filter(vehicle_id=vehicle_id)
+        return qs.order_by('-installed_at')
+
+
+class MaintenanceRecordViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MaintenanceRecordSerializer
+
+    def get_queryset(self):
+        qs = MaintenanceRecord.objects.select_related('vehicle', 'work_order').all()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            qs = qs.filter(vehicle_id=vehicle_id)
+        return qs.order_by('-date_performed')
+
+
+class ScheduledMaintenanceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ScheduledMaintenanceSerializer
+
+    def get_queryset(self):
+        qs = ScheduledMaintenance.objects.select_related('vehicle', 'vehicle__client').all()
+        vehicle_id = self.request.query_params.get('vehicle')
+        if vehicle_id:
+            qs = qs.filter(vehicle_id=vehicle_id)
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
+
+    @action(detail=True, methods=['post'])
+    def mark_completed(self, request, pk=None):
+        """Marca una mantención programada como completada."""
+        scheduled = self.get_object()
+        scheduled.status = 'COMPLETED'
+        scheduled.save()
+        return Response(ScheduledMaintenanceSerializer(scheduled).data)
+
+    @action(detail=True, methods=['post'])
+    def notify_client(self, request, pk=None):
+        """Envía recordatorio de mantención al cliente vía WhatsApp."""
+        scheduled = self.get_object()
+        client = scheduled.vehicle.client
+
+        if not client or not client.phone:
+            return Response(
+                {'error': 'El vehículo no tiene un cliente con teléfono asignado.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        due_info = ""
+        if scheduled.due_date:
+            due_info += f"Fecha: {scheduled.due_date.strftime('%d/%m/%Y')}"
+        if scheduled.due_mileage:
+            if due_info:
+                due_info += " o "
+            due_info += f"Kilometraje: {scheduled.due_mileage:,} km"
+
+        message = (
+            f"Hola {client.first_name}, te recordamos que tu vehículo "
+            f"{scheduled.vehicle.make} {scheduled.vehicle.model} "
+            f"(Patente: {scheduled.vehicle.license_plate}) tiene una mantención pendiente:\n\n"
+            f"📋 {scheduled.get_maintenance_type_display()}: {scheduled.description}\n"
+            f"📅 {due_info}\n\n"
+            f"Te esperamos en el taller. ¡Agenda tu hora!"
+        )
+
+        try:
+            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+
+            response = requests.post(whatsapp_service_url, json={
+                "number": client.phone,
+                "text": message
+            })
+
+            if response.status_code == 200:
+                scheduled.status = 'NOTIFIED'
+                scheduled.notified_at = timezone.now()
+                scheduled.save()
+                return Response({'success': True, 'message': 'Recordatorio enviado vía WhatsApp.'})
+            else:
+                return Response(
+                    {'error': 'Fallo al enviar notificación al microservicio.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        except Exception as e:
+            return Response(
+                {'error': f'Error de conexión con microservicio: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class MaintenanceAlertsView(APIView):
+    """Lista mantenciones próximas a vencer (< 30 días) o vencidas para el dashboard."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from datetime import timedelta
+        today = timezone.now().date()
+        threshold_date = today + timedelta(days=30)
+
+        # Auto-update overdue
+        ScheduledMaintenance.objects.filter(
+            status__in=['PENDING', 'NOTIFIED'],
+            due_date__lt=today
+        ).update(status='OVERDUE')
+
+        alerts = ScheduledMaintenance.objects.select_related(
+            'vehicle', 'vehicle__client'
+        ).filter(
+            status__in=['PENDING', 'NOTIFIED', 'OVERDUE'],
+            due_date__lte=threshold_date
+        ).order_by('due_date')[:20]
+
+        return Response(ScheduledMaintenanceSerializer(alerts, many=True).data)

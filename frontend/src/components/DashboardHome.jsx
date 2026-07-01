@@ -9,9 +9,11 @@ const DashboardHome = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState([]);
 
   useEffect(() => {
     fetchStats();
+    fetchMaintenanceAlerts();
   }, []);
 
   const fetchStats = async () => {
@@ -26,6 +28,18 @@ const DashboardHome = () => {
       console.error(err);
       setError("Error al cargar las estadísticas del dashboard.");
       setLoading(false);
+    }
+  };
+
+  const fetchMaintenanceAlerts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/operations/maintenance-alerts/', {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setMaintenanceAlerts(response.data || []);
+    } catch (err) {
+      console.error('Error fetching maintenance alerts:', err);
     }
   };
 
@@ -91,6 +105,56 @@ const DashboardHome = () => {
           <span style={{ fontSize: '0.75rem', color: '#a3a3a3' }}>Mes en curso</span>
         </div>
       </div>
+
+      {/* Maintenance Alerts Widget */}
+      {maintenanceAlerts.length > 0 && (
+        <div className="glass-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+          <h4 style={{ marginBottom: '1rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            🔔 Próximas Mantenciones
+            <span className="badge red" style={{ fontSize: '0.75rem' }}>{maintenanceAlerts.length}</span>
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {maintenanceAlerts.slice(0, 5).map(alert => (
+              <div key={alert.id} style={{
+                padding: '0.8rem',
+                backgroundColor: alert.status === 'OVERDUE' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.05)',
+                borderRadius: '8px',
+                borderLeft: `3px solid ${alert.status === 'OVERDUE' ? '#ef4444' : '#f59e0b'}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+              }}>
+                <div>
+                  <strong style={{ fontSize: '0.9rem' }}>
+                    {alert.status === 'OVERDUE' ? '🔴' : '⏳'} {alert.maintenance_type_display}
+                  </strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                    — {alert.vehicle_make} {alert.vehicle_model} ({alert.vehicle_plate})
+                  </span>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {alert.description}
+                    {alert.due_date && (
+                      <span style={{ marginLeft: '0.5rem', fontWeight: '600', color: alert.days_remaining < 0 ? '#ef4444' : alert.days_remaining <= 7 ? '#f59e0b' : '#a3a3a3' }}>
+                        ({alert.days_remaining < 0 ? `${Math.abs(alert.days_remaining)} días vencido` : `${alert.days_remaining} días restantes`})
+                      </span>
+                    )}
+                  </p>
+                  {alert.client_name && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>👤 {alert.client_name}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+            {maintenanceAlerts.length > 5 && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                +{maintenanceAlerts.length - 5} más. Ve a Vehículos para gestionar.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Gráficos Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>

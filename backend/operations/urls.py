@@ -5,7 +5,9 @@ from .views import (
     WorkOrderItemViewSet, VisualInspectionViewSet, 
     CustomAuthToken, ClientAuthToken, ClientDataView,
     AIDiagnosticsView, AITranscribeView, WorkshopSettingsView,
-    DashboardStatsView, UserViewSet
+    DashboardStatsView, UserViewSet,
+    VehiclePartViewSet, MaintenanceRecordViewSet,
+    ScheduledMaintenanceViewSet, MaintenanceAlertsView
 )
 
 router = DefaultRouter()
@@ -15,9 +17,13 @@ router.register(r'work-orders', WorkOrderViewSet)
 router.register(r'work-order-items', WorkOrderItemViewSet)
 router.register(r'inspections', VisualInspectionViewSet)
 router.register(r'users', UserViewSet)
+router.register(r'vehicle-parts', VehiclePartViewSet, basename='vehiclepart')
+router.register(r'maintenance-records', MaintenanceRecordViewSet, basename='maintenancerecord')
+router.register(r'scheduled-maintenance', ScheduledMaintenanceViewSet, basename='scheduledmaintenance')
 
 urlpatterns = [
     path('dashboard-stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
+    path('maintenance-alerts/', MaintenanceAlertsView.as_view(), name='maintenance_alerts'),
     path('settings/', WorkshopSettingsView.as_view(), name='workshop_settings'),
     path('login/', CustomAuthToken.as_view(), name='api_login'),
     path('client/login/', ClientAuthToken.as_view(), name='client_login'),
@@ -26,3 +32,4 @@ urlpatterns = [
     path('ai-transcribe/', AITranscribeView.as_view(), name='ai_transcribe'),
     path('', include(router.urls)),
 ]
+
