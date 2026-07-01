@@ -5,6 +5,7 @@ import { useToast } from './Toast';
 const WorkOrderList = () => {
   const [orders, setOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [clients, setClients] = useState([]);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,10 +17,31 @@ const WorkOrderList = () => {
   const [showAiModal, setShowAiModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  // Quick Vehicle Form State
+  const [showQuickVehicle, setShowQuickVehicle] = useState(false);
+  const [quickVehicle, setQuickVehicle] = useState({
+    license_plate: '',
+    make: '',
+    model: '',
+    year: '',
+    color: '',
+    transmission_type: 'MANUAL',
+    fuel_type: 'GASOLINE',
+    vin: '',
+    engine_number: '',
+    engine_displacement: '',
+    mileage: '',
+    client_id: ''
+  });
+
   // AI State
   const [aiSymptoms, setAiSymptoms] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Mechanic Findings State in Detail modal
+  const [mechanicFinding, setMechanicFinding] = useState('');
+  const [savingFinding, setSavingFinding] = useState(false);
 
   // Catálogo de servicios y productos para agregar a OT
   const [catalogServices, setCatalogServices] = useState([]);
@@ -30,7 +52,10 @@ const WorkOrderList = () => {
     vehicle_id: '',
     mileage: '',
     fuel_level: 50,
-    status: 'PENDING'
+    status: 'PENDING',
+    visit_reason: '',
+    desired_service: '',
+    symptoms: ''
   });
 
   const [newItem, setNewItem] = useState({
@@ -58,7 +83,6 @@ const WorkOrderList = () => {
       const data = JSON.parse(event.data);
       if (data.type === 'work_order_updated') {
         console.log("WebSocket Update Received:", data.message);
-        // Toast notification could go here
         fetchData(); // Re-fetch the orders to get the latest changes
       }
     };
@@ -75,9 +99,10 @@ const WorkOrderList = () => {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const [ordersRes, vehiclesRes] = await Promise.all([
+      const [ordersRes, vehiclesRes, clientsRes] = await Promise.all([
         axios.get('/api/operations/work-orders/', { headers: { Authorization: `Token ${token}` } }),
-        axios.get('/api/operations/vehicles/', { headers: { Authorization: `Token ${token}` } })
+        axios.get('/api/operations/vehicles/', { headers: { Authorization: `Token ${token}` } }),
+        axios.get('/api/operations/clients/', { headers: { Authorization: `Token ${token}` } })
       ]);
       const data = ordersRes.data.results || ordersRes.data;
       // Sort orders so PENDING and IN_PROGRESS are first
@@ -86,6 +111,7 @@ const WorkOrderList = () => {
       
       setOrders(data);
       setVehicles(vehiclesRes.data.results || vehiclesRes.data);
+      setClients(clientsRes.data.results || clientsRes.data);
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -115,13 +141,128 @@ const WorkOrderList = () => {
         headers: { Authorization: `Token ${token}` }
       });
       setShowNewModal(false);
-      setNewOrder({ vehicle_id: '', mileage: '', fuel_level: 50, status: 'PENDING' });
+      setNewOrder({ vehicle_id: '', mileage: '', fuel_level: 50, status: 'PENDING', visit_reason: '', desired_service: '', symptoms: '' });
       fetchData();
       toast({ title: 'OT Creada', message: 'La orden de trabajo fue creada exitosamente.', type: 'success' });
     } catch (err) {
       console.error(err);
       const msg = err.response?.data?.detail || 'No se pudo crear la OT. Revisa los datos.';
       toast({ title: 'Error', message: msg, type: 'error' });
+    }
+  };
+
+  const handleQuickVehicleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        license_plate: quickVehicle.license_plate,
+        make: quickVehicle.make,
+        model: quickVehicle.model,
+        year: quickVehicle.year,
+        color: quickVehicle.color || null,
+        transmission_type: quickVehicle.transmission_type,
+        fuel_type: quickVehicle.fuel_type,
+        vin: quickVehicle.vin || null,
+        engine_number: quickVehicle.engine_number || null,
+        engine_displacement: quickVehicle.engine_displacement || null,
+        mileage: quickVehicle.mileage ? parseInt(quickVehicle.mileage) : null,
+        client_id: quickVehicle.client_id || null
+      };
+
+      const res = await axios.post('/api/operations/vehicles/', payload, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      
+      const createdVehicle = res.data;
+      toast({ title: 'Vehículo registrado', message: 'El vehículo fue guardado y seleccionado para la OT.', type: 'success' });
+      
+      // Update vehicles state
+      setVehicles([createdVehicle, ...vehicles]);
+      setNewOrder({
+        ...newOrder,
+        vehicle_id: createdVehicle.id
+      });
+      setShowQuickVehicle(false);
+      setQuickVehicle({
+        license_plate: '', make: '', model: '', year: '', color: '', transmission_type: 'MANUAL',
+        fuel_type: 'GASOLINE', vin: '', engine_number: '', engine_displacement: '', mileage: '', client_id: ''
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar vehículo rápido.");
+    }
+  };
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`/api/operations/work-orders/${orderId}/change_status/`, {
+        status: newStatus
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Estado Actualizado', message: `Orden pasada a ${newStatus}`, type: 'success' });
+      fetchData();
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.error || 'No se pudo cambiar el estado de la OT.';
+      toast({ title: 'Error', message: msg, type: 'error' });
+    }
+  };
+
+  const handleSaveFindings = async () => {
+    if (!selectedOrder) return;
+    setSavingFinding(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.patch(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        additional_findings: mechanicFinding
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Hallazgo Guardado', message: 'Detalle ingresado correctamente.', type: 'success' });
+      setSelectedOrder(res.data);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo registrar el hallazgo.', type: 'error' });
+    } finally {
+      setSavingFinding(false);
+    }
+  };
+
+  const handleSendFindingsWhatsApp = async () => {
+    if (!selectedOrder) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/operations/work-orders/${selectedOrder.id}/send_findings_whatsapp/`, {}, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'WhatsApp Enviado', message: 'Notificación de hallazgo enviada al cliente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'Fallo al notificar hallazgos por WhatsApp.', type: 'error' });
+    }
+  };
+
+  const handleToggleFindingsApproval = async (approved) => {
+    if (!selectedOrder) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.patch(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        findings_approved: approved
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Aprobación Actualizada', message: approved ? 'Hallazgos aprobados por cliente.' : 'Aprobación removida.', type: 'success' });
+      setSelectedOrder(res.data);
+      fetchData();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -133,7 +274,6 @@ const WorkOrderList = () => {
       const token = localStorage.getItem('token');
       let payload = { ...newItem, work_order: selectedOrder.id };
 
-      // Si viene del catálogo, agregar referencia al servicio o producto
       if (itemSource === 'service' && selectedCatalogItem) {
         payload.service = selectedCatalogItem.id;
         payload.description = selectedCatalogItem.name;
@@ -197,6 +337,7 @@ const WorkOrderList = () => {
 
   const openDetails = (order) => {
     setSelectedOrder(order);
+    setMechanicFinding(order.additional_findings || '');
     setShowDetailsModal(true);
     // Cargar catálogo al abrir el modal
     const token = localStorage.getItem('token');
@@ -212,7 +353,9 @@ const WorkOrderList = () => {
 
   const openAiModal = (order) => {
     setSelectedOrder(order);
-    setAiSymptoms('');
+    // Pre-fill prompt context for user preview
+    const specs = order.vehicle ? `${order.vehicle.make} ${order.vehicle.model} (${order.vehicle.year})` : '';
+    setAiSymptoms(`Presintomas/Motivos de OT: \n- Motivo: ${order.visit_reason || 'No especificado'}\n- Síntomas: ${order.symptoms || 'No especificado'}\n- Servicio: ${order.desired_service || 'No especificado'}`);
     setAiResponse('');
     setShowAiModal(true);
   };
@@ -223,7 +366,7 @@ const WorkOrderList = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post('/api/operations/ai-diagnostics/', {
-        symptoms: aiSymptoms
+        work_order_id: selectedOrder.id
       }, {
         headers: { Authorization: `Token ${token}` }
       });
@@ -241,7 +384,7 @@ const WorkOrderList = () => {
       const token = localStorage.getItem('token');
       const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/generate_pdf/`, {
         headers: { Authorization: `Token ${token}` },
-        responseType: 'blob' // Important for downloading files
+        responseType: 'blob'
       });
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -294,11 +437,10 @@ const WorkOrderList = () => {
       ) : (
         <div>
           {[
-            { key: 'PENDING', label: 'Pendientes' },
+            { key: 'PENDING', label: 'Pendientes (Nuevas)' },
             { key: 'IN_PROGRESS', label: 'En Progreso' },
+            { key: 'COMPLETED', label: 'Completadas / Listas para Retiro' },
             { key: 'DELIVERED', label: 'Entregadas' },
-            { key: 'COMPLETED', label: 'Completadas' },
-            { key: 'PAID', label: 'Pagadas' },
             { key: 'CANCELLED', label: 'Canceladas' }
           ].map(group => {
             const groupOrders = orders.filter(o => o.status === group.key);
@@ -325,9 +467,16 @@ const WorkOrderList = () => {
                         <span>{order.mileage?.toLocaleString('es-CL')} km</span>
                         <span style={{ color: 'var(--text-tertiary)' }}>OT #{order.id}</span>
                       </div>
+
+                      {/* Motivo & Sintomas Breve */}
+                      <div style={{ margin: '0.5rem 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        {order.visit_reason && <div><strong>Motivo:</strong> {order.visit_reason.substring(0, 50)}...</div>}
+                        {order.symptoms && <div><strong>Síntomas:</strong> {order.symptoms.substring(0, 50)}...</div>}
+                      </div>
+
                       <div className="ot-actions">
                         <div className="ot-actions-row">
-                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Repuestos</button>
+                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Cambiar Estado</button>
                           <button
                             className="btn"
                             style={{ flex: 1, background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }}
@@ -336,13 +485,6 @@ const WorkOrderList = () => {
                             🤖 MecanIA
                           </button>
                         </div>
-                        <button
-                          className="btn btn-whatsapp"
-                          style={{ width: '100%' }}
-                          onClick={() => handleNotifyClient(order.id)}
-                        >
-                          💬 Notificar por WhatsApp
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -360,50 +502,160 @@ const WorkOrderList = () => {
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
           justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '500px' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0 }}>Crear Nueva OT</h3>
               <button onClick={() => setShowNewModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
             </div>
             
-            <form onSubmit={handleCreateOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Vehículo</label>
-                <select 
-                  className="input-field" style={{ width: '100%' }} required
-                  value={newOrder.vehicle_id} 
-                  onChange={(e) => setNewOrder({...newOrder, vehicle_id: e.target.value})}
-                >
-                  <option value="">Seleccione un vehículo...</option>
-                  {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>{v.license_plate} - {v.make} {v.model}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Kilometraje Actual</label>
-                <input 
-                  type="number" className="input-field" style={{ width: '100%' }} required
-                  value={newOrder.mileage} 
-                  onChange={(e) => setNewOrder({...newOrder, mileage: e.target.value})}
-                />
-              </div>
-              
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Nivel de Combustible (%)</label>
-                <input 
-                  type="number" min="0" max="100" className="input-field" style={{ width: '100%' }} required
-                  value={newOrder.fuel_level} 
-                  onChange={(e) => setNewOrder({...newOrder, fuel_level: e.target.value})}
-                />
-              </div>
+            {showQuickVehicle ? (
+              <form onSubmit={handleQuickVehicleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0 }}>Registrar Vehículo Rápido</h4>
+                
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Patente (Placa) *</label>
+                  <input type="text" required value={quickVehicle.license_plate} onChange={e => setQuickVehicle({...quickVehicle, license_plate: e.target.value})} className="input-field" style={{ width: '100%', textTransform: 'uppercase' }} placeholder="AB12CD" />
+                </div>
+                
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Marca *</label>
+                    <input type="text" required value={quickVehicle.make} onChange={e => setQuickVehicle({...quickVehicle, make: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="Toyota" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Modelo *</label>
+                    <input type="text" required value={quickVehicle.model} onChange={e => setQuickVehicle({...quickVehicle, model: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="Yaris" />
+                  </div>
+                </div>
 
-              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                <button type="button" className="btn btn-outline" onClick={() => setShowNewModal(false)}>Cancelar</button>
-                <button type="submit" className="btn">Crear OT</button>
-              </div>
-            </form>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Año *</label>
+                    <input type="number" required value={quickVehicle.year} onChange={e => setQuickVehicle({...quickVehicle, year: e.target.value})} className="input-field" style={{ width: '100%' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Color</label>
+                    <input type="text" value={quickVehicle.color} onChange={e => setQuickVehicle({...quickVehicle, color: e.target.value})} className="input-field" style={{ width: '100%' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Transmisión *</label>
+                    <select required value={quickVehicle.transmission_type} onChange={e => setQuickVehicle({...quickVehicle, transmission_type: e.target.value})} className="input-field" style={{ width: '100%', backgroundColor: 'var(--bg-card)' }}>
+                      <option value="MANUAL">Manual</option>
+                      <option value="AUTOMATIC">Automática</option>
+                      <option value="CVT">CVT</option>
+                      <option value="DCT">Doble Embrague</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Combustible *</label>
+                    <select required value={quickVehicle.fuel_type} onChange={e => setQuickVehicle({...quickVehicle, fuel_type: e.target.value})} className="input-field" style={{ width: '100%', backgroundColor: 'var(--bg-card)' }}>
+                      <option value="GASOLINE">Gasolina</option>
+                      <option value="DIESEL">Diesel</option>
+                      <option value="HYBRID">Híbrido</option>
+                      <option value="ELECTRIC">Eléctrico</option>
+                      <option value="GNC_GLP">Gas (GNC/GLP)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Cilindrada Motor</label>
+                    <input type="text" value={quickVehicle.engine_displacement} onChange={e => setQuickVehicle({...quickVehicle, engine_displacement: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="2.0L" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Cliente *</label>
+                    <select required value={quickVehicle.client_id} onChange={e => setQuickVehicle({...quickVehicle, client_id: e.target.value})} className="input-field" style={{ width: '100%', backgroundColor: 'var(--bg-card)' }}>
+                      <option value="">Seleccione Propietario...</option>
+                      {clients.map(c => (
+                        <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowQuickVehicle(false)}>Cancelar Registro</button>
+                  <button type="submit" className="btn">Guardar y Seleccionar</button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleCreateOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Vehículo</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select 
+                      className="input-field" style={{ flex: 1 }} required
+                      value={newOrder.vehicle_id} 
+                      onChange={(e) => setNewOrder({...newOrder, vehicle_id: e.target.value})}
+                    >
+                      <option value="">Seleccione un vehículo...</option>
+                      {vehicles.map(v => (
+                        <option key={v.id} value={v.id}>{v.license_plate} - {v.make} {v.model}</option>
+                      ))}
+                    </select>
+                    <button type="button" className="btn btn-outline" onClick={() => setShowQuickVehicle(true)}>+ Nuevo</button>
+                  </div>
+                </div>
+                
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Kilometraje Actual</label>
+                    <input 
+                      type="number" className="input-field" style={{ width: '100%' }} required
+                      value={newOrder.mileage} 
+                      onChange={(e) => setNewOrder({...newOrder, mileage: e.target.value})}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem' }}>Nivel de Combustible (%)</label>
+                    <input 
+                      type="number" min="0" max="100" className="input-field" style={{ width: '100%' }} required
+                      value={newOrder.fuel_level} 
+                      onChange={(e) => setNewOrder({...newOrder, fuel_level: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Motivo de la Visita</label>
+                  <input 
+                    type="text" className="input-field" style={{ width: '100%' }} 
+                    placeholder="Ej. Mantención de kilometraje, revisión general, ruido extraño"
+                    value={newOrder.visit_reason} 
+                    onChange={(e) => setNewOrder({...newOrder, visit_reason: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Servicio que Desea Realizar</label>
+                  <input 
+                    type="text" className="input-field" style={{ width: '100%' }} 
+                    placeholder="Ej. Cambio de aceite y filtro de aire"
+                    value={newOrder.desired_service} 
+                    onChange={(e) => setNewOrder({...newOrder, desired_service: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Síntomas del Vehículo</label>
+                  <textarea 
+                    className="input-field" style={{ width: '100%', minHeight: '80px' }} 
+                    placeholder="Describe los problemas que presenta el automóvil..."
+                    value={newOrder.symptoms} 
+                    onChange={(e) => setNewOrder({...newOrder, symptoms: e.target.value})}
+                  />
+                </div>
+
+                <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowNewModal(false)}>Cancelar</button>
+                  <button type="submit" className="btn">Crear OT</button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -415,15 +667,91 @@ const WorkOrderList = () => {
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
           justifyContent: 'center', alignItems: 'center', zIndex: 1000
         }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '750px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
                 <button className="btn btn-outline" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', borderColor: '#3b82f6', color: '#3b82f6' }} onClick={handleDownloadPDF}>
-                  <i className="fa-solid fa-file-pdf"></i> Descargar PDF
+                  Descargar PDF
                 </button>
               </div>
               <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+            </div>
+            
+            {/* Gestión del Estado de la OT */}
+            <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+              <h4 style={{ margin: '0 0 0.8rem 0' }}>Flujo de Trabajo</h4>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>Estado actual: <span className={`badge ${STATUS_BADGE_CLASS[selectedOrder.status]}`}>{selectedOrder.status}</span></div>
+                
+                {selectedOrder.status === 'PENDING' && (
+                  <button className="btn" style={{ backgroundColor: '#3b82f6' }} onClick={() => handleStatusChange(selectedOrder.id, 'IN_PROGRESS')}>
+                    ⚙️ Iniciar Trabajo (En Progreso)
+                  </button>
+                )}
+
+                {selectedOrder.status === 'IN_PROGRESS' && (
+                  <>
+                    <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={() => handleStatusChange(selectedOrder.id, 'COMPLETED')}>
+                      ✓ Finalizar Trabajo (Completado)
+                    </button>
+                  </>
+                )}
+
+                {selectedOrder.status === 'COMPLETED' && (
+                  <>
+                    <button className="btn" style={{ backgroundColor: '#8b5cf6' }} onClick={() => handleStatusChange(selectedOrder.id, 'DELIVERED')}>
+                      🔑 Entregar Vehículo (Entregado)
+                    </button>
+                    <button className="btn btn-whatsapp" onClick={() => handleNotifyClient(selectedOrder.id)}>
+                      💬 Notificar Listo (WhatsApp)
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Registro de Detalle o Hallazgo Encontrado */}
+              {selectedOrder.status === 'IN_PROGRESS' && (
+                <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                  <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--status-yellow)' }}>⚠️ Hallazgos Adicionales / Detalles Encontrados</h5>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                    <textarea 
+                      className="input-field"
+                      style={{ width: '100%', minHeight: '60px' }}
+                      placeholder="Ej. Pastillas de freno delanteras gastadas (menos del 15% de vida restante)..."
+                      value={mechanicFinding}
+                      onChange={e => setMechanicFinding(e.target.value)}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '0.5rem' }}>
+                      <button className="btn btn-outline" onClick={handleSaveFindings} disabled={savingFinding}>
+                        {savingFinding ? 'Guardando...' : 'Guardar Hallazgo'}
+                      </button>
+                      {selectedOrder.additional_findings && (
+                        <button className="btn btn-whatsapp" onClick={handleSendFindingsWhatsApp}>
+                          💬 Solicitar Aprobación por WhatsApp
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mostrar estado de aprobación si hay hallazgos */}
+              {selectedOrder.additional_findings && (
+                <div style={{ marginTop: '1rem', padding: '0.8rem', backgroundColor: 'rgba(239, 68, 68, 0.08)', borderRadius: '6px', borderLeft: '4px solid var(--status-red)' }}>
+                  <div><strong>Problema detectado:</strong> "{selectedOrder.additional_findings}"</div>
+                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <span>Aprobación del cliente: <strong>{selectedOrder.findings_approved ? 'APROBADO ✓' : 'PENDIENTE'}</strong></span>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}
+                      onClick={() => handleToggleFindingsApproval(!selectedOrder.findings_approved)}
+                    >
+                      {selectedOrder.findings_approved ? 'Marcar como Pendiente' : 'Marcar como Aprobado'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div style={{ marginBottom: '2rem' }}>
@@ -443,7 +771,7 @@ const WorkOrderList = () => {
                   </thead>
                   <tbody>
                     {selectedOrder.items.map(item => (
-                      <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                       <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '0.5rem' }}>{item.description}</td>
                         <td style={{ padding: '0.5rem' }}>{item.quantity}</td>
                         <td style={{ padding: '0.5rem' }}>${item.unit_price}</td>
@@ -459,7 +787,7 @@ const WorkOrderList = () => {
             {['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(selectedOrder.status) ? (
               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
                 <p style={{ color: 'var(--status-yellow)', fontSize: '0.9rem' }}>
-                  ⚠️ Esta Orden de Trabajo se encuentra cerrada o finalizada y no admite más modificaciones.
+                  ⚠️ Esta Orden de Trabajo se encuentra cerrada o finalizada y no admite más modificaciones directas sobre ítems.
                 </p>
               </div>
             ) : (
@@ -587,10 +915,9 @@ const WorkOrderList = () => {
             
             <form onSubmit={handleAiSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Describe los síntomas del vehículo (OT #{selectedOrder.id})</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Detalles de la OT para Analizar</label>
                 <textarea 
-                  className="input-field" style={{ width: '100%', minHeight: '100px', resize: 'vertical' }} required
-                  placeholder="Ej: El motor hace un ruido metálico al pasar de 3000 RPM y el escape saca humo azul..."
+                  className="input-field" style={{ width: '100%', minHeight: '120px', resize: 'vertical' }} required
                   value={aiSymptoms} 
                   onChange={(e) => setAiSymptoms(e.target.value)}
                 />
@@ -598,15 +925,15 @@ const WorkOrderList = () => {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="submit" className="btn" style={{ background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)', border: 'none' }} disabled={aiLoading}>
-                  {aiLoading ? 'Analizando...' : 'Solicitar Pre-Diagnóstico'}
+                  {aiLoading ? 'Analizando...' : 'Analizar con MecanIA'}
                 </button>
               </div>
             </form>
 
             {aiResponse && (
               <div style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '12px', borderLeft: '4px solid #8b5cf6' }}>
-                <h4 style={{ color: '#c4b5fd', marginTop: 0, marginBottom: '1rem' }}>Respuesta de MecanIA:</h4>
-                <div style={{ color: 'var(--text-light)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                <h4 style={{ color: '#c4b5fd', marginTop: 0, marginBottom: '1rem' }}>Diagnóstico de MecanIA:</h4>
+                <div style={{ color: 'var(--text-light)', lineHeight: '1.6', whiteSpace: 'pre-wrap', fontSize: '0.95rem' }}>
                   {aiResponse}
                 </div>
               </div>

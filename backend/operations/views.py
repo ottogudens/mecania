@@ -110,6 +110,41 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Error de conexión con microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @action(detail=True, methods=['post'])
+    def send_findings_whatsapp(self, request, pk=None):
+        work_order = self.get_object()
+        client = work_order.vehicle.client
+        
+        if not client or not client.phone:
+            return Response({'error': 'El vehículo no tiene un cliente asignado con teléfono válido.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        findings = work_order.additional_findings
+        if not findings:
+            return Response({'error': 'No hay hallazgos adicionales registrados en esta OT.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        message = (
+            f"Hola {client.first_name}, durante la revisión de tu vehículo {work_order.vehicle.make} {work_order.vehicle.model} "
+            f"(Placa: {work_order.vehicle.license_plate}), nuestro mecánico ha identificado el siguiente detalle/problema:\n\n"
+            f"\"{findings}\"\n\n"
+            f"Por favor, indícanos si apruebas realizar este servicio adicional respondiendo a este mensaje."
+        )
+        
+        try:
+            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+            
+            response = requests.post(whatsapp_service_url, json={
+                "number": client.phone,
+                "text": message
+            })
+            
+            if response.status_code == 200:
+                return Response({'success': True, 'message': 'Mensaje de hallazgos enviado vía WhatsApp.'})
+            else:
+                return Response({'error': 'Fallo al enviar notificación al microservicio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({'error': f'Error de conexión con microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
         work_order = self.get_object()
@@ -315,20 +350,51 @@ class AIDiagnosticsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, *args, **kwargs):
-        symptoms = request.data.get('symptoms')
-        if not symptoms:
-            return Response({'error': 'Por favor, describe los síntomas del vehículo.'}, status=status.HTTP_400_BAD_REQUEST)
+        work_order_id = request.data.get('work_order_id')
+        
+        if work_order_id:
+            try:
+                work_order = WorkOrder.objects.select_related('vehicle').get(id=work_order_id)
+                vehicle = work_order.vehicle
+                symptoms = work_order.symptoms or "No especificado"
+                visit_reason = work_order.visit_reason or "No especificado"
+                desired_service = work_order.desired_service or "No especificado"
+                
+                vehicle_info = (
+                    f"Vehículo: {vehicle.make} {vehicle.model} ({vehicle.year})\n"
+                    f"Transmisión: {vehicle.get_transmission_type_display()}\n"
+                    f"Combustible: {vehicle.get_fuel_type_display()}\n"
+                    f"Cilindrada: {vehicle.engine_displacement or 'No especificado'}\n"
+                    f"Kilometraje OT: {work_order.mileage} km"
+                )
+            except WorkOrder.DoesNotExist:
+                return Response({'error': 'Orden de trabajo no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            symptoms = request.data.get('symptoms')
+            visit_reason = request.data.get('visit_reason', 'No especificado')
+            desired_service = request.data.get('desired_service', 'No especificado')
+            vehicle_info = request.data.get('vehicle_info', 'Vehículo: No especificado')
             
+            if not symptoms:
+                return Response({'error': 'Por favor, describe los síntomas del vehículo.'}, status=status.HTTP_400_BAD_REQUEST)
+                
         try:
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
             
             prompt = f"""
             Eres 'MecanIA', un experto mecánico automotriz con décadas de experiencia.
-            Un usuario reporta los siguientes síntomas en su vehículo:
-            "{symptoms}"
             
-            Proporciona un breve pre-diagnóstico técnico (máximo 3 párrafos), indicando las posibles causas 
-            y qué componentes específicos debería revisar el mecánico en el taller. Usa un tono profesional y amable.
+            Información del Vehículo:
+            {vehicle_info}
+            
+            Datos de la Orden de Trabajo / Visita:
+            - Motivo de la visita: {visit_reason}
+            - Servicio solicitado: {desired_service}
+            - Síntomas reportados: {symptoms}
+            
+            Proporciona un pre-diagnóstico técnico estructurado (máximo 4 párrafos), indicando las posibles causas,
+            los componentes específicos a revisar, y sugerencias de mantenimiento basadas en los datos técnicos del vehículo.
+            Usa un tono profesional, claro y amable.
             """
             
             response = client.chat.completions.create(
@@ -337,7 +403,7 @@ class AIDiagnosticsView(APIView):
                     {"role": "system", "content": "Eres un asistente mecánico experto."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_tokens=600,
                 temperature=0.7
             )
             

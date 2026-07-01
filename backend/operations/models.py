@@ -39,11 +39,32 @@ class Client(models.Model):
         return f"{self.first_name} {self.last_name}"
 
 class Vehicle(models.Model):
+    TRANSMISSION_CHOICES = [
+        ('MANUAL', 'Manual'),
+        ('AUTOMATIC', 'Automática'),
+        ('CVT', 'CVT'),
+        ('DCT', 'Doble Embrague'),
+    ]
+
+    FUEL_CHOICES = [
+        ('GASOLINE', 'Gasolina'),
+        ('DIESEL', 'Diesel'),
+        ('HYBRID', 'Híbrido'),
+        ('ELECTRIC', 'Eléctrico'),
+        ('GNC_GLP', 'Gas (GNC/GLP)'),
+    ]
+
     license_plate = models.CharField(max_length=20, unique=True)
     make = models.CharField(max_length=50)
     model = models.CharField(max_length=50)
     year = models.IntegerField()
     color = models.CharField(max_length=30, blank=True, null=True, help_text="Color del vehículo")
+    transmission_type = models.CharField(max_length=20, choices=TRANSMISSION_CHOICES, default='MANUAL')
+    fuel_type = models.CharField(max_length=20, choices=FUEL_CHOICES, default='GASOLINE')
+    vin = models.CharField(max_length=50, blank=True, null=True, help_text="Número VIN (Chasis)")
+    engine_number = models.CharField(max_length=50, blank=True, null=True, help_text="Número de Motor")
+    engine_displacement = models.CharField(max_length=20, blank=True, null=True, help_text="Cilindrada (ej: 1.6, 2.0L)")
+    mileage = models.IntegerField(blank=True, null=True, help_text="Kilometraje inicial")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='vehicles', null=True, blank=True)
 
     def __str__(self):
@@ -66,6 +87,11 @@ class WorkOrder(models.Model):
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    visit_reason = models.TextField(blank=True, null=True, help_text="Motivo de la visita")
+    desired_service = models.TextField(blank=True, null=True, help_text="Servicio que desea realizar")
+    symptoms = models.TextField(blank=True, null=True, help_text="Síntomas reportados")
+    additional_findings = models.TextField(blank=True, null=True, help_text="Hallazgos o problemas adicionales encontrados por el mecánico")
+    findings_approved = models.BooleanField(default=False, help_text="¿Los hallazgos adicionales fueron aprobados por el cliente?")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
