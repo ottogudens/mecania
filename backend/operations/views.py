@@ -451,19 +451,20 @@ class AITranscribeView(APIView):
         try:
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
             
-            # OpenAI requires a file-like object with a filename attribute for audio
-            # We can pass the django uploaded file directly since it behaves like a file object
+            # Pass file as tuple to preserve filename extension for Whisper api
+            file_data = (audio_file.name, audio_file.read(), audio_file.content_type)
+            
             transcription = client.audio.transcriptions.create(
               model="whisper-1", 
-              file=audio_file,
-              language="es" # Optionally force Spanish
+              file=file_data,
+              language="es"
             )
             
             return Response({'transcription': transcription.text})
             
         except Exception as e:
             print("Error OpenAI Whisper:", str(e))
-            return Response({'error': 'Error al transcribir el audio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f'Error al transcribir el audio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 from django.utils import timezone
 from django.db.models import Sum, Count

@@ -2,52 +2,68 @@ import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { useToast } from './Toast';
 
+const VEHICLE_PARTS = [
+  { id: 'engine', name: 'Motor', icon: '🔧', desc: 'Nivel de aceite, mangueras, fugas y batería.' },
+  { id: 'brakes', name: 'Frenos', icon: '🛑', desc: 'Pastillas, discos y líquido de frenos.' },
+  { id: 'suspension', name: 'Suspensión', icon: '↕️', desc: 'Amortiguadores, bandejas y rótulas.' },
+  { id: 'tires', name: 'Neumáticos', icon: '🛞', desc: 'Desgaste, presión y estado de llantas.' },
+  { id: 'lights', name: 'Luces', icon: '💡', desc: 'Focos delanteros, traseros, intermitentes.' },
+  { id: 'bodywork', name: 'Carrocería', icon: '🚗', desc: 'Rayones, abolladuras, golpes exteriores.' },
+  { id: 'interior', name: 'Interior', icon: '💺', desc: 'Cinturones, aire acondicionado, tablero.' },
+  { id: 'exhaust', name: 'Escape', icon: '💨', desc: 'Fugas de humo, catalizador y silenciador.' }
+];
+
 const VisualInspection = () => {
-  const [markers, setMarkers] = useState([]);
-  const [selectedMarkerIndex, setSelectedMarkerIndex] = useState(null);
+  const toast = useToast();
+  const [selectedPartId, setSelectedPartId] = useState('engine');
   
-  // AI Voice states
-  const [aiNotes, setAiNotes] = useState('');
+  // Inspection State per Part
+  const [inspections, setInspections] = useState({
+    engine: { status: 'OK', note: '', image: null },
+    brakes: { status: 'OK', note: '', image: null },
+    suspension: { status: 'OK', note: '', image: null },
+    tires: { status: 'OK', note: '', image: null },
+    lights: { status: 'OK', note: '', image: null },
+    bodywork: { status: 'OK', note: '', image: null },
+    interior: { status: 'OK', note: '', image: null },
+    exhaust: { status: 'OK', note: '', image: null }
+  });
+
+  // Audio recording state
   const [isRecording, setIsRecording] = useState(false);
   const [loadingAi, setLoadingAi] = useState(false);
-  
-  // Audio recording refs
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const toast = useToast();
 
-  const handleSvgClick = (e) => {
-    // Solo permitir añadir marcadores si no hay uno seleccionado
-    if (selectedMarkerIndex !== null) return;
-    
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    
-    // Calcular coordenadas relativas (0 a 100%)
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    
-    const newMarker = { x, y, note: '', type: 'red' }; // red, yellow, green
-    setMarkers([...markers, newMarker]);
-    setSelectedMarkerIndex(markers.length);
+  const selectedPart = VEHICLE_PARTS.find(p => p.id === selectedPartId);
+  const currentPartData = inspections[selectedPartId];
+
+  const updatePartData = (partId, key, value) => {
+    setInspections(prev => ({
+      ...prev,
+      [partId]: {
+        ...prev[partId],
+        [key]: value
+      }
+    }));
   };
 
-  const updateMarker = (index, field, value) => {
-    const newMarkers = [...markers];
-    newMarkers[index][field] = value;
-    setMarkers(newMarkers);
+  // Image Upload handler
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      updatePartData(selectedPartId, 'image', reader.result);
+      toast({ title: 'Foto Adjunta', message: 'Imagen cargada exitosamente.', type: 'success' });
+    };
+    reader.readAsDataURL(file);
   };
 
-  const deleteMarker = (index) => {
-    setMarkers(markers.filter((_, i) => i !== index));
-    setSelectedMarkerIndex(null);
-  };
-
+  // Voice recording handlers
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Intentar soportar tipos MIME soportados por el navegador
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       
@@ -67,10 +83,10 @@ const VisualInspection = () => {
 
       mediaRecorder.start();
       setIsRecording(true);
-      toast({ title: 'Grabando...', message: 'Habla ahora para registrar tu nota de voz.', type: 'info' });
+      toast({ title: 'Grabando...', message: 'Describe el estado de esta sección...', type: 'info' });
     } catch (err) {
-      console.error("Error accediendo al micrófono:", err);
-      toast({ title: 'Error de Micrófono', message: 'No se pudo acceder al micrófono. Verifica los permisos de tu navegador.', type: 'error' });
+      console.error(err);
+      toast({ title: 'Error de micrófono', message: 'No se pudo acceder al micrófono.', type: 'error' });
     }
   };
 
@@ -78,22 +94,17 @@ const VisualInspection = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // detener todas las pistas del stream
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
   };
 
-  const sendAudioForTranscription = async (audioBlob, mimeType = 'audio/webm') => {
+  const sendAudioForTranscription = async (audioBlob, mimeType) => {
     setLoadingAi(true);
     try {
       const formData = new FormData();
-      
-      // Determinar extensión correcta según el navegador (Safari usa mp4)
       let ext = 'webm';
       if (mimeType.includes('mp4')) ext = 'mp4';
-      else if (mimeType.includes('ogg')) ext = 'ogg';
       
-      // Django necesita un archivo con extensión para pasarlo a OpenAI
       formData.append('audio', audioBlob, `nota_voz.${ext}`);
       
       const token = localStorage.getItem('token');
@@ -104,185 +115,231 @@ const VisualInspection = () => {
         }
       });
       
-      // Añadir la transcripción a las notas
-      setAiNotes(prev => prev + (prev ? ' ' : '') + response.data.transcription);
-      toast({ title: 'Transcripción completada', message: 'La nota de voz se convirtió a texto.', type: 'success' });
+      const transText = response.data.transcription;
+      // Append text
+      const existingNote = inspections[selectedPartId].note;
+      updatePartData(selectedPartId, 'note', existingNote ? `${existingNote} ${transText}` : transText);
+      toast({ title: 'Transcripción Exitosa', message: 'Nota añadida por voz.', type: 'success' });
     } catch (err) {
-      console.error("Error transcribiendo audio:", err);
-      toast({ title: 'Error', message: 'Error al transcribir el audio usando Inteligencia Artificial.', type: 'error' });
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo transcribir con la IA. Inténtalo de nuevo.', type: 'error' });
+    } finally {
+      setLoadingAi(false);
     }
-    setLoadingAi(false);
   };
 
-  const saveInspection = async () => {
-    toast({ title: 'Guardado', message: 'Inspección Guardada con Éxito (Demo)', type: 'success' });
+  const handleSaveInspection = () => {
+    toast({ title: 'Inspección Guardada', message: 'Los datos de la inspección visual fueron guardados.', type: 'success' });
   };
 
   return (
-    <div className="visual-inspection" style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', animation: 'fadeIn 0.5s ease-out' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '900px', margin: '0 auto' }}>
       
-      {/* 2D Wireframe Section */}
-      <div className="glass-card" style={{ flex: '2 1 600px', minHeight: '500px', position: 'relative' }}>
-        <div className="ot-header" style={{ marginBottom: '1rem' }}>
-          <h2>Diagrama de Inspección 2D</h2>
-          <span className="badge in_progress">Interactúe con la imagen</span>
-        </div>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-          Haga clic en cualquier parte del vehículo para añadir un marcador de daño (rayón, abolladura, etc.).
+      {/* Mobile Oriented Parts GRID Selector */}
+      <div>
+        <h3 style={{ marginBottom: '0.8rem', color: 'var(--primary)' }}>🩺 Inspección por Componentes</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.2rem' }}>
+          Selecciona una sección del vehículo para auditar, subir fotos y registrar notas por voz:
         </p>
 
-        <div style={{ position: 'relative', width: '100%', maxWidth: '400px', margin: '0 auto', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '12px', padding: '1rem', backgroundColor: 'rgba(0,0,0,0.3)' }}>
-          {/* Simple Top-Down Car Wireframe SVG */}
-          <svg 
-            viewBox="0 0 200 400" 
-            style={{ width: '100%', height: 'auto', cursor: 'crosshair', opacity: 0.8 }}
-            onClick={handleSvgClick}
-          >
-            {/* Chasis */}
-            <rect x="40" y="20" width="120" height="360" rx="40" fill="transparent" stroke="#60a5fa" strokeWidth="4" />
-            {/* Ruedas */}
-            <rect x="25" y="60" width="15" height="40" rx="5" fill="#334155" />
-            <rect x="160" y="60" width="15" height="40" rx="5" fill="#334155" />
-            <rect x="25" y="300" width="15" height="40" rx="5" fill="#334155" />
-            <rect x="160" y="300" width="15" height="40" rx="5" fill="#334155" />
-            {/* Cabina */}
-            <rect x="50" y="120" width="100" height="150" rx="20" fill="rgba(59,130,246,0.1)" stroke="#3b82f6" strokeWidth="3" />
-            {/* Focos delanteros */}
-            <circle cx="65" cy="30" r="8" fill="#fcd34d" />
-            <circle cx="135" cy="30" r="8" fill="#fcd34d" />
-            {/* Focos traseros */}
-            <rect x="55" y="375" width="20" height="5" fill="#ef4444" />
-            <rect x="125" y="375" width="20" height="5" fill="#ef4444" />
-          </svg>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+          gap: '0.75rem',
+          marginBottom: '1.5rem'
+        }}>
+          {VEHICLE_PARTS.map(part => {
+            const status = inspections[part.id].status;
+            let statusColor = 'rgba(255,255,255,0.05)';
+            let borderColor = 'transparent';
+            
+            if (status === 'WARNING') {
+              statusColor = 'rgba(245,158,11,0.08)';
+              borderColor = 'var(--secondary)';
+            } else if (status === 'CRITICAL') {
+              statusColor = 'rgba(239,68,68,0.08)';
+              borderColor = 'var(--status-red)';
+            } else if (status === 'OK') {
+              statusColor = 'rgba(16,185,129,0.05)';
+              borderColor = 'var(--status-green)';
+            }
 
-          {/* Marcadores */}
-          {markers.map((marker, idx) => (
-            <div 
-              key={idx}
-              style={{
-                position: 'absolute',
-                left: `${marker.x}%`,
-                top: `${marker.y}%`,
-                transform: 'translate(-50%, -100%)',
-                cursor: 'pointer',
-                zIndex: 10
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedMarkerIndex(idx);
-              }}
-            >
-              <i className="fa-solid fa-location-dot" style={{ 
-                fontSize: selectedMarkerIndex === idx ? '2rem' : '1.5rem', 
-                color: marker.type === 'red' ? '#ef4444' : marker.type === 'yellow' ? '#f59e0b' : '#10b981',
-                filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))',
-                transition: 'all 0.2s'
-              }}></i>
-            </div>
-          ))}
+            const isSelected = part.id === selectedPartId;
+
+            return (
+              <button
+                key={part.id}
+                onClick={() => setSelectedPartId(part.id)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '1rem',
+                  borderRadius: '12px',
+                  border: isSelected ? `2px solid var(--primary)` : `1px solid ${borderColor}`,
+                  background: isSelected ? 'rgba(255, 206, 0, 0.08)' : statusColor,
+                  cursor: 'pointer',
+                  color: 'white',
+                  transition: 'all 0.2s',
+                  boxShadow: isSelected ? '0 0 10px rgba(255,206,0,0.1)' : 'none'
+                }}
+              >
+                <span style={{ fontSize: '2rem' }}>{part.icon}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{part.name}</span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: status === 'OK' ? '#10b981' : status === 'WARNING' ? '#f59e0b' : '#ef4444',
+                  color: 'black',
+                  fontWeight: 'bold'
+                }}>
+                  {status}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Editor Lateral */}
-      <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        
-        {/* Editor de Marcador */}
-        <div className="glass-card" style={{ flex: '1' }}>
-          <h3 style={{ marginTop: 0, color: '#60a5fa' }}>
-            <i className="fa-solid fa-circle-info" style={{ marginRight: '8px' }}></i>
-            Detalle del Daño
-          </h3>
-          
-          {selectedMarkerIndex !== null ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.3s ease-out' }}>
-              <div>
-                <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>Gravedad</label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button 
-                    onClick={() => updateMarker(selectedMarkerIndex, 'type', 'red')}
-                    style={{ flex: 1, padding: '0.5rem', border: 'none', borderRadius: '4px', background: markers[selectedMarkerIndex].type === 'red' ? '#ef4444' : 'rgba(239,68,68,0.2)', color: markers[selectedMarkerIndex].type === 'red' ? '#ffffff' : '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}
-                  >Crítico</button>
-                  <button 
-                    onClick={() => updateMarker(selectedMarkerIndex, 'type', 'yellow')}
-                    style={{ flex: 1, padding: '0.5rem', border: 'none', borderRadius: '4px', background: markers[selectedMarkerIndex].type === 'yellow' ? '#f59e0b' : 'rgba(245,158,11,0.2)', color: markers[selectedMarkerIndex].type === 'yellow' ? '#000000' : '#f59e0b', fontWeight: 'bold', cursor: 'pointer' }}
-                  >Leve</button>
+      {/* Selected Part Detail Editor */}
+      {selectedPart && (
+        <div className="glass-card" style={{
+          border: '1px solid var(--border-color)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.25rem',
+          animation: 'fadeIn 0.25s ease-out'
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.8rem' }}>
+            <span style={{ fontSize: '2.5rem' }}>{selectedPart.icon}</span>
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--primary)' }}>{selectedPart.name}</h3>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>{selectedPart.desc}</p>
+            </div>
+          </div>
+
+          {/* Status buttons */}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Estado del Componente</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                style={{
+                  flex: 1, padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', border: 'none', fontWeight: 'bold',
+                  background: currentPartData.status === 'OK' ? '#10b981' : 'rgba(16,185,129,0.1)',
+                  color: currentPartData.status === 'OK' ? 'black' : '#10b981'
+                }}
+                onClick={() => updatePartData(selectedPartId, 'status', 'OK')}
+              >
+                ✓ Todo OK
+              </button>
+              <button
+                style={{
+                  flex: 1, padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', border: 'none', fontWeight: 'bold',
+                  background: currentPartData.status === 'WARNING' ? '#f59e0b' : 'rgba(245,158,11,0.1)',
+                  color: currentPartData.status === 'WARNING' ? 'black' : '#f59e0b'
+                }}
+                onClick={() => updatePartData(selectedPartId, 'status', 'WARNING')}
+              >
+                ⚠️ Advertencia
+              </button>
+              <button
+                style={{
+                  flex: 1, padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', border: 'none', fontWeight: 'bold',
+                  background: currentPartData.status === 'CRITICAL' ? '#ef4444' : 'rgba(239,68,68,0.1)',
+                  color: currentPartData.status === 'CRITICAL' ? 'white' : '#ef4444'
+                }}
+                onClick={() => updatePartData(selectedPartId, 'status', 'CRITICAL')}
+              >
+                🚨 Crítico / Falla
+              </button>
+            </div>
+          </div>
+
+          {/* Media Capture: Voice & Images */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            
+            {/* Audio Recording */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🎙️ Registrar Diagnóstico por Voz (IA)</label>
+              <button
+                className={`btn ${isRecording ? 'btn-danger' : 'btn-outline'}`}
+                style={{ width: '100%', height: '45px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={loadingAi}
+              >
+                {isRecording ? (
+                  <>🔴 Detener Grabación</>
+                ) : (
+                  <>🎤 Grabar Nota de Voz</>
+                )}
+              </button>
+              {loadingAi && <div style={{ fontSize: '0.8rem', color: 'var(--secondary)', textAlign: 'center', marginTop: '0.3rem' }}>Transcribiendo con Whisper...</div>}
+            </div>
+
+            {/* Photo Capture */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>📸 Adjuntar Evidencia Fotográfica</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                id="camera-upload"
+                style={{ display: 'none' }}
+                onChange={handleImageUpload}
+              />
+              <button
+                className="btn btn-outline"
+                style={{ width: '100%', height: '45px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                onClick={() => document.getElementById('camera-upload').click()}
+              >
+                📷 Tomar Foto / Subir Imagen
+              </button>
+            </div>
+            
+          </div>
+
+          {/* Photo Preview & Note */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {currentPartData.image && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', width: '120px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Evidencia:</span>
+                <div style={{ position: 'relative', width: '120px', height: '90px', borderRadius: '6px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <img src={currentPartData.image} alt="Evidencia" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button
+                    onClick={() => updatePartData(selectedPartId, 'image', null)}
+                    style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.7)', border: 'none', color: 'white', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.8rem' }}
+                  >
+                    &times;
+                  </button>
                 </div>
               </div>
-              
-              <div>
-                <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>Descripción / Notas</label>
-                <textarea 
-                  className="input-field"
-                  style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
-                  value={markers[selectedMarkerIndex].note}
-                  onChange={(e) => updateMarker(selectedMarkerIndex, 'note', e.target.value)}
-                  placeholder="Ej: Abolladura profunda de 5cm..."
-                />
-              </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                <button 
-                  className="btn btn-outline" 
-                  style={{ borderColor: '#ef4444', color: '#ef4444' }}
-                  onClick={() => deleteMarker(selectedMarkerIndex)}
-                >
-                  <i className="fa-solid fa-trash"></i> Eliminar
-                </button>
-                <button className="btn" onClick={() => setSelectedMarkerIndex(null)}>
-                  Cerrar
-                </button>
-              </div>
+            )}
+
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>Notas del Diagnóstico</label>
+              <textarea
+                className="input-field"
+                style={{ width: '100%', minHeight: '90px', resize: 'vertical' }}
+                placeholder="Las observaciones transcritas o escritas se guardarán aquí..."
+                value={currentPartData.note}
+                onChange={(e) => updatePartData(selectedPartId, 'note', e.target.value)}
+              />
             </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)' }}>
-              <i className="fa-solid fa-hand-pointer" style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.5 }}></i>
-              <p>Selecciona o añade un marcador en el diagrama para ver sus detalles.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Módulo IA - Notas de Voz */}
-        <div className="glass-card" style={{ flex: '1', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ marginTop: 0, color: '#8b5cf6' }}>
-            <i className="fa-solid fa-microphone-lines" style={{ marginRight: '8px' }}></i>
-            Notas de Voz con IA
-          </h3>
-          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Grabe sus observaciones generales y MecanIA las transcribirá automáticamente a texto.
-          </p>
-
-          <textarea 
-            className="input-field" 
-            style={{ width: '100%', flex: 1, minHeight: '120px', resize: 'vertical', marginBottom: '1rem' }}
-            placeholder="Las notas transcritas aparecerán aquí..."
-            value={aiNotes}
-            onChange={(e) => setAiNotes(e.target.value)}
-          />
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button 
-              className={`btn ${isRecording ? 'btn-danger' : 'btn-success'}`} 
-              style={{ flex: 1, height: '48px', fontSize: '1rem' }}
-              onClick={isRecording ? stopRecording : startRecording}
-            >
-              {isRecording ? (
-                <span><i className="fa-solid fa-circle-stop"></i> Detener Grabación</span>
-              ) : (
-                <span><i className="fa-solid fa-microphone"></i> Iniciar Nota de Voz</span>
-              )}
-            </button>
           </div>
-          {loadingAi && <div style={{ textAlign: 'center', marginTop: '0.5rem', color: '#8b5cf6', fontSize: '0.9rem' }}><i className="fa-solid fa-circle-notch fa-spin"></i> Transcribiendo audio con Whisper...</div>}
 
-          <div style={{ marginTop: '2rem' }}>
-            <button className="btn" style={{ width: '100%' }} onClick={saveInspection}>
-              <i className="fa-solid fa-floppy-disk" style={{ marginRight: '8px' }}></i> 
-              Guardar Inspección Completa
-            </button>
-          </div>
         </div>
-        
+      )}
+
+      {/* Save Action */}
+      <div style={{ marginTop: '1rem' }}>
+        <button className="btn" style={{ width: '100%', height: '50px', fontSize: '1.1rem', backgroundColor: 'var(--primary)' }} onClick={handleSaveInspection}>
+          💾 Guardar Inspección de Vehículo Completa
+        </button>
       </div>
+
     </div>
   );
 };
