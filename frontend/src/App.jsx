@@ -14,6 +14,7 @@ import VehicleList from './components/VehicleList';
 import POSDashboard from './components/POSDashboard';
 import SaleHistory from './components/SaleHistory';
 import EstimatesDashboard from './components/EstimatesDashboard';
+import DashboardHome from './components/DashboardHome';
 import { ToastProvider } from './components/Toast';
 
 /* ── Icons (inline SVG, no extra dep) ── */
@@ -49,6 +50,7 @@ const ICONS = {
 };
 
 const NAV_ITEMS = [
+  { id: 'dashboard',  label: 'Inicio / Panel',      icon: 'history' },
   { id: 'orders',     label: 'Órdenes de Trabajo', icon: 'orders' },
   { id: 'inspection', label: 'Inspección Visual',   icon: 'inspection' },
   { id: 'inventory',  label: 'Inventario',          icon: 'inventory' },
@@ -62,6 +64,7 @@ const NAV_ITEMS = [
 ];
 
 const PAGE_TITLES = {
+  dashboard:  { title: 'Panel de Control',    subtitle: 'Resumen e indicadores clave del taller' },
   orders:     { title: 'Órdenes de Trabajo',  subtitle: 'Gestión digital de OTs en tiempo real' },
   inspection: { title: 'Inspección Visual',   subtitle: 'Registro fotográfico de hallazgos' },
   inventory:  { title: 'Inventario',          subtitle: 'Control de stock y productos' },
@@ -104,7 +107,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 
         <nav className="sidebar-nav">
           <div className="nav-section-label">Principal</div>
-          {NAV_ITEMS.slice(0, 5).map(item => (
+          {NAV_ITEMS.slice(0, 6).map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -118,7 +121,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           ))}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas</div>
-          {NAV_ITEMS.slice(5, 9).map(item => (
+          {NAV_ITEMS.slice(6, 10).map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -132,7 +135,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           ))}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Sistema</div>
-          {NAV_ITEMS.slice(9).map(item => (
+          {NAV_ITEMS.slice(10).map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -185,13 +188,14 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 
 /* ── Admin Layout ── */
 function AdminLayout({ onLogout, username }) {
-  const [activeTab, setActiveTab] = useState('orders');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const pageInfo = PAGE_TITLES[activeTab] || { title: '', subtitle: '' };
 
   const PANELS = {
+    dashboard:  <DashboardHome />,
     orders:     <WorkOrderList />,
     inspection: <VisualInspection />,
     inventory:  <InventoryDashboard />,

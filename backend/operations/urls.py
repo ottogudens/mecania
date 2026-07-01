@@ -4,7 +4,8 @@ from .views import (
     ClientViewSet, VehicleViewSet, WorkOrderViewSet, 
     WorkOrderItemViewSet, VisualInspectionViewSet, 
     CustomAuthToken, ClientAuthToken, ClientDataView,
-    AIDiagnosticsView, AITranscribeView, WorkshopSettingsView
+    AIDiagnosticsView, AITranscribeView, WorkshopSettingsView,
+    DashboardStatsView
 )
 
 router = DefaultRouter()
@@ -15,6 +16,7 @@ router.register(r'work-order-items', WorkOrderItemViewSet)
 router.register(r'inspections', VisualInspectionViewSet)
 
 urlpatterns = [
+    path('dashboard-stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
     path('settings/', WorkshopSettingsView.as_view(), name='workshop_settings'),
     path('login/', CustomAuthToken.as_view(), name='api_login'),
     path('client/login/', ClientAuthToken.as_view(), name='client_login'),

@@ -439,3 +439,58 @@ class AITranscribeView(APIView):
         except Exception as e:
             print("Error OpenAI Whisper:", str(e))
             return Response({'error': 'Error al transcribir el audio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+from django.utils import timezone
+from django.db.models import Sum, Count
+from datetime import timedelta
+
+class DashboardStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        now = timezone.now()
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_week = start_of_day - timedelta(days=start_of_day.weekday())
+        start_of_month = start_of_day.replace(day=1)
+
+        # Sales Calculations from payments
+        from finance.models import Payment
+        sales_day = Payment.objects.filter(date__gte=start_of_day).aggregate(total=Sum('amount'))['total'] or 0
+        sales_week = Payment.objects.filter(date__gte=start_of_week).aggregate(total=Sum('amount'))['total'] or 0
+        sales_month = Payment.objects.filter(date__gte=start_of_month).aggregate(total=Sum('amount'))['total'] or 0
+
+        # OT States
+        ot_stats = WorkOrder.objects.values('status').annotate(count=Count('id'))
+        ot_status_counts = {stat['status']: stat['count'] for stat in ot_stats}
+
+        # Most Visited Brands/Models
+        vehicles_visited = Vehicle.objects.annotate(
+            visits=Count('work_orders')
+        ).filter(visits__gt=0).order_by('-visits')[:5]
+        
+        most_visited_vehicles = [{
+            'make': v.make,
+            'model': v.model,
+            'visits': v.visits
+        } for v in vehicles_visited]
+
+        # Most Sold Products / Services
+        most_sold_items = WorkOrderItem.objects.values('description').annotate(
+            total_qty=Sum('quantity')
+        ).order_by('-total_qty')[:5]
+
+        items_sold = [{
+            'description': item['description'],
+            'quantity': float(item['total_qty']),
+        } for item in most_sold_items]
+
+        return Response({
+            'sales': {
+                'day': float(sales_day),
+                'week': float(sales_week),
+                'month': float(sales_month),
+            },
+            'ot_status': ot_status_counts,
+            'most_visited_vehicles': most_visited_vehicles,
+            'most_sold_items': items_sold
+        })
