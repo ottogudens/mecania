@@ -334,7 +334,11 @@ function App() {
             } 
           />
           <Route path="/client" element={<ClientLayout />} />
-          <Route path="/mechanic" element={<MechanicPortal />} />
+          <Route path="/mechanic" element={<MechanicPortal onLogout={() => {
+            setAuthRole(localStorage.getItem('role'));
+            setAuthToken(localStorage.getItem('token'));
+            setUsername(localStorage.getItem('username') || '');
+          }} />} />
         </Routes>
       </Router>
     </ToastProvider>

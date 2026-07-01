@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from './Toast';
 
-const MechanicPortal = () => {
+const MechanicPortal = ({ onLogout }) => {
   const [orders, setOrders] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
   const [assignedOrders, setAssignedOrders] = useState([]);
@@ -81,6 +81,10 @@ const MechanicPortal = () => {
       setToken(data.token);
       setRole(data.role);
       setUsername(data.username);
+      if (onLogout) {
+        // Just trigger logout/auth state update in parent with correct state
+        onLogout(); 
+      }
     } catch (err) {
       setLoginError("Credenciales incorrectas o problema de conexión.");
     }
@@ -94,6 +98,9 @@ const MechanicPortal = () => {
     setToken(null);
     setRole(null);
     setUsername('');
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   const handleTakeOrder = async (orderId) => {
