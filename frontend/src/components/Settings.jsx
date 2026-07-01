@@ -7,7 +7,7 @@ const Settings = () => {
   const [qrCode, setQrCode] = useState(null);
   
   const [workshopSettings, setWorkshopSettings] = useState({
-    name: '', phone: '', address: '', email: '', website: '', logo_url: ''
+    name: '', phone: '', address: '', email: '', website: '', logo_url: '', google_maps_link: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -50,7 +50,8 @@ const Settings = () => {
     formData.append('phone', workshopSettings.phone);
     formData.append('address', workshopSettings.address);
     formData.append('email', workshopSettings.email);
-    formData.append('website', workshopSettings.website);
+    formData.append('website', workshopSettings.website || '');
+    formData.append('google_maps_link', workshopSettings.google_maps_link || '');
     if (logoFile) {
       formData.append('logo', logoFile);
     }
@@ -106,6 +107,11 @@ const Settings = () => {
             <div className="form-group">
               <label>Dirección</label>
               <input type="text" value={workshopSettings.address} onChange={e => setWorkshopSettings({...workshopSettings, address: e.target.value})} />
+            </div>
+
+            <div className="form-group">
+              <label>Enlace Google Maps</label>
+              <input type="url" placeholder="https://maps.google.com/..." value={workshopSettings.google_maps_link || ''} onChange={e => setWorkshopSettings({...workshopSettings, google_maps_link: e.target.value})} />
             </div>
 
             <div className="form-group">

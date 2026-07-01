@@ -7,7 +7,7 @@ class WorkshopSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkshopSettings
-        fields = ['name', 'logo', 'logo_url', 'phone', 'address', 'email', 'website']
+        fields = ['name', 'logo', 'logo_url', 'phone', 'address', 'email', 'website', 'google_maps_link']
     
     def get_logo_url(self, obj):
         if obj.logo:

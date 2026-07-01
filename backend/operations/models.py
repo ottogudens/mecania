@@ -16,6 +16,7 @@ class WorkshopSettings(models.Model):
     address = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True)
     website = models.URLField(blank=True)
+    google_maps_link = models.URLField(blank=True, null=True, help_text="Enlace de ubicación en Google Maps")
 
     def save(self, *args, **kwargs):
         self.pk = 1 # Singleton

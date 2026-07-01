@@ -171,9 +171,11 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         settings = WorkshopSettings.load()
         if settings.logo:
             try:
-                p.drawImage(settings.logo.path, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
-            except:
-                pass
+                from reportlab.lib.utils import ImageReader
+                img = ImageReader(settings.logo)
+                p.drawImage(img, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
+            except Exception as e:
+                print("PDF Logo drawing failed:", e)
         
         p.setFont("Helvetica-Bold", 24)
         p.drawString(160, 750, settings.name)
