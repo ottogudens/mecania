@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from './Toast';
 
@@ -118,6 +119,17 @@ const Login = ({ onLogin }) => {
             ) : 'Iniciar Sesión'}
           </button>
         </form>
+
+        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ height: '1px', backgroundColor: 'var(--border-muted)', flex: 1 }}></span>
+            <span style={{ padding: '0 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>¿Eres Mecánico?</span>
+            <span style={{ height: '1px', backgroundColor: 'var(--border-muted)', flex: 1 }}></span>
+          </div>
+          <Link to="/mechanic" className="btn btn-outline" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', gap: '0.5rem' }}>
+            🛠️ Portal de Mecánicos
+          </Link>
+        </div>
 
         {/* Footer */}
         <p style={{

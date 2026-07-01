@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from './Toast';
 
@@ -188,6 +189,17 @@ const MechanicPortal = () => {
             </div>
             <button type="submit" className="btn" style={{ width: '100%', marginTop: '0.5rem' }}>Iniciar Sesión</button>
           </form>
+
+          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', flex: 1 }}></span>
+              <span style={{ padding: '0 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>¿No eres Mecánico?</span>
+              <span style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', flex: 1 }}></span>
+            </div>
+            <Link to="/login" className="btn btn-outline" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', gap: '0.5rem', textDecoration: 'none' }}>
+              ← Ir al Acceso Principal
+            </Link>
+          </div>
         </div>
       </div>
     );
