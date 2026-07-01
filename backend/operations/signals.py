@@ -2,10 +2,16 @@ import requests
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.conf import settings
-from .models import WorkOrder
+from django.contrib.auth.models import User
+from .models import WorkOrder, UserProfile
 import os
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        UserProfile.objects.get_or_create(user=instance, defaults={'role': 'ADMIN' if instance.is_superuser else 'MECHANIC'})
 
 WHATSAPP_SERVICE_URL = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3000/api/send-message')
 

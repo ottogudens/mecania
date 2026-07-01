@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, Navigate } from 'react-router-dom';
 import axios from 'axios';
 
 import WorkOrderList from './components/WorkOrderList';
@@ -15,6 +15,8 @@ import POSDashboard from './components/POSDashboard';
 import SaleHistory from './components/SaleHistory';
 import EstimatesDashboard from './components/EstimatesDashboard';
 import DashboardHome from './components/DashboardHome';
+import UserManager from './components/UserManager';
+import MechanicPortal from './components/MechanicPortal';
 import { ToastProvider } from './components/Toast';
 
 /* ── Icons (inline SVG, no extra dep) ── */
@@ -47,6 +49,7 @@ const ICONS = {
   logout:     'M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1',
   menu:       'M4 6h16M4 12h16M4 18h16',
   car:        'M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2M14 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM5 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  users:      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'
 };
 
 const NAV_ITEMS = [
@@ -60,7 +63,8 @@ const NAV_ITEMS = [
   { id: 'pos',        label: 'Punto de Venta',      icon: 'pos' },
   { id: 'history',    label: 'Caja / Historial',    icon: 'history' },
   { id: 'estimates',  label: 'Presupuestos',        icon: 'orders' },
-  { id: 'settings',   label: 'Configuración',       icon: 'settings' },
+  { id: 'settings',   label: 'Configuración',     icon: 'settings' },
+  { id: 'users',      label: 'Usuarios',          icon: 'users' },
 ];
 
 const PAGE_TITLES = {
@@ -68,13 +72,14 @@ const PAGE_TITLES = {
   orders:     { title: 'Órdenes de Trabajo',  subtitle: 'Gestión digital de OTs en tiempo real' },
   inspection: { title: 'Inspección Visual',   subtitle: 'Registro fotográfico de hallazgos' },
   inventory:  { title: 'Inventario',          subtitle: 'Control de stock y productos' },
-  clients:    { title: 'Clientes',            subtitle: 'Base de datos de clientes y vehículos' },
-  vehicles:   { title: 'Vehículos',           subtitle: 'Gestión de vehículos' },
-  finance:    { title: 'Finanzas',            subtitle: 'Facturación y cobros' },
-  pos:        { title: 'Punto de Venta',      subtitle: 'Ventas de mostrador' },
-  history:    { title: 'Caja / Historial',    subtitle: 'Registro de ventas y cortes de caja' },
-  estimates:  { title: 'Presupuestos',        subtitle: 'Generación y envío de presupuestos' },
-  settings:   { title: 'Configuración',       subtitle: 'Integraciones y sistema' },
+  clients:    { title: 'Clientes',            subtitle: 'Directorio y contacto de clientes' },
+  vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
+  finance:    { title: 'Finanzas',            subtitle: 'Boletas, facturas y pagos del taller' },
+  pos:        { title: 'Punto de Venta',      subtitle: 'Caja rápida y venta directa de repuestos' },
+  history:    { title: 'Caja / Historial',    subtitle: 'Arqueo de caja e historial de pagos' },
+  estimates:  { title: 'Presupuestos',        subtitle: 'Cotizaciones y pre-aprobaciones' },
+  settings:   { title: 'Configuración',       subtitle: 'Ajustes del taller e integraciones' },
+  users:      { title: 'Usuarios del Sistema', subtitle: 'Administración de accesos y roles' },
 };
 
 /* ── Gear SVG Logo ── */
@@ -206,6 +211,7 @@ function AdminLayout({ onLogout, username }) {
     history:    <SaleHistory />,
     estimates:  <EstimatesDashboard />,
     settings:   <Settings />,
+    users:      <UserManager />,
   };
 
   return (
@@ -311,12 +317,24 @@ function App() {
             path="/"
             element={
               authRole
-                ? <AdminLayout onLogout={handleLogout} username={username} />
-                : <Login onLogin={handleLogin} />
+                ? authRole === 'admin'
+                  ? <AdminLayout onLogout={handleLogout} username={username} />
+                  : <Navigate to="/mechanic" replace />
+                : <Navigate to="/login" replace />
             }
           />
-          <Route path="/login" element={<Login onLogin={handleLogin} />} />
+          <Route 
+            path="/login" 
+            element={
+              authRole 
+                ? authRole === 'admin' 
+                  ? <Navigate to="/" replace /> 
+                  : <Navigate to="/mechanic" replace />
+                : <Login onLogin={handleLogin} />
+            } 
+          />
           <Route path="/client" element={<ClientLayout />} />
+          <Route path="/mechanic" element={<MechanicPortal />} />
         </Routes>
       </Router>
     </ToastProvider>

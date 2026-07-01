@@ -153,10 +153,17 @@ const WorkOrderList = () => {
 
   const handleQuickVehicleSubmit = async (e) => {
     e.preventDefault();
+    const cleanedPlate = quickVehicle.license_plate.toUpperCase().replace(/\s/g, '').replace(/-/g, '');
+    const plateRegex = /^[A-Z]{2}\d{4}$|^[A-Z]{4}\d{2}$/;
+    if (!plateRegex.test(cleanedPlate)) {
+      alert("La patente debe tener formato válido chileno: 2 letras y 4 números (ej. AB1234) o 4 letras y 2 números (ej. ABCD12).");
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       const payload = {
-        license_plate: quickVehicle.license_plate,
+        license_plate: cleanedPlate,
         make: quickVehicle.make,
         model: quickVehicle.model,
         year: quickVehicle.year,
@@ -476,7 +483,7 @@ const WorkOrderList = () => {
 
                       <div className="ot-actions">
                         <div className="ot-actions-row">
-                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Cambiar Estado</button>
+                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Estado</button>
                           <button
                             className="btn"
                             style={{ flex: 1, background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }}

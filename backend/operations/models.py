@@ -1,6 +1,13 @@
+import re
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator, RegexValidator
+from django.core.exceptions import ValidationError
+
+def validate_license_plate(value):
+    val = value.upper().replace(" ", "").replace("-", "")
+    if not re.match(r'^[A-Z]{2}\d{4}$|^[A-Z]{4}\d{2}$', val):
+        raise ValidationError("La patente debe tener formato chileno válido (ej: AB1234 o ABCD12).")
 
 class WorkshopSettings(models.Model):
     name = models.CharField(max_length=100, default="MecanIA")
@@ -38,6 +45,17 @@ class Client(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
+class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ('ADMIN', 'Administrador'),
+        ('MECHANIC', 'Mecánico'),
+    ]
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='MECHANIC')
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_role_display()}"
+
 class Vehicle(models.Model):
     TRANSMISSION_CHOICES = [
         ('MANUAL', 'Manual'),
@@ -54,7 +72,7 @@ class Vehicle(models.Model):
         ('GNC_GLP', 'Gas (GNC/GLP)'),
     ]
 
-    license_plate = models.CharField(max_length=20, unique=True)
+    license_plate = models.CharField(max_length=20, unique=True, validators=[validate_license_plate])
     make = models.CharField(max_length=50)
     model = models.CharField(max_length=50)
     year = models.IntegerField()
@@ -66,6 +84,14 @@ class Vehicle(models.Model):
     engine_displacement = models.CharField(max_length=20, blank=True, null=True, help_text="Cilindrada (ej: 1.6, 2.0L)")
     mileage = models.IntegerField(blank=True, null=True, help_text="Kilometraje inicial")
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='vehicles', null=True, blank=True)
+
+    def clean(self):
+        super().clean()
+        self.license_plate = self.license_plate.upper().replace(" ", "").replace("-", "")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.license_plate} - {self.make} {self.model}"

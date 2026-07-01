@@ -73,6 +73,17 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         return Response(WorkOrderSerializer(work_order).data)
 
     @action(detail=True, methods=['post'])
+    def take_order(self, request, pk=None):
+        work_order = self.get_object()
+        if work_order.status != 'PENDING':
+            return Response({'error': 'La orden de trabajo ya no está pendiente.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        work_order.mechanic = request.user
+        work_order.status = 'IN_PROGRESS'
+        work_order.save()
+        return Response(WorkOrderSerializer(work_order).data)
+
+    @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         """Cancela la OT (no aplica si ya fue entregada al cliente)."""
         work_order = self.get_object()
@@ -241,7 +252,12 @@ class CustomAuthToken(APIView):
         
         if user is not None:
             token, created = Token.objects.get_or_create(user=user)
-            role = 'superadmin' if user.is_superuser else 'tenant'
+            try:
+                profile = user.profile
+                role = 'admin' if profile.role == 'ADMIN' else 'mechanic'
+            except UserProfile.DoesNotExist:
+                role = 'admin' if user.is_superuser else 'mechanic'
+            
             return Response({
                 'token': token.key,
                 'role': role,
@@ -494,3 +510,67 @@ class DashboardStatsView(APIView):
             'most_visited_vehicles': most_visited_vehicles,
             'most_sold_items': items_sold
         })
+
+from django.contrib.auth.models import User
+from rest_framework import serializers
+
+class UserSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source='profile.role', required=False)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'password']
+        extra_kwargs = {'password': {'write_only': True, 'required': False}}
+
+    def create(self, validated_data):
+        profile_data = validated_data.pop('profile', {})
+        role = profile_data.get('role', 'MECHANIC')
+        password = validated_data.pop('password', None)
+        
+        user = User.objects.create(**validated_data)
+        if password:
+            user.set_password(password)
+            user.save()
+            
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.role = role
+        profile.save()
+        
+        if role == 'ADMIN':
+            user.is_staff = True
+            user.is_superuser = True
+        else:
+            user.is_staff = False
+            user.is_superuser = False
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop('profile', {})
+        role = profile_data.get('role')
+        password = validated_data.pop('password', None)
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+            
+        if password:
+            instance.set_password(password)
+        instance.save()
+        
+        if role:
+            profile, _ = UserProfile.objects.get_or_create(user=instance)
+            profile.role = role
+            profile.save()
+            if role == 'ADMIN':
+                instance.is_staff = True
+                instance.is_superuser = True
+            else:
+                instance.is_staff = False
+                instance.is_superuser = False
+            instance.save()
+        return instance
+
+class UserViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = User.objects.all().order_by('-id')
+    serializer_class = UserSerializer

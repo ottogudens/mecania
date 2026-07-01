@@ -82,10 +82,17 @@ const VehicleList = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanedPlate = currentVehicle.license_plate.toUpperCase().replace(/\s/g, '').replace(/-/g, '');
+    const plateRegex = /^[A-Z]{2}\d{4}$|^[A-Z]{4}\d{2}$/;
+    if (!plateRegex.test(cleanedPlate)) {
+      alert("La patente debe tener formato válido chileno: 2 letras y 4 números (ej. AB1234) o 4 letras y 2 números (ej. ABCD12).");
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       const payload = {
-        license_plate: currentVehicle.license_plate,
+        license_plate: cleanedPlate,
         make: currentVehicle.make,
         model: currentVehicle.model,
         year: currentVehicle.year,
