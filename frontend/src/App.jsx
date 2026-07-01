@@ -93,7 +93,7 @@ function GearLogo() {
 }
 
 /* ── Sidebar ── */
-function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, closeSidebar }) {
+function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, closeSidebar, logoUrl }) {
   const initials = username ? username.slice(0, 2).toUpperCase() : 'U';
 
   return (
@@ -101,8 +101,12 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
       <div className={`sidebar-overlay ${sidebarOpen ? 'open' : ''}`} onClick={closeSidebar} />
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">
-            <GearLogo />
+          <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {logoUrl ? (
+              <img src={logoUrl} alt="Logo" style={{ maxWidth: '40px', maxHeight: '40px', objectFit: 'contain', borderRadius: '4px' }} />
+            ) : (
+              <GearLogo />
+            )}
           </div>
           <div className="sidebar-logo-text">
             <strong>MecanIA</strong>
@@ -192,7 +196,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 }
 
 /* ── Admin Layout ── */
-function AdminLayout({ onLogout, username }) {
+function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -210,7 +214,7 @@ function AdminLayout({ onLogout, username }) {
     pos:        <POSDashboard />,
     history:    <SaleHistory />,
     estimates:  <EstimatesDashboard />,
-    settings:   <Settings />,
+    settings:   <Settings onSettingsUpdate={onSettingsUpdate} />,
     users:      <UserManager />,
   };
 
@@ -223,6 +227,7 @@ function AdminLayout({ onLogout, username }) {
         username={username}
         sidebarOpen={sidebarOpen}
         closeSidebar={closeSidebar}
+        logoUrl={logoUrl}
       />
       <div className="main-wrapper">
         {/* Mobile top bar */}
@@ -285,14 +290,34 @@ function App() {
   const [authRole, setAuthRole]   = useState(localStorage.getItem('role') || null);
   const [authToken, setAuthToken] = useState(localStorage.getItem('token') || null);
   const [username, setUsername]   = useState(localStorage.getItem('username') || '');
+  const [logoUrl, setLogoUrl]     = useState(null);
+
+  const fetchLogo = useCallback(async () => {
+    const currentToken = localStorage.getItem('token');
+    if (!currentToken) return;
+    try {
+      const res = await axios.get('/api/operations/settings/', {
+        headers: { Authorization: `Token ${currentToken}` }
+      });
+      if (res.data && res.data.logo) {
+        setLogoUrl(res.data.logo);
+      } else {
+        setLogoUrl(null);
+      }
+    } catch (err) {
+      console.error("Error loading logo:", err);
+    }
+  }, []);
 
   useEffect(() => {
     if (authToken) {
       axios.defaults.headers.common['Authorization'] = `Token ${authToken}`;
+      fetchLogo();
     } else {
       delete axios.defaults.headers.common['Authorization'];
+      setLogoUrl(null);
     }
-  }, [authToken]);
+  }, [authToken, fetchLogo]);
 
   const handleLogin = (role, token, user = '') => {
     setAuthRole(role);
@@ -307,6 +332,7 @@ function App() {
     setAuthRole(null);
     setAuthToken(null);
     setUsername('');
+    setLogoUrl(null);
   };
 
   return (
@@ -318,7 +344,7 @@ function App() {
             element={
               authRole
                 ? authRole === 'admin'
-                  ? <AdminLayout onLogout={handleLogout} username={username} />
+                  ? <AdminLayout onLogout={handleLogout} username={username} logoUrl={logoUrl} onSettingsUpdate={fetchLogo} />
                   : <Navigate to="/mechanic" replace />
                 : <Navigate to="/login" replace />
             }

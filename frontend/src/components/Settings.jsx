@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 
-const Settings = () => {
+const Settings = ({ onSettingsUpdate }) => {
   const [waStatus, setWaStatus] = useState('loading');
   const [qrCode, setQrCode] = useState(null);
   
@@ -71,6 +71,9 @@ const Settings = () => {
         logo: workshopSettings.logo || null
       });
       setWorkshopSettings(res.data);
+      if (onSettingsUpdate) {
+        onSettingsUpdate();
+      }
       alert('Configuración guardada exitosamente.');
     } catch (err) {
       console.error(err);
