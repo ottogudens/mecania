@@ -364,40 +364,32 @@ const VisualInspection = () => {
     try {
       const token = localStorage.getItem('token');
       
-      // We can mock saving the estimate, or if there is a real endpoint:
-      // Let's check if there is an endpoint `/api/operations/estimates/` or similar.
-      // Usually, there is a WorkOrder estimate or standalone estimate.
-      // Let's create a WorkOrder in status PENDING with the pre-filled items!
-      // This will act as the budget/quote!
-      
+      // Ensure we have a client associated with the vehicle
+      if (!selectedInspection.vehicle_client_id) {
+        alert('Este vehículo no tiene un cliente asignado. Por favor asigne un cliente al vehículo primero.');
+        return;
+      }
+
       const payload = {
+        client_id: selectedInspection.vehicle_client_id,
         vehicle_id: selectedInspection.vehicle_id,
-        status: 'PENDING',
-        mileage: 0,
-        fuel_level: 0,
-        symptoms: `Generado desde Inspección Visual #${selectedInspection.id}`,
-        visit_reason: 'Cotización / Presupuesto post-inspección'
-      };
-
-      // Create WorkOrder
-      const woRes = await axios.post('/api/operations/work-orders/', payload, {
-        headers: { Authorization: `Token ${token}` }
-      });
-      const workOrderId = woRes.data.id;
-
-      // Add items
-      for (const item of estimateItems) {
-        await axios.post('/api/operations/work-order-items/', {
-          work_order: workOrderId,
+        valid_until: null,
+        items: estimateItems.map(item => ({
+          product_id: null,
+          service_id: null,
           description: item.description,
           quantity: item.quantity,
           unit_price: item.unit_price
-        }, {
-          headers: { Authorization: `Token ${token}` }
-        });
-      }
+        }))
+      };
 
-      toast({ title: 'Presupuesto Creado', message: `Se generó la cotización asociada (OT #${workOrderId})`, type: 'success' });
+      // Create Estimate in finance app
+      const res = await axios.post('/api/finance/estimates/', payload, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      const estimateId = res.data.id;
+
+      toast({ title: 'Presupuesto Creado', message: `Se generó el presupuesto PRE-${estimateId} pendiente de aprobación.`, type: 'success' });
       setShowEstimateModal(false);
     } catch (err) {
       console.error(err);

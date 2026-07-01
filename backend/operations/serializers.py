@@ -55,12 +55,15 @@ class VisualInspectionSerializer(serializers.ModelSerializer):
     mechanic_username = serializers.CharField(source='mechanic.username', read_only=True)
     vehicle_id = serializers.PrimaryKeyRelatedField(queryset=Vehicle.objects.all(), source='vehicle', required=False, allow_null=True)
 
+    vehicle_client_id = serializers.IntegerField(source='vehicle.client.id', read_only=True, default=None)
+
     class Meta:
         model = VisualInspection
         fields = [
             'id', 'vehicle_id', 'vehicle_plate', 'vehicle_make', 'vehicle_model', 
             'mechanic', 'mechanic_username', 'status', 'notes', 'items_json', 
-            'created_at', 'updated_at', 'work_order', 'category', 'evidence_file', 'observations'
+            'created_at', 'updated_at', 'work_order', 'category', 'evidence_file', 'observations',
+            'vehicle_client_id'
         ]
 
 class WorkOrderItemSerializer(serializers.ModelSerializer):
