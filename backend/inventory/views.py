@@ -256,6 +256,9 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        barcode = self.request.query_params.get('barcode')
+        if barcode:
+            qs = qs.filter(barcode=barcode)
         if self.request.query_params.get('popular') == 'true':
             qs = qs.order_by('-sales_count', '-id')
         return qs

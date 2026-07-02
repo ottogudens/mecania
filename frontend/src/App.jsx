@@ -17,6 +17,7 @@ import EstimatesDashboard from './components/EstimatesDashboard';
 import DashboardHome from './components/DashboardHome';
 import UserManager from './components/UserManager';
 import MechanicPortal from './components/MechanicPortal';
+import MobileScanner from './components/MobileScanner';
 import { ToastProvider } from './components/Toast';
 
 /* ── Icons (inline SVG, no extra dep) ── */
@@ -49,7 +50,8 @@ const ICONS = {
   logout:     'M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1',
   menu:       'M4 6h16M4 12h16M4 18h16',
   car:        'M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2M14 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM5 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
-  users:      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'
+  users:      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm14 0-3 3m0 0-3-3m3 3V8',
+  scan:       'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z'
 };
 
 const NAV_ITEMS = [
@@ -57,6 +59,7 @@ const NAV_ITEMS = [
   { id: 'orders',     label: 'Órdenes de Trabajo', icon: 'orders' },
   { id: 'inspection', label: 'Inspección Visual',   icon: 'inspection' },
   { id: 'inventory',  label: 'Inventario',          icon: 'inventory' },
+  { id: 'scan',       label: 'Escanear Stock',      icon: 'scan' },
   { id: 'clients',    label: 'Clientes',            icon: 'clients' },
   { id: 'vehicles',   label: 'Vehículos',           icon: 'car' },
   { id: 'finance',    label: 'Finanzas',            icon: 'finance' },
@@ -72,6 +75,7 @@ const PAGE_TITLES = {
   orders:     { title: 'Órdenes de Trabajo',  subtitle: 'Gestión digital de OTs en tiempo real' },
   inspection: { title: 'Inspección Visual',   subtitle: 'Registro fotográfico de hallazgos' },
   inventory:  { title: 'Inventario',          subtitle: 'Control de stock y productos' },
+  scan:       { title: 'Escanear Stock',      subtitle: 'Busca, edita o actualiza el stock con tu cámara móvil' },
   clients:    { title: 'Clientes',            subtitle: 'Directorio y contacto de clientes' },
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
   finance:    { title: 'Finanzas',            subtitle: 'Boletas, facturas y pagos del taller' },
@@ -116,7 +120,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 
         <nav className="sidebar-nav">
           <div className="nav-section-label">Principal</div>
-          {NAV_ITEMS.slice(0, 6).map(item => (
+          {NAV_ITEMS.slice(0, 7).map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -130,7 +134,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           ))}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas</div>
-          {NAV_ITEMS.slice(6, 10).map(item => (
+          {NAV_ITEMS.slice(7, 11).map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -144,7 +148,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           ))}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Sistema</div>
-          {NAV_ITEMS.slice(10).map(item => (
+          {NAV_ITEMS.slice(11).map(item => (
             <button
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
@@ -208,6 +212,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     orders:     <WorkOrderList />,
     inspection: <VisualInspection />,
     inventory:  <InventoryDashboard />,
+    scan:       <MobileScanner />,
     clients:    <ClientList />,
     vehicles:   <VehicleList />,
     finance:    <FinanceDashboard />,
