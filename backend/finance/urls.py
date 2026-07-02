@@ -9,13 +9,15 @@ from .views import (
     POSCancelInvoiceView,
     POSCounterSaleView,
     InvoicePDFView,
-    EstimateViewSet
+    EstimateViewSet,
+    CashRegisterViewSet
 )
 
 router = DefaultRouter()
 router.register(r'invoices', InvoiceViewSet)
 router.register(r'payments', PaymentViewSet)
 router.register(r'estimates', EstimateViewSet, basename='estimate')
+router.register(r'cash-register', CashRegisterViewSet, basename='cash-register')
 
 urlpatterns = [
     path('pos/work-order-lookup/', POSWorkOrderLookupView.as_view(), name='pos-work-order-lookup'),

@@ -193,3 +193,28 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Pago {self.id} - FACT-{self.invoice.id} ({self.amount})"
+
+
+class CashRegisterSession(models.Model):
+    STATUS_CHOICES = [
+        ('OPEN', 'Abierta'),
+        ('CLOSED', 'Cerrada'),
+    ]
+
+    opened_by = models.ForeignKey('auth.User', on_delete=models.PROTECT, related_name='opened_sessions')
+    closed_by = models.ForeignKey('auth.User', on_delete=models.PROTECT, related_name='closed_sessions', null=True, blank=True)
+    opened_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    opening_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='OPEN')
+    
+    # Declarado por el usuario al cerrar
+    closing_cash = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    closing_card = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    closing_transfer = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    
+    closing_notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Caja {self.id} ({self.get_status_display()}) - Abierta el {self.opened_at.strftime('%d/%m/%Y %H:%M')}"
+

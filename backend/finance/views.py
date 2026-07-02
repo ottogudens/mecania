@@ -5,9 +5,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from django.utils import timezone
 from operations.models import WorkOrder
-from .models import Invoice, InvoiceLineItem, Payment
-from .serializers import InvoiceSerializer, PaymentSerializer
+from .models import Invoice, InvoiceLineItem, Payment, CashRegisterSession
+from .serializers import InvoiceSerializer, PaymentSerializer, CashRegisterSessionSerializer
 from .services import (
     POSError,
     get_or_create_invoice_for_work_order,
@@ -15,6 +16,121 @@ from .services import (
     cancel_invoice,
     create_counter_sale,
 )
+from rest_framework.decorators import action
+
+class CashRegisterViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = CashRegisterSession.objects.all().order_by('-opened_at')
+    serializer_class = CashRegisterSessionSerializer
+
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """Obtiene la sesión de caja actualmente abierta."""
+        current_session = CashRegisterSession.objects.filter(status='OPEN').first()
+        if not current_session:
+            return Response(None, status=status.HTTP_200_OK)
+        return Response(CashRegisterSessionSerializer(current_session).data)
+
+    @action(detail=False, methods=['post'])
+    def open_session(self, request):
+        """Abre una nueva sesión de caja."""
+        # Verificar si ya existe una abierta
+        if CashRegisterSession.objects.filter(status='OPEN').exists():
+            return Response({'error': 'Ya existe una sesión de caja abierta.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        opening_amount = request.data.get('opening_amount', 0)
+        try:
+            opening_amount = Decimal(str(opening_amount))
+        except (InvalidOperation, ValueError):
+            return Response({'error': 'Monto inicial inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        session = CashRegisterSession.objects.create(
+            opened_by=request.user,
+            opening_amount=opening_amount,
+            status='OPEN'
+        )
+        return Response(CashRegisterSessionSerializer(session).data, status=status.HTTP_201_CREATED)
+
+    def get_session_stats(self, session):
+        """Calcula los totales esperados en base a los pagos de la sesión."""
+        payments = Payment.objects.filter(date__gte=session.opened_at)
+        if session.closed_at:
+            payments = payments.filter(date__lte=session.closed_at)
+        
+        # Agrupar por método de pago
+        cash_total = Decimal('0.00')
+        card_total = Decimal('0.00')
+        transfer_total = Decimal('0.00')
+
+        for p in payments:
+            if p.payment_method == 'CASH':
+                cash_total += p.amount
+            elif p.payment_method == 'CARD':
+                card_total += p.amount
+            elif p.payment_method == 'TRANSFER':
+                transfer_total += p.amount
+
+        return {
+            'opening_amount': float(session.opening_amount),
+            'expected_cash': float(cash_total),
+            'expected_card': float(card_total),
+            'expected_transfer': float(transfer_total),
+            'expected_total': float(session.opening_amount + cash_total + card_total + transfer_total)
+        }
+
+    @action(detail=False, methods=['get'])
+    def x_report(self, request):
+        """Genera el reporte X para la caja abierta actual (sin cerrarla)."""
+        session = CashRegisterSession.objects.filter(status='OPEN').first()
+        if not session:
+            return Response({'error': 'No hay ninguna sesión de caja abierta para generar reporte X.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        stats = self.get_session_stats(session)
+        # Traer listado de transacciones/pagos detallados
+        payments = Payment.objects.filter(date__gte=session.opened_at).order_by('-date')
+        stats['payments'] = PaymentSerializer(payments, many=True).data
+        stats['session'] = CashRegisterSessionSerializer(session).data
+        return Response(stats)
+
+    @action(detail=True, methods=['post'])
+    def close_session(self, request, pk=None):
+        """Cierra la sesión de caja especificada, declarando montos físicos."""
+        session = self.get_object()
+        if session.status == 'CLOSED':
+            return Response({'error': 'Esta sesión ya está cerrada.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        closing_cash = request.data.get('closing_cash', 0)
+        closing_card = request.data.get('closing_card', 0)
+        closing_transfer = request.data.get('closing_transfer', 0)
+        closing_notes = request.data.get('closing_notes', '')
+
+        try:
+            session.closing_cash = Decimal(str(closing_cash))
+            session.closing_card = Decimal(str(closing_card))
+            session.closing_transfer = Decimal(str(closing_transfer))
+        except (InvalidOperation, ValueError):
+            return Response({'error': 'Montos de cierre inválidos.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        session.closed_by = request.user
+        session.closed_at = timezone.now()
+        session.closing_notes = closing_notes
+        session.status = 'CLOSED'
+        session.save()
+
+        return Response(CashRegisterSessionSerializer(session).data)
+
+    @action(detail=True, methods=['get'])
+    def z_report(self, request, pk=None):
+        """Reporte detallado de cierre Z para una sesión cerrada."""
+        session = self.get_object()
+        stats = self.get_session_stats(session)
+        payments = Payment.objects.filter(date__gte=session.opened_at)
+        if session.closed_at:
+            payments = payments.filter(date__lte=session.closed_at)
+        stats['payments'] = PaymentSerializer(payments.order_by('-date'), many=True).data
+        stats['session'] = CashRegisterSessionSerializer(session).data
+        return Response(stats)
+
 
 
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):

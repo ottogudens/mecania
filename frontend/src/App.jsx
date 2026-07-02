@@ -12,7 +12,7 @@ import FinanceDashboard from './components/FinanceDashboard';
 import ClientList from './components/ClientList';
 import VehicleList from './components/VehicleList';
 import POSDashboard from './components/POSDashboard';
-import SaleHistory from './components/SaleHistory';
+import CashRegister from './components/CashRegister';
 import EstimatesDashboard from './components/EstimatesDashboard';
 import DashboardHome from './components/DashboardHome';
 import UserManager from './components/UserManager';
@@ -76,7 +76,7 @@ const PAGE_TITLES = {
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
   finance:    { title: 'Finanzas',            subtitle: 'Boletas, facturas y pagos del taller' },
   pos:        { title: 'Punto de Venta',      subtitle: 'Caja rápida y venta directa de repuestos' },
-  history:    { title: 'Caja / Historial',    subtitle: 'Arqueo de caja e historial de pagos' },
+  history:    { title: 'Control de Caja y Ventas',    subtitle: 'Arqueo de caja, reporte X e historial de pagos' },
   estimates:  { title: 'Presupuestos',        subtitle: 'Cotizaciones y pre-aprobaciones' },
   settings:   { title: 'Configuración',       subtitle: 'Ajustes del taller e integraciones' },
   users:      { title: 'Usuarios del Sistema', subtitle: 'Administración de accesos y roles' },
@@ -212,7 +212,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     vehicles:   <VehicleList />,
     finance:    <FinanceDashboard />,
     pos:        <POSDashboard />,
-    history:    <SaleHistory />,
+    history:    <CashRegister />,
     estimates:  <EstimatesDashboard />,
     settings:   <Settings onSettingsUpdate={onSettingsUpdate} />,
     users:      <UserManager />,

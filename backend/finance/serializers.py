@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Invoice, InvoiceLineItem, Payment, Estimate, EstimateLineItem
+from .models import Invoice, InvoiceLineItem, Payment, Estimate, EstimateLineItem, CashRegisterSession
 
 class EstimateLineItemSerializer(serializers.ModelSerializer):
     total_price = serializers.ReadOnlyField()
@@ -85,3 +85,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
             c = obj.work_order.vehicle.client
             return f"{c.first_name} {c.last_name}"
         return None
+
+
+class CashRegisterSessionSerializer(serializers.ModelSerializer):
+    opened_by_username = serializers.CharField(source='opened_by.username', read_only=True)
+    closed_by_username = serializers.CharField(source='closed_by.username', read_only=True, default=None)
+
+    class Meta:
+        model = CashRegisterSession
+        fields = [
+            'id', 'opened_by', 'opened_by_username', 'closed_by', 'closed_by_username',
+            'opened_at', 'closed_at', 'opening_amount', 'status',
+            'closing_cash', 'closing_card', 'closing_transfer', 'closing_notes',
+        ]
+        read_only_fields = ['opened_at', 'closed_at', 'opened_by', 'closed_by', 'status']
+
