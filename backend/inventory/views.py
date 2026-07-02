@@ -131,6 +131,123 @@ class ServiceViewSet(viewsets.ModelViewSet):
             
         return qs
 
+    @action(detail=False, methods=['get'])
+    def download_service_template(self, request):
+        import pandas as pd
+        import io
+        from django.http import HttpResponse
+
+        columns = ['Nombre', 'Categoría', 'Precio', 'Descripción', 'Activo']
+        rows = []
+
+        # Exportar todos los servicios existentes
+        for s in Service.objects.select_related('category').all().order_by('category__name', 'name'):
+            rows.append([
+                s.name,
+                s.category.name if s.category else '',
+                float(s.price),
+                s.description or '',
+                'Sí' if s.is_active else 'No',
+            ])
+
+        # Si no hay datos, agregar filas de ejemplo
+        if not rows:
+            rows.append(['Cambio de Aceite', 'Mantenimiento', 25000, 'Cambio de aceite y filtro', 'Sí'])
+            rows.append(['Alineación y Balanceo', 'Suspensión', 35000, 'Alineación computarizada', 'Sí'])
+            rows.append(['Diagnóstico Computarizado', 'Diagnóstico', 15000, 'Lectura de códigos OBD', 'Sí'])
+
+        df = pd.DataFrame(rows, columns=columns)
+
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Servicios')
+            
+            worksheet = writer.sheets['Servicios']
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = max(max_length + 2, 12)
+                worksheet.column_dimensions[column].width = adjusted_width
+
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="plantilla_servicios.xlsx"'
+        return response
+
+    @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
+    def bulk_upload_services(self, request):
+        import pandas as pd
+
+        file = request.FILES.get('file')
+        if not file:
+            return Response({'error': 'No se proporcionó ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            df = pd.read_excel(file)
+            df.columns = df.columns.str.strip().str.lower()
+
+            # Validar columnas requeridas
+            required_cols = ['nombre', 'precio']
+            for col in required_cols:
+                if col not in df.columns:
+                    return Response({'error': f'Columna requerida faltante: {col}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            services_created = 0
+            errors = []
+
+            for index, row in df.iterrows():
+                nombre = str(row.get('nombre', '')).strip()
+                if not nombre or nombre == 'nan':
+                    continue
+
+                try:
+                    precio = row.get('precio', 0)
+                    if pd.isna(precio):
+                        precio = 0
+
+                    # Leer categoría - auto-crear si no existe
+                    categoria_str = str(row.get('categoría', row.get('categoria', 'General'))).strip()
+                    if categoria_str == 'nan' or not categoria_str:
+                        categoria_str = 'General'
+                    categoria, _ = ServiceCategory.objects.get_or_create(name=categoria_str)
+
+                    # Leer descripción
+                    descripcion = str(row.get('descripción', row.get('descripcion', ''))).strip()
+                    if descripcion == 'nan':
+                        descripcion = ''
+
+                    # Leer estado activo
+                    activo_str = str(row.get('activo', 'Sí')).strip().lower()
+                    is_active = activo_str not in ('no', 'false', '0', 'inactivo')
+
+                    Service.objects.update_or_create(
+                        name=nombre,
+                        category=categoria,
+                        defaults={
+                            'price': precio,
+                            'description': descripcion,
+                            'is_active': is_active,
+                        }
+                    )
+                    services_created += 1
+                except Exception as e:
+                    errors.append(f'Fila {index+2}: Error al procesar "{nombre}": {str(e)}')
+
+            return Response({
+                'message': 'Carga completada',
+                'services_created': services_created,
+                'errors': errors
+            })
+
+        except Exception as e:
+            return Response({'error': f'Error al leer el archivo: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -149,13 +266,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         import io
         from django.http import HttpResponse
 
-        columns = ['Tipo', 'SKU', 'Código de Barras', 'Nombre', 'Categoría', 'Precio', 'Costo Neto', 'Stock', 'Proveedor']
+        columns = ['SKU', 'Código de Barras', 'Nombre', 'Categoría', 'Precio', 'Costo Neto', 'Stock', 'Proveedor']
         rows = []
 
         # Exportar todos los productos existentes
         for p in Product.objects.all().order_by('category', 'name'):
             rows.append([
-                'Producto',
                 p.sku,
                 p.barcode or '',
                 p.name,
@@ -166,24 +282,9 @@ class ProductViewSet(viewsets.ModelViewSet):
                 p.supplier or '',
             ])
 
-        # Exportar todos los servicios existentes
-        for s in Service.objects.select_related('category').filter(is_active=True).order_by('category__name', 'name'):
-            rows.append([
-                'Servicio',
-                '',
-                '',
-                s.name,
-                s.category.name if s.category else '',
-                float(s.price),
-                0,
-                '',
-                '',
-            ])
-
         # Si no hay datos, agregar filas de ejemplo
         if not rows:
-            rows.append(['Producto', 'ACE-001', '7891000315507', 'Filtro de Aceite', 'Aceites', 15000, 10000, 10, 'AutoParts SA'])
-            rows.append(['Servicio', '', '', 'Alineación', 'Mantenimiento', 20000, 0, '', ''])
+            rows.append(['ACE-001', '7891000315507', 'Filtro de Aceite', 'Aceites', 15000, 10000, 10, 'AutoParts SA'])
 
         df = pd.DataFrame(rows, columns=columns)
 
@@ -227,17 +328,15 @@ class ProductViewSet(viewsets.ModelViewSet):
             df.columns = df.columns.str.strip().str.lower()
             
             # Validar columnas requeridas
-            required_cols = ['tipo', 'nombre', 'precio']
+            required_cols = ['nombre', 'precio']
             for col in required_cols:
                 if col not in df.columns:
                     return Response({'error': f'Columna requerida faltante: {col}'}, status=status.HTTP_400_BAD_REQUEST)
             
             products_created = 0
-            services_created = 0
             errors = []
             
             for index, row in df.iterrows():
-                tipo = str(row.get('tipo', '')).strip().lower()
                 nombre = str(row.get('nombre', '')).strip()
                 precio = row.get('precio', 0)
                 
@@ -245,91 +344,76 @@ class ProductViewSet(viewsets.ModelViewSet):
                     continue
                 
                 try:
-                    if tipo == 'producto':
-                        sku = str(row.get('sku', '')).strip()
-                        barcode = str(row.get('código de barras', row.get('codigo de barras', ''))).strip()
-                        if not barcode or barcode == 'nan' or barcode.strip() == '':
-                            barcode = None
-                        else:
-                            barcode = barcode.strip()
-                        stock = int(row.get('stock', 0) if pd.notna(row.get('stock')) else 0)
-                        cost_price = float(row.get('costo neto', 0) if pd.notna(row.get('costo neto')) else 0)
-                        supplier = str(row.get('proveedor', '')).strip()
-                        if supplier == 'nan': supplier = ''
-                        categoria_prod = str(row.get('categoría', row.get('categoria', ''))).strip()
-                        if categoria_prod == 'nan': categoria_prod = ''
-                        
-                        if not sku or sku == 'nan':
-                            # Auto-generar SKU basado en la categoría del producto
-                            source = categoria_prod if categoria_prod else nombre
-                            normalized = unicodedata.normalize('NFKD', source).encode('ascii', 'ignore').decode('ascii')
-                            # Tomar las primeras letras significativas como prefijo (3-4 chars)
-                            words = re.sub(r'[^A-Za-z0-9\s]', '', normalized).split()
-                            if len(words) == 1:
-                                prefix = words[0][:4].upper()
-                            else:
-                                # Tomar primeras letras de cada palabra (máx 4 palabras)
-                                prefix = ''.join(w[0] for w in words[:4]).upper()
-                            if not prefix:
-                                prefix = 'PROD'
-                            
-                            # Buscar el siguiente número secuencial para este prefijo
-                            existing = Product.objects.filter(sku__startswith=f'{prefix}-').order_by('-sku')
-                            max_num = 0
-                            for p in existing:
-                                try:
-                                    num = int(p.sku.split('-')[-1])
-                                    if num > max_num:
-                                        max_num = num
-                                except (ValueError, IndexError):
-                                    pass
-                            sku = f'{prefix}-{str(max_num + 1).zfill(3)}'
-                            
-                            # Asegurar unicidad por si acaso
-                            while Product.objects.filter(sku=sku).exists():
-                                max_num += 1
-                                sku = f'{prefix}-{str(max_num + 1).zfill(3)}'
-                            
-                        # Si existe otro producto con el mismo barcode (no vacío/nulo), arrojar error descriptivo
-                        if barcode:
-                            duplicate_barcode_prod = Product.objects.filter(barcode=barcode).exclude(sku=sku).first()
-                            if duplicate_barcode_prod:
-                                errors.append(f'Fila {index+2}: El código de barras "{barcode}" ya está en uso por el producto "{duplicate_barcode_prod.name}" (SKU: {duplicate_barcode_prod.sku}).')
-                                continue
-
-                        Product.objects.update_or_create(
-                            sku=sku,
-                            defaults={
-                                'name': nombre, 
-                                'price': precio, 
-                                'stock_quantity': stock,
-                                'barcode': barcode,
-                                'cost_price': cost_price,
-                                'supplier': supplier,
-                                'category': categoria_prod,
-                            }
-                        )
-                        products_created += 1
-                    elif tipo == 'servicio':
-                        categoria_str = str(row.get('categoría', row.get('categoria', 'General'))).strip()
-                        if categoria_str == 'nan' or not categoria_str:
-                            categoria_str = 'General'
-                        categoria, _ = ServiceCategory.objects.get_or_create(name=categoria_str)
-                        Service.objects.update_or_create(
-                            name=nombre,
-                            category=categoria,
-                            defaults={'price': precio}
-                        )
-                        services_created += 1
+                    sku = str(row.get('sku', '')).strip()
+                    barcode = str(row.get('código de barras', row.get('codigo de barras', ''))).strip()
+                    if not barcode or barcode == 'nan' or barcode.strip() == '':
+                        barcode = None
                     else:
-                        errors.append(f'Fila {index+2}: Tipo desconocido "{tipo}". Debe ser "Producto" o "Servicio".')
+                        barcode = barcode.strip()
+                    stock = int(row.get('stock', 0) if pd.notna(row.get('stock')) else 0)
+                    cost_price = float(row.get('costo neto', 0) if pd.notna(row.get('costo neto')) else 0)
+                    supplier = str(row.get('proveedor', '')).strip()
+                    if supplier == 'nan': supplier = ''
+                    categoria_prod = str(row.get('categoría', row.get('categoria', ''))).strip()
+                    if categoria_prod == 'nan': categoria_prod = ''
+                    
+                    if not sku or sku == 'nan':
+                        # Auto-generar SKU basado en la categoría del producto
+                        source = categoria_prod if categoria_prod else nombre
+                        normalized = unicodedata.normalize('NFKD', source).encode('ascii', 'ignore').decode('ascii')
+                        # Tomar las primeras letras significativas como prefijo (3-4 chars)
+                        words = re.sub(r'[^A-Za-z0-9\\s]', '', normalized).split()
+                        if len(words) == 1:
+                            prefix = words[0][:4].upper()
+                        else:
+                            # Tomar primeras letras de cada palabra (máx 4 palabras)
+                            prefix = ''.join(w[0] for w in words[:4]).upper()
+                        if not prefix:
+                            prefix = 'PROD'
+                        
+                        # Buscar el siguiente número secuencial para este prefijo
+                        existing = Product.objects.filter(sku__startswith=f'{prefix}-').order_by('-sku')
+                        max_num = 0
+                        for p in existing:
+                            try:
+                                num = int(p.sku.split('-')[-1])
+                                if num > max_num:
+                                    max_num = num
+                            except (ValueError, IndexError):
+                                pass
+                        sku = f'{prefix}-{str(max_num + 1).zfill(3)}'
+                        
+                        # Asegurar unicidad por si acaso
+                        while Product.objects.filter(sku=sku).exists():
+                            max_num += 1
+                            sku = f'{prefix}-{str(max_num + 1).zfill(3)}'
+                        
+                    # Si existe otro producto con el mismo barcode (no vacío/nulo), arrojar error descriptivo
+                    if barcode:
+                        duplicate_barcode_prod = Product.objects.filter(barcode=barcode).exclude(sku=sku).first()
+                        if duplicate_barcode_prod:
+                            errors.append(f'Fila {index+2}: El código de barras "{barcode}" ya está en uso por el producto "{duplicate_barcode_prod.name}" (SKU: {duplicate_barcode_prod.sku}).')
+                            continue
+
+                    Product.objects.update_or_create(
+                        sku=sku,
+                        defaults={
+                            'name': nombre, 
+                            'price': precio, 
+                            'stock_quantity': stock,
+                            'barcode': barcode,
+                            'cost_price': cost_price,
+                            'supplier': supplier,
+                            'category': categoria_prod,
+                        }
+                    )
+                    products_created += 1
                 except Exception as e:
                     errors.append(f'Fila {index+2}: Error al procesar "{nombre}": {str(e)}')
             
             return Response({
                 'message': 'Carga completada',
                 'products_created': products_created,
-                'services_created': services_created,
                 'errors': errors
             })
             

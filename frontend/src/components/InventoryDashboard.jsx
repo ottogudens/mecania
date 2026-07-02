@@ -29,6 +29,8 @@ const InventoryDashboard = () => {
   const [bundleItems, setBundleItems] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false);
+  const [uploadingServices, setUploadingServices] = useState(false);
+  const serviceFileInputRef = useRef(null);
 
   const toast = useToast();
 
@@ -117,8 +119,8 @@ const InventoryDashboard = () => {
         }
       });
       
-      const { products_created, services_created, errors } = response.data;
-      let msg = `Productos creados/actualizados: ${products_created}\nServicios creados/actualizados: ${services_created}`;
+      const { products_created, errors } = response.data;
+      let msg = `Productos creados/actualizados: ${products_created}`;
       if (errors && errors.length > 0) {
         msg += `\n\nErrores:\n` + errors.join('\n');
       }
@@ -212,6 +214,57 @@ const InventoryDashboard = () => {
   };
 
   // ── Service Handlers ──
+
+  const handleDownloadServiceTemplate = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/inventory/services/download_service_template/', {
+        headers: { Authorization: `Token ${token}` },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'plantilla_servicios.xlsx');
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      toast({ title: 'Error', message: 'Error al descargar la plantilla de servicios.', type: 'error' });
+    }
+  };
+
+  const handleServiceFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploadingServices(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/inventory/services/bulk_upload_services/', formData, {
+        headers: { 
+          Authorization: `Token ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      
+      const { services_created, errors } = response.data;
+      let msg = `Servicios creados/actualizados: ${services_created}`;
+      if (errors && errors.length > 0) {
+        msg += `\n\nErrores:\n` + errors.join('\n');
+      }
+      toast({ title: 'Carga completada', message: msg, type: errors && errors.length ? 'warning' : 'success' });
+      fetchAll();
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error de Carga', message: 'Error al procesar el archivo Excel. Revisa el formato.', type: 'error' });
+    } finally {
+      setUploadingServices(false);
+      e.target.value = null;
+    }
+  };
 
   const openNewServiceModal = () => {
     setIsEditingService(false);
@@ -468,7 +521,27 @@ const InventoryDashboard = () => {
         <>
           <div className="header" style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between' }}>
             <h2>🛠️ Catálogo de Servicios</h2>
-            <button className="btn" onClick={openNewServiceModal}>+ Nuevo Servicio</button>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-outline" onClick={handleDownloadServiceTemplate}>
+                📄 Descargar Plantilla
+              </button>
+              <input 
+                type="file" 
+                ref={serviceFileInputRef} 
+                onChange={handleServiceFileUpload} 
+                accept=".xls,.xlsx" 
+                style={{ display: 'none' }} 
+              />
+              <button 
+                className="btn btn-outline" 
+                style={{ borderColor: 'var(--status-green)', color: 'var(--status-green)' }}
+                onClick={() => serviceFileInputRef.current?.click()}
+                disabled={uploadingServices}
+              >
+                {uploadingServices ? '⏳ Subiendo...' : '🔼 Carga Masiva (Excel)'}
+              </button>
+              <button className="btn" onClick={openNewServiceModal}>+ Nuevo Servicio</button>
+            </div>
           </div>
 
           <div className="glass-card" style={{ padding: '0' }}>
