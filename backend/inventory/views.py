@@ -149,12 +149,43 @@ class ProductViewSet(viewsets.ModelViewSet):
         import io
         from django.http import HttpResponse
 
-        # Crear un DataFrame con las columnas esperadas
-        df = pd.DataFrame(columns=['Tipo', 'SKU', 'Código de Barras', 'Nombre', 'Precio', 'Costo Neto', 'Stock', 'Proveedor', 'Categoría'])
-        
-        # Añadir algunos datos de ejemplo
-        df.loc[0] = ['Producto', 'FILT-001', '7891000315507', 'Filtro de Aceite', 15000, 10000, 10, 'AutoParts SA', '']
-        df.loc[1] = ['Servicio', '', '', 'Alineación', 20000, 0, '', '', 'Mantenimiento']
+        columns = ['Tipo', 'SKU', 'Código de Barras', 'Nombre', 'Categoría', 'Precio', 'Costo Neto', 'Stock', 'Proveedor']
+        rows = []
+
+        # Exportar todos los productos existentes
+        for p in Product.objects.all().order_by('category', 'name'):
+            rows.append([
+                'Producto',
+                p.sku,
+                p.barcode or '',
+                p.name,
+                p.category or '',
+                float(p.price),
+                float(p.cost_price),
+                p.stock_quantity,
+                p.supplier or '',
+            ])
+
+        # Exportar todos los servicios existentes
+        for s in Service.objects.select_related('category').filter(is_active=True).order_by('category__name', 'name'):
+            rows.append([
+                'Servicio',
+                '',
+                '',
+                s.name,
+                s.category.name if s.category else '',
+                float(s.price),
+                0,
+                '',
+                '',
+            ])
+
+        # Si no hay datos, agregar filas de ejemplo
+        if not rows:
+            rows.append(['Producto', 'ACE-001', '7891000315507', 'Filtro de Aceite', 'Aceites', 15000, 10000, 10, 'AutoParts SA'])
+            rows.append(['Servicio', '', '', 'Alineación', 'Mantenimiento', 20000, 0, '', ''])
+
+        df = pd.DataFrame(rows, columns=columns)
 
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -168,10 +199,10 @@ class ProductViewSet(viewsets.ModelViewSet):
                 for cell in col:
                     try:
                         if len(str(cell.value)) > max_length:
-                            max_length = len(cell.value)
+                            max_length = len(str(cell.value))
                     except:
                         pass
-                adjusted_width = (max_length + 2)
+                adjusted_width = max(max_length + 2, 12)
                 worksheet.column_dimensions[column].width = adjusted_width
 
         buffer.seek(0)
@@ -182,6 +213,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser])
     def bulk_upload(self, request):
         import pandas as pd
+        import re, unicodedata
         
         file = request.FILES.get('file')
         if not file:
@@ -224,14 +256,40 @@ class ProductViewSet(viewsets.ModelViewSet):
                         cost_price = float(row.get('costo neto', 0) if pd.notna(row.get('costo neto')) else 0)
                         supplier = str(row.get('proveedor', '')).strip()
                         if supplier == 'nan': supplier = ''
+                        categoria_prod = str(row.get('categoría', row.get('categoria', ''))).strip()
+                        if categoria_prod == 'nan': categoria_prod = ''
                         
                         if not sku or sku == 'nan':
-                            errors.append(f'Fila {index+2}: SKU vacío para producto "{nombre}".')
-                            continue
+                            # Auto-generar SKU basado en la categoría del producto
+                            source = categoria_prod if categoria_prod else nombre
+                            normalized = unicodedata.normalize('NFKD', source).encode('ascii', 'ignore').decode('ascii')
+                            # Tomar las primeras letras significativas como prefijo (3-4 chars)
+                            words = re.sub(r'[^A-Za-z0-9\s]', '', normalized).split()
+                            if len(words) == 1:
+                                prefix = words[0][:4].upper()
+                            else:
+                                # Tomar primeras letras de cada palabra (máx 4 palabras)
+                                prefix = ''.join(w[0] for w in words[:4]).upper()
+                            if not prefix:
+                                prefix = 'PROD'
                             
-                        # Verificar si existe el SKU
-                        product_by_sku = Product.objects.filter(sku=sku).first()
-                        
+                            # Buscar el siguiente número secuencial para este prefijo
+                            existing = Product.objects.filter(sku__startswith=f'{prefix}-').order_by('-sku')
+                            max_num = 0
+                            for p in existing:
+                                try:
+                                    num = int(p.sku.split('-')[-1])
+                                    if num > max_num:
+                                        max_num = num
+                                except (ValueError, IndexError):
+                                    pass
+                            sku = f'{prefix}-{str(max_num + 1).zfill(3)}'
+                            
+                            # Asegurar unicidad por si acaso
+                            while Product.objects.filter(sku=sku).exists():
+                                max_num += 1
+                                sku = f'{prefix}-{str(max_num + 1).zfill(3)}'
+                            
                         # Si existe otro producto con el mismo barcode (no vacío/nulo), arrojar error descriptivo
                         if barcode:
                             duplicate_barcode_prod = Product.objects.filter(barcode=barcode).exclude(sku=sku).first()
@@ -247,7 +305,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                                 'stock_quantity': stock,
                                 'barcode': barcode,
                                 'cost_price': cost_price,
-                                'supplier': supplier
+                                'supplier': supplier,
+                                'category': categoria_prod,
                             }
                         )
                         products_created += 1

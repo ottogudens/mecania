@@ -15,7 +15,7 @@ const InventoryDashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
-  const [newProduct, setNewProduct] = useState({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
+  const [newProduct, setNewProduct] = useState({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5 });
   const [imageFile, setImageFile] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -143,6 +143,7 @@ const InventoryDashboard = () => {
       price: product.price,
       cost_price: product.cost_price || '',
       supplier: product.supplier || '',
+      category: product.category || '',
       stock_quantity: product.stock_quantity,
       low_stock_threshold: product.low_stock_threshold || 5,
     });
@@ -153,7 +154,7 @@ const InventoryDashboard = () => {
   const openNewProductModal = () => {
     setIsEditing(false);
     setEditingProductId(null);
-    setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
+    setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5 });
     setImageFile(null);
     setShowModal(true);
   };
@@ -187,7 +188,7 @@ const InventoryDashboard = () => {
       }
       
       setShowModal(false);
-      setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', stock_quantity: 0, low_stock_threshold: 5 });
+      setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5 });
       setImageFile(null);
       setIsEditing(false);
       setEditingProductId(null);
@@ -560,6 +561,16 @@ const InventoryDashboard = () => {
                   value={newProduct.name} 
                   onChange={e => setNewProduct({...newProduct, name: e.target.value})} 
                   required 
+                />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Categoría</label>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={newProduct.category} 
+                  onChange={e => setNewProduct({...newProduct, category: e.target.value})} 
+                  placeholder="Ej: Aceites, Filtros, Frenos..."
                 />
               </div>
               <div className="input-group">
