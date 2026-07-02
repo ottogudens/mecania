@@ -123,6 +123,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           {NAV_ITEMS.slice(0, 7).map(item => (
             <button
               key={item.id}
+              data-key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => { setActiveTab(item.id); closeSidebar(); }}
             >
@@ -137,6 +138,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           {NAV_ITEMS.slice(7, 11).map(item => (
             <button
               key={item.id}
+              data-key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => { setActiveTab(item.id); closeSidebar(); }}
             >
@@ -151,6 +153,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           {NAV_ITEMS.slice(11).map(item => (
             <button
               key={item.id}
+              data-key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
               onClick={() => { setActiveTab(item.id); closeSidebar(); }}
             >

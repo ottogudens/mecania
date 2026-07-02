@@ -452,8 +452,8 @@ const InventoryDashboard = () => {
                 {uploading ? '⏳ Subiendo...' : '🔼 Carga Masiva (Excel)'}
               </button>
               <button className="btn btn-outline" style={{ borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} onClick={() => {
-                // Dispara el clic del botón de navegación en la barra lateral con id 'scan'
-                const scanBtn = document.querySelector('button.nav-item[key="scan"]') || Array.from(document.querySelectorAll('.sidebar button')).find(el => el.textContent.includes('Escanear Stock'));
+                // Dispara el clic del botón de navegación en la barra lateral con data-key 'scan'
+                const scanBtn = document.querySelector('button[data-key="scan"]') || Array.from(document.querySelectorAll('.sidebar button')).find(el => el.textContent.includes('Escanear Stock'));
                 if (scanBtn) {
                   scanBtn.click();
                 } else {
