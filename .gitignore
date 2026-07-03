@@ -26,3 +26,7 @@ auth_info_baileys/
 # OS
 .DS_Store
 Thumbs.db
+
+# Lockfiles (for clean npm install on deploy)
+package-lock.json
+
