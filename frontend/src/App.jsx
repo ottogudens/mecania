@@ -219,7 +219,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     clients:    <ClientList />,
     vehicles:   <VehicleList />,
     finance:    <FinanceDashboard />,
-    pos:        <POSDashboard />,
+    pos:        <POSDashboard onNavigate={setActiveTab} />,
     history:    <CashRegister />,
     estimates:  <EstimatesDashboard />,
     settings:   <Settings onSettingsUpdate={onSettingsUpdate} />,

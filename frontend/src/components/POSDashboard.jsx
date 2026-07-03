@@ -754,8 +754,15 @@ const ServiceCatalog = () => {
 };
 
 // ─── componente principal ─────────────────────────────────────────────────────
-const POSDashboard = () => {
+const POSDashboard = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState('charge');
+  const [cashOpen, setCashOpen] = useState(null); // null = loading, true/false
+
+  useEffect(() => {
+    axios.get('/api/finance/cash-register/current/', { headers: authHeader() })
+      .then(res => setCashOpen(res.data !== null && res.data !== '' && res.data?.status === 'OPEN'))
+      .catch(() => setCashOpen(false));
+  }, []);
 
   const tabs = [
     { id: 'charge',   label: '📋 Cobrar OT'         },
@@ -769,30 +776,70 @@ const POSDashboard = () => {
         <h2>🏪 Punto de Venta</h2>
       </div>
 
-      {/* tabs */}
-      <div style={{
-        display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap',
-        background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: 12,
-        border: '1px solid var(--border-color)'
-      }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '0.6rem 1.4rem', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: activeTab === t.id
-              ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))'
-              : 'transparent',
-            color: activeTab === t.id ? '#000' : 'var(--text-muted)',
-            fontWeight: activeTab === t.id ? 700 : 400,
-            fontFamily: 'Outfit, sans-serif', fontSize: '0.9rem', transition: 'all 0.2s',
-          }}>{t.label}</button>
-        ))}
-      </div>
+      {/* ── alerta de caja cerrada ────────────────────────────────────────── */}
+      {cashOpen === false && (
+        <div style={{
+          background: 'rgba(231,76,60,0.12)',
+          border: '1px solid rgba(231,76,60,0.5)',
+          borderRadius: 12,
+          padding: '2rem',
+          textAlign: 'center',
+          marginBottom: '2rem',
+        }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>🔒</div>
+          <h3 style={{ color: 'var(--status-red)', marginBottom: '0.5rem' }}>
+            Caja no abierta
+          </h3>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem', maxWidth: 420, margin: '0 auto 1.25rem' }}>
+            No puedes generar ventas ni registrar cobros mientras la caja esté cerrada. 
+            Abre una sesión de caja para continuar operando.
+          </p>
+          <button
+            className="btn"
+            onClick={() => onNavigate && onNavigate('history')}
+            style={{ padding: '0.75rem 2rem' }}
+          >
+            📂 Ir a Caja
+          </button>
+        </div>
+      )}
 
-      {activeTab === 'charge'  && <ChargeWorkOrder />}
-      {activeTab === 'counter' && <CounterSale />}
-      {activeTab === 'catalog' && <ServiceCatalog />}
+      {cashOpen === null && (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+          Verificando estado de la caja...
+        </div>
+      )}
+
+      {/* ── contenido normal (solo si caja abierta) ───────────────────────── */}
+      {cashOpen === true && (
+        <>
+          {/* tabs */}
+          <div style={{
+            display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap',
+            background: 'rgba(0,0,0,0.3)', padding: '0.4rem', borderRadius: 12,
+            border: '1px solid var(--border-color)'
+          }}>
+            {tabs.map(t => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+                padding: '0.6rem 1.4rem', borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: activeTab === t.id
+                  ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))'
+                  : 'transparent',
+                color: activeTab === t.id ? '#000' : 'var(--text-muted)',
+                fontWeight: activeTab === t.id ? 700 : 400,
+                fontFamily: 'Outfit, sans-serif', fontSize: '0.9rem', transition: 'all 0.2s',
+              }}>{t.label}</button>
+            ))}
+          </div>
+
+          {activeTab === 'charge'  && <ChargeWorkOrder />}
+          {activeTab === 'counter' && <CounterSale />}
+          {activeTab === 'catalog' && <ServiceCatalog />}
+        </>
+      )}
     </div>
   );
 };
 
 export default POSDashboard;
+

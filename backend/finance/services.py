@@ -21,7 +21,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from finance.models import Invoice, InvoiceLineItem, Payment
+from finance.models import Invoice, InvoiceLineItem, Payment, CashRegisterSession
 from inventory.models import Product, Service, StockTransaction
 from operations.models import WorkOrder
 
@@ -29,6 +29,20 @@ from operations.models import WorkOrder
 class POSError(Exception):
     """Error de negocio del punto de venta — las vistas lo traducen a HTTP 400."""
     pass
+
+
+def require_open_cash_register():
+    """
+    Verifica que exista una sesión de caja abierta. Todas las operaciones
+    del POS (cobrar, crear venta de mostrador, buscar OT para cobrar) deben
+    pasar por esta validación para garantizar que cada transacción financiera
+    quede dentro de una sesión de caja.
+    """
+    if not CashRegisterSession.objects.filter(status='OPEN').exists():
+        raise POSError(
+            "No se puede realizar esta operación: la caja no está abierta. "
+            "Abre una sesión de caja antes de continuar."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -49,6 +63,8 @@ def create_counter_sale(*, client_id, items, registered_by=None):
     Si cualquier producto no tiene stock suficiente, se aborta toda la venta
     (no se descuenta nada, no se crea la factura).
     """
+    require_open_cash_register()
+
     if not items:
         raise POSError("La venta debe tener al menos un producto o servicio.")
 
@@ -120,6 +136,8 @@ def get_or_create_invoice_for_work_order(work_order: WorkOrder) -> Invoice:
     sus WorkOrderItem actuales. Si ya existe, simplemente la recalcula y la
     devuelve — así el POS siempre opera sobre montos actualizados.
     """
+    require_open_cash_register()
+
     invoice, created = Invoice.objects.get_or_create(
         work_order=work_order,
         defaults={'source': 'WORK_ORDER', 'status': 'DRAFT'},
@@ -140,6 +158,8 @@ def charge_invoice(*, invoice_id, amount, payment_method, reference_number='', r
     Si la factura está CANCELLED, se rechaza el pago — no se puede cobrar
     algo que ya fue anulado.
     """
+    require_open_cash_register()
+
     invoice = Invoice.objects.select_for_update().get(id=invoice_id)
 
     if invoice.status == 'CANCELLED':
