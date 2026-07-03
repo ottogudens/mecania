@@ -609,6 +609,29 @@ const ClientDashboard = ({ clientName, onLogout }) => {
   const [loading, setLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [error, setError] = useState('');
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    }
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -685,6 +708,23 @@ const ClientDashboard = ({ clientName, onLogout }) => {
           Cerrar Sesión
         </button>
       </div>
+
+      {showInstallBanner && (
+        <div className="glass-card" style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '1rem 1.5rem', marginBottom: '1.5rem', background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))',
+          border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12,
+        }}>
+          <div>
+            <h4 style={{ margin: 0, color: '#fff', fontSize: '0.95rem' }}>📱 ¡Instala la App de MecanIA!</h4>
+            <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Accede al portal más rápido directamente desde tu pantalla de inicio.</p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button className="btn btn-outline" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }} onClick={() => setShowInstallBanner(false)}>Quizás más tarde</button>
+            <button className="btn" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem', background: '#3b82f6', border: 'none' }} onClick={handleInstallClick}>Instalar</button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{
