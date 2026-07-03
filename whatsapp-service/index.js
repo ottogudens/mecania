@@ -115,6 +115,38 @@ async function connectToWhatsApp() {
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    // Escuchar mensajes entrantes de clientes para automatizar el agente de ventas con IA
+    sock.ev.on('messages.upsert', async (m) => {
+        try {
+            const msg = m.messages[0];
+            if (!msg || !msg.message) return;
+            if (msg.key.fromMe) return; // Ignorar mensajes propios
+            
+            const senderJid = msg.key.remoteJid;
+            if (!senderJid || !senderJid.endsWith('@s.whatsapp.net')) return;
+
+            // Extraer texto
+            const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+            if (!text || text.trim() === '') return;
+
+            console.log(`Mensaje entrante de ${senderJid}: "${text}"`);
+
+            // Consultar a Django AI Assistant
+            const response = await axios.post(`${BACKEND_URL}/api/ai/whatsapp-agent/`, {
+                number: senderJid,
+                text: text
+            }, { timeout: 15000 });
+
+            if (response.data && response.data.reply) {
+                const replyText = response.data.reply;
+                console.log(`Respuesta IA para ${senderJid}: "${replyText}"`);
+                await sock.sendMessage(senderJid, { text: replyText });
+            }
+        } catch (err) {
+            console.error('Error al responder mensaje vía IA:', err.message);
+        }
+    });
 }
 
 // Start WhatsApp connection
