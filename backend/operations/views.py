@@ -43,11 +43,17 @@ class ClientViewSet(viewsets.ModelViewSet):
         client.portal_enabled = True
         client.save(update_fields=['pin_hash', 'portal_enabled'])
 
-        # Construir URL del portal
-        portal_url = request.build_absolute_uri('/client')
-
-        # Obtener nombre del taller
+        # Construir URL del portal de manera segura y pública
         workshop = WorkshopSettings.load()
+        frontend_base = os.environ.get('FRONTEND_URL', '')
+        if not frontend_base and workshop.website:
+            frontend_base = workshop.website
+        
+        if frontend_base:
+            portal_url = f"{frontend_base.rstrip('/')}/client"
+        else:
+            portal_url = request.build_absolute_uri('/client')
+
         workshop_name = workshop.name or 'MecanIA'
 
         message = (
@@ -58,7 +64,7 @@ class ClientViewSet(viewsets.ModelViewSet):
             f"🔐 Tus credenciales de acceso:\n"
             f"📱 Teléfono: {client.phone}\n"
             f"🔑 PIN: {raw_pin}\n\n"
-            f"🌐 Accede aquí: {portal_url}\n\n"
+            f"🌐 Accede e instala la app aquí: {portal_url}\n\n"
             f"¡Gracias por confiar en nosotros!"
         )
 
@@ -109,12 +115,22 @@ class ClientViewSet(viewsets.ModelViewSet):
         client.save(update_fields=['pin_hash', 'portal_enabled'])
 
         workshop = WorkshopSettings.load()
+        frontend_base = os.environ.get('FRONTEND_URL', '')
+        if not frontend_base and workshop.website:
+            frontend_base = workshop.website
+        
+        if frontend_base:
+            portal_url = f"{frontend_base.rstrip('/')}/client"
+        else:
+            portal_url = request.build_absolute_uri('/client')
+
         workshop_name = workshop.name or 'MecanIA'
 
         message = (
             f"Hola {client.first_name}, aquí tienes tu nuevo PIN de acceso "
             f"al Portal de Clientes de {workshop_name}:\n\n"
             f"🔑 PIN: {raw_pin}\n\n"
+            f"🌐 Accede e instala la app aquí: {portal_url}\n\n"
             f"Si no solicitaste este cambio, contáctanos."
         )
 
