@@ -19,12 +19,18 @@ class WorkshopSettingsSerializer(serializers.ModelSerializer):
 
 class ClientSerializer(serializers.ModelSerializer):
     vehicle_count = serializers.SerializerMethodField()
+    has_pin = serializers.SerializerMethodField()
+
     class Meta:
         model = Client
         fields = '__all__'
-        
+        extra_kwargs = {'pin_hash': {'write_only': True, 'required': False}}
+
     def get_vehicle_count(self, obj):
         return obj.vehicles.count()
+
+    def get_has_pin(self, obj):
+        return bool(obj.pin_hash)
 
 class VehicleSerializer(serializers.ModelSerializer):
     client = ClientSerializer(read_only=True)

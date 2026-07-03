@@ -41,7 +41,33 @@ class Client(models.Model):
         validators=[RegexValidator(r'^\+?[\d\s\-]{7,20}$', 'Ingrese un número de teléfono válido.')]
     )
     address = models.CharField(max_length=255, null=True, blank=True)
+    pin_hash = models.CharField(
+        max_length=128, blank=True, default='',
+        help_text="PIN de 4 dígitos hasheado para acceso al portal de clientes.",
+    )
+    portal_enabled = models.BooleanField(
+        default=False,
+        help_text="Indica si el cliente tiene acceso al portal.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def set_pin(self, raw_pin):
+        """Hashea y almacena un PIN en texto plano."""
+        from django.contrib.auth.hashers import make_password
+        self.pin_hash = make_password(raw_pin)
+
+    def check_pin(self, raw_pin):
+        """Verifica un PIN en texto plano contra el hash almacenado."""
+        from django.contrib.auth.hashers import check_password
+        if not self.pin_hash:
+            return False
+        return check_password(raw_pin, self.pin_hash)
+
+    @staticmethod
+    def generate_pin():
+        """Genera un PIN aleatorio de 4 dígitos."""
+        import random
+        return f"{random.randint(0, 9999):04d}"
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

@@ -214,9 +214,61 @@ const ClientList = () => {
               <h3>{client.first_name} {client.last_name}</h3>
               <p style={{ color: 'var(--text-muted)' }}>📞 {client.phone}</p>
               <p style={{ color: 'var(--text-muted)' }}>✉️ {client.email || 'Sin correo'}</p>
-              <p style={{ color: 'var(--text-muted)' }}>🚗 {client.vehicle_count || 0} Vehículos</p>
-              <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                <button className="btn" style={{ flex: 1 }} onClick={() => openVehicleModal(client.id)}>+ Vehículo</button>
+              <p style={{ color: 'var(--text-muted)' }}>
+                🚗 {client.vehicle_count || 0} Vehículos
+              </p>
+              <p style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
+                🔑 Portal: {client.portal_enabled ? (
+                  <span style={{ color: '#10b981', fontWeight: 600 }}>Activo (PIN establecido)</span>
+                ) : (
+                  <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Inactivo</span>
+                )}
+              </p>
+
+              <div style={{ marginTop: 'auto', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="btn" style={{ flex: 1 }} onClick={() => openVehicleModal(client.id)}>+ Vehículo</button>
+                </div>
+                
+                {client.portal_enabled ? (
+                  <button 
+                    className="btn btn-outline" 
+                    style={{ fontSize: '0.8rem', padding: '0.4rem', borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} 
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await axios.post(`/api/operations/clients/${client.id}/resend_pin/`, {}, {
+                          headers: { Authorization: `Token ${token}` }
+                        });
+                        alert(`PIN regenerado y enviado. Nuevo PIN: ${res.data.pin}`);
+                        fetchClients();
+                      } catch (err) {
+                        alert(err.response?.data?.error || "Error al reenviar credenciales.");
+                      }
+                    }}
+                  >
+                    🔄 Re-enviar PIN (WhatsApp)
+                  </button>
+                ) : (
+                  <button 
+                    className="btn" 
+                    style={{ fontSize: '0.8rem', padding: '0.4rem', backgroundColor: '#25D366', color: '#fff', border: 'none' }}
+                    onClick={async () => {
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await axios.post(`/api/operations/clients/${client.id}/send_credentials/`, {}, {
+                          headers: { Authorization: `Token ${token}` }
+                        });
+                        alert(`Portal habilitado con éxito. PIN generado: ${res.data.pin}. Mensaje de WhatsApp enviado.`);
+                        fetchClients();
+                      } catch (err) {
+                        alert(err.response?.data?.error || "Error al habilitar portal.");
+                      }
+                    }}
+                  >
+                    📲 Habilitar Portal (WhatsApp)
+                  </button>
+                )}
               </div>
             </div>
           ))}
