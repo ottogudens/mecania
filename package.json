@@ -1,0 +1,8 @@
+{
+  "name": "mecania-root",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "whatsapp-service"
+  ]
+}
