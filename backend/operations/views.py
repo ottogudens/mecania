@@ -1075,3 +1075,35 @@ class MaintenanceAlertsView(APIView):
         ).order_by('due_date')[:20]
 
         return Response(ScheduledMaintenanceSerializer(alerts, many=True).data)
+
+
+class WhatsAppSessionView(APIView):
+    """Endpoints públicos para sincronizar los archivos de autenticación de WhatsApp en la base de datos."""
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request):
+        from .models import WhatsAppSession
+        sessions = WhatsAppSession.objects.all()
+        data = {s.key: s.data for s in sessions}
+        return Response(data)
+
+    def post(self, request):
+        from .models import WhatsAppSession
+        key = request.data.get('key')
+        data = request.data.get('data')
+
+        if not key:
+            return Response({'error': 'Key is required'}, status=400)
+
+        # Si el valor de data es vacío o nulo, significa que el archivo se eliminó localmente
+        if data is None or data == '':
+            WhatsAppSession.objects.filter(key=key).delete()
+            return Response({'success': True, 'action': 'deleted'})
+
+        session_obj, created = WhatsAppSession.objects.update_or_create(
+            key=key,
+            defaults={'data': data}
+        )
+        return Response({'success': True, 'action': 'saved'})
+

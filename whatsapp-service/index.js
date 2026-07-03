@@ -3,21 +3,89 @@ const cors = require('cors');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const AUTH_DIR = 'auth_info_baileys';
+
 let sock = null;
 let currentQr = null;
 let connectionStatus = 'disconnected';
 
+// Descarga sesión guardada desde la base de datos de Django
+async function syncSessionFromDB() {
+    try {
+        console.log('Descargando sesión de WhatsApp desde la base de datos...');
+        const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`);
+        const files = response.data;
+        
+        if (!fs.existsSync(AUTH_DIR)) {
+            fs.mkdirSync(AUTH_DIR, { recursive: true });
+        }
+        
+        for (const [filename, content] of Object.entries(files)) {
+            const filepath = path.join(AUTH_DIR, filename);
+            fs.writeFileSync(filepath, content, 'utf-8');
+        }
+        console.log(`Sesión descargada. ${Object.keys(files).length} archivos sincronizados.`);
+    } catch (err) {
+        console.error('Error al descargar sesión de WhatsApp:', err.message);
+    }
+}
+
+// Inicia el monitor del directorio local para sincronizar escrituras/eliminaciones en Django
+function startWatchingSession() {
+    if (!fs.existsSync(AUTH_DIR)) {
+        fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+
+    fs.watch(AUTH_DIR, async (eventType, filename) => {
+        if (!filename) return;
+        const filepath = path.join(AUTH_DIR, filename);
+        
+        try {
+            if (fs.existsSync(filepath)) {
+                // Archivo creado o modificado
+                const stats = fs.statSync(filepath);
+                if (stats.isFile()) {
+                    const content = fs.readFileSync(filepath, 'utf-8');
+                    await axios.post(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
+                        key: filename,
+                        data: content
+                    });
+                }
+            } else {
+                // Archivo eliminado
+                await axios.post(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
+                    key: filename,
+                    data: ''
+                });
+            }
+        } catch (err) {
+            console.error(`Error al sincronizar archivo de sesión (${filename}):`, err.message);
+        }
+    });
+    console.log('Monitoreo y persistencia de sesión activado.');
+}
+
 async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    // 1. Descargar credenciales persistentes antes de conectar
+    await syncSessionFromDB();
+
+    // 2. Iniciar monitoreo del disco local
+    startWatchingSession();
+
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
     sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // We'll handle it manually for better formatting
+        printQRInTerminal: false,
         logger: pino({ level: 'silent' })
     });
 

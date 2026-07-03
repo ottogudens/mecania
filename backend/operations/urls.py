@@ -7,7 +7,7 @@ from .views import (
     AIDiagnosticsView, AITranscribeView, WorkshopSettingsView,
     DashboardStatsView, UserViewSet,
     VehiclePartViewSet, MaintenanceRecordViewSet,
-    ScheduledMaintenanceViewSet, MaintenanceAlertsView
+    ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView
 )
 
 router = DefaultRouter()
@@ -34,5 +34,7 @@ urlpatterns = [
     # AI endpoints
     path('ai-diagnostics/', AIDiagnosticsView.as_view(), name='ai_diagnostics'),
     path('ai-transcribe/', AITranscribeView.as_view(), name='ai_transcribe'),
+    # WhatsApp session persistence
+    path('whatsapp-session/', WhatsAppSessionView.as_view(), name='whatsapp_session'),
     path('', include(router.urls)),
 ]

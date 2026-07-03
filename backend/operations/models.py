@@ -299,3 +299,14 @@ class ScheduledMaintenance(models.Model):
 
     def __str__(self):
         return f"{self.get_maintenance_type_display()} - {self.vehicle.license_plate} ({self.get_status_display()})"
+
+
+class WhatsAppSession(models.Model):
+    """Guarda los archivos de sesión de Baileys en la base de datos para persistirlos entre deploys efímeros."""
+    key = models.CharField(max_length=255, unique=True, help_text="Nombre del archivo (ej: creds.json o pre-key-*)")
+    data = models.TextField(help_text="Contenido serializado del archivo (Base64 o JSON texto)")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.key
+
