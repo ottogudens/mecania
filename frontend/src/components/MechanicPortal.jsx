@@ -392,7 +392,7 @@ const MechanicPortal = ({ onLogout }) => {
   return (
     <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+      <div className="mechanic-header">
         <div>
           <h2 style={{ margin: 0, color: 'var(--primary)' }}>🛠️ Portal de Mecánicos</h2>
           <p style={{ margin: 0, color: 'var(--text-muted)' }}>Bienvenido, <strong>{username}</strong></p>
@@ -401,7 +401,7 @@ const MechanicPortal = ({ onLogout }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem' }}>
+      <div className="mechanic-tabs-container">
         <button className={`btn ${portalTab === 'orders' ? '' : 'btn-outline'}`} onClick={() => setPortalTab('orders')}>
           📋 Órdenes de Trabajo (OT)
         </button>
@@ -425,7 +425,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>No hay nuevas OTs disponibles en este momento.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                     {pendingOrders.map(ot => (
                       <div key={ot.id} className="glass-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -450,7 +450,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>Aún no tienes órdenes de trabajo asignadas.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
                     {assignedOrders.map(ot => (
                       <div key={ot.id} className="glass-card" style={{ borderLeft: ot.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -479,7 +479,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>No hay inspecciones visuales pendientes en este momento.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                     {pendingInspections.map(ins => (
                       <div key={ins.id} className="glass-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -504,7 +504,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>Aún no has tomado ninguna inspección visual.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
                     {assignedInspections.map(ins => (
                       <div key={ins.id} className="glass-card" style={{ borderLeft: ins.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -529,7 +529,7 @@ const MechanicPortal = ({ onLogout }) => {
       {/* Details Modal (Work Orders) */}
       {showDetailsModal && selectedOrder && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="glass-card mechanic-modal-card" style={{ maxWidth: '650px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
               <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
@@ -555,7 +555,7 @@ const MechanicPortal = ({ onLogout }) => {
       {/* Active Inspection Modal (Audit Checklist) */}
       {showInspectionModal && selectedInspection && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div className="glass-card" style={{ width: '100%', maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="glass-card mechanic-modal-card" style={{ maxWidth: '850px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
               <h3 style={{ margin: 0 }}>Inspección #{selectedInspection.id} - {selectedInspection.vehicle_plate}</h3>
               <button onClick={() => setShowInspectionModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
@@ -611,7 +611,7 @@ const MechanicPortal = ({ onLogout }) => {
 
               {/* Checklist Editor */}
               {selectedPartId && (
-                <div className="glass-card" style={{ flex: '2 1 350px', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border-color)', padding: '1rem' }}>
+                <div className="glass-card" style={{ flex: '2 1 280px', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--border-color)', padding: '1rem', minWidth: '0' }}>
                   <h4 style={{ margin: 0, color: 'var(--primary)' }}>
                     {VEHICLE_PARTS.find(p => p.id === selectedPartId)?.icon} {VEHICLE_PARTS.find(p => p.id === selectedPartId)?.name}
                   </h4>
@@ -619,7 +619,7 @@ const MechanicPortal = ({ onLogout }) => {
                   {selectedInspection.status === 'IN_PROGRESS' ? (
                     <>
                       {/* Status selectors */}
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div className="status-selectors">
                         <button
                           style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeItemsData[selectedPartId]?.status === 'OK' ? '#10b981' : 'rgba(16,185,129,0.1)', color: activeItemsData[selectedPartId]?.status === 'OK' ? 'black' : '#10b981' }}
                           onClick={() => handleUpdatePart(selectedPartId, 'status', 'OK')}
@@ -635,7 +635,7 @@ const MechanicPortal = ({ onLogout }) => {
                       </div>
 
                       {/* Recording and Camera */}
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <div className="action-selectors">
                         <button className={`btn btn-sm ${isRecording ? 'btn-danger' : 'btn-outline'}`} style={{ flex: 1 }} onClick={isRecording ? stopRecording : startRecording}>
                           {isRecording ? '🔴 Parar' : '🎤 Grabar Voz'}
                         </button>

@@ -1342,6 +1342,191 @@ canvas {
   }
 }
 
+/* ===== UTILITIES PORTAL CLIENTE ===== */
+.client-login-card {
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+  padding: 3rem 2rem;
+  background: linear-gradient(145deg, rgba(30,41,59,0.7), rgba(15,23,42,0.9));
+}
+
+.client-pin-input {
+  width: 52px;
+  height: 60px;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 2px solid rgba(255,255,255,0.1);
+  background: rgba(15,23,42,0.8);
+  color: #fff;
+  outline: none;
+  transition: all 0.2s;
+  font-family: 'Outfit', sans-serif;
+}
+
+.client-kpi-container {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.client-tabs-container {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.client-tabs-container::-webkit-scrollbar {
+  height: 4px;
+}
+.client-tabs-container::-webkit-scrollbar-thumb {
+  background: var(--border-muted);
+  border-radius: 2px;
+}
+
+.client-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.client-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.client-install-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15));
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 12px;
+}
+
+/* ===== UTILITIES PORTAL MECANICO ===== */
+.mechanic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.mechanic-tabs-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.mechanic-modal-card {
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.status-selectors {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-selectors {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .client-login-card {
+    padding: 2rem 1rem;
+  }
+
+  .client-pin-input {
+    width: 42px;
+    height: 50px;
+    font-size: 1.25rem;
+    border-radius: 8px;
+  }
+
+  .client-kpi-container {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .client-detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .client-dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .client-install-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .mechanic-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .mechanic-header button {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .mechanic-tabs-container {
+    flex-direction: column;
+    width: 100%;
+  }
+  .mechanic-tabs-container button {
+    width: 100%;
+  }
+
+  .mechanic-modal-card {
+    margin: 10px;
+    max-height: 95vh;
+    padding: var(--space-4) !important;
+  }
+
+  .status-selectors {
+    flex-direction: column;
+    width: 100%;
+  }
+  .status-selectors button {
+    width: 100%;
+  }
+
+  .action-selectors {
+    flex-direction: column;
+    width: 100%;
+  }
+  .action-selectors button {
+    width: 100%;
+  }
+}
+
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

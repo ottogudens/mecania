@@ -74,12 +74,9 @@ const LoginScreen = ({ onLogin }) => {
 
   return (
     <div style={{
-      display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh',
+      display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', padding: '1rem',
     }}>
-      <div className="glass-card" style={{
-        maxWidth: 460, width: '100%', textAlign: 'center', padding: '3rem 2rem',
-        background: 'linear-gradient(145deg, rgba(30,41,59,0.7), rgba(15,23,42,0.9))',
-      }}>
+      <div className="glass-card client-login-card">
         {/* Logo */}
         <div style={{
           width: 80, height: 80,
@@ -146,12 +143,9 @@ const LoginScreen = ({ onLogin }) => {
                   value={digit}
                   onChange={(e) => handlePinChange(i, e.target.value.replace(/\D/g, ''))}
                   onKeyDown={(e) => handlePinKeyDown(i, e)}
+                  className="client-pin-input"
                   style={{
-                    width: 52, height: 60, textAlign: 'center', fontSize: '1.5rem',
-                    fontWeight: 700, borderRadius: 12,
-                    border: `2px solid ${digit ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                    background: 'rgba(15,23,42,0.8)', color: '#fff',
-                    outline: 'none', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif',
+                    borderColor: digit ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.1)',
                   }}
                   onFocus={(e) => e.target.style.borderColor = 'rgba(139,92,246,0.8)'}
                   onBlur={(e) => e.target.style.borderColor = digit ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.1)'}
@@ -237,7 +231,7 @@ const VehicleCard = ({ vehicle, activeOrders, pastOrders, pendingMaintenance, on
       </div>
 
       {/* Quick stats */}
-      <div style={{ display: 'flex', gap: '1rem' }}>
+      <div className="client-kpi-container">
         {activeOrders.length > 0 && (
           <div style={{
             flex: 1, padding: '0.6rem 0.8rem', borderRadius: 8,
@@ -319,7 +313,7 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
   return (
     <div style={{ animation: 'fadeIn 0.4s ease-out' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="client-detail-header">
         <button
           onClick={onBack}
           style={{
@@ -343,10 +337,7 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{
-        display: 'flex', gap: '0.4rem', marginBottom: '1.5rem', flexWrap: 'wrap',
-        overflowX: 'auto', paddingBottom: 4,
-      }}>
+      <div className="client-tabs-container">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
             padding: '0.55rem 1.1rem', borderRadius: 8, border: 'none', cursor: 'pointer',
@@ -683,11 +674,7 @@ const ClientDashboard = ({ clientName, onLogout }) => {
   return (
     <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
       {/* Header */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: '2rem', paddingBottom: '1.25rem',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-      }}>
+      <div className="client-dashboard-header">
         <div>
           <h2 style={{
             fontSize: '1.8rem', margin: '0 0 0.25rem 0',
@@ -710,11 +697,7 @@ const ClientDashboard = ({ clientName, onLogout }) => {
       </div>
 
       {showInstallBanner && (
-        <div className="glass-card" style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '1rem 1.5rem', marginBottom: '1.5rem', background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))',
-          border: '1px solid rgba(59,130,246,0.3)', borderRadius: 12,
-        }}>
+        <div className="glass-card client-install-banner">
           <div>
             <h4 style={{ margin: 0, color: '#fff', fontSize: '0.95rem' }}>📱 ¡Instala la App de MecanIA!</h4>
             <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>Accede al portal más rápido directamente desde tu pantalla de inicio.</p>
@@ -746,7 +729,7 @@ const ClientDashboard = ({ clientName, onLogout }) => {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '1.5rem',
         }}>
           {vehicles.map((item, idx) => (
