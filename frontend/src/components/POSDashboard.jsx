@@ -396,6 +396,7 @@ const ChargeWorkOrder = () => {
           </div>
         )}
       </div>
+    </div>
   );
 };
 
