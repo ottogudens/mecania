@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
-    WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance
+    WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
+    WhatsAppFlow
 )
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -185,3 +186,13 @@ class ScheduledMaintenanceSerializer(serializers.ModelSerializer):
             delta = obj.due_date - timezone.now().date()
             return delta.days
         return None
+
+
+class WhatsAppFlowSerializer(serializers.ModelSerializer):
+    trigger_type_display = serializers.CharField(source='get_trigger_type_display', read_only=True)
+    action_type_display = serializers.CharField(source='get_action_type_display', read_only=True)
+
+    class Meta:
+        model = WhatsAppFlow
+        fields = '__all__'
+

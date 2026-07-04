@@ -14,11 +14,12 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
     WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer,
-    VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer
+    VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer,
+    WhatsAppFlowSerializer
 )
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
@@ -1099,4 +1100,11 @@ class WhatsAppSessionView(APIView):
         from .models import WhatsAppSession
         WhatsAppSession.objects.all().delete()
         return Response({'success': True, 'action': 'cleared'})
+
+
+class WhatsAppFlowViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WhatsAppFlowSerializer
+    queryset = WhatsAppFlow.objects.all().order_by('id')
+
 

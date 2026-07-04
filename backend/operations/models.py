@@ -310,3 +310,46 @@ class WhatsAppSession(models.Model):
     def __str__(self):
         return self.key
 
+
+class WhatsAppFlow(models.Model):
+    TRIGGER_CHOICES = [
+        ('welcome', 'Mensaje de Bienvenida (Welcome)'),
+        ('keyword', 'Palabra Clave (Keyword)'),
+        ('default', 'Respuesta por Defecto (Fallback)'),
+    ]
+
+    ACTION_CHOICES = [
+        ('static', 'Mensaje de Texto Estático'),
+        ('ai_assistant', 'Agente de IA (GPT)'),
+        ('portal_link', 'Enviar Enlace de Acceso al Portal'),
+        ('human_transfer', 'Derivar a Humano (Notificar / Pausar Asistente)'),
+    ]
+
+    name = models.CharField(max_length=100, verbose_name="Nombre del Flujo")
+    trigger_type = models.CharField(max_length=20, choices=TRIGGER_CHOICES, default='keyword')
+    keywords = models.CharField(
+        max_length=255, 
+        blank=True, 
+        help_text="Lista de palabras separadas por comas. Ej: precio, cotizar, costo, valor", 
+        verbose_name="Palabras Clave"
+    )
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES, default='static')
+    response_text = models.TextField(
+        blank=True, 
+        default='', 
+        verbose_name="Mensaje de Respuesta / Instrucciones de IA", 
+        help_text="El texto estático para responder, o las instrucciones de comportamiento personalizadas para el agente de IA."
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Flujo de WhatsApp"
+        verbose_name_plural = "Flujos de WhatsApp"
+        ordering = ['trigger_type', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_trigger_type_display()} -> {self.get_action_type_display()})"
+
+

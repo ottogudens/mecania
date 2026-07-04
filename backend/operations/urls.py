@@ -7,7 +7,8 @@ from .views import (
     AIDiagnosticsView, AITranscribeView, WorkshopSettingsView,
     DashboardStatsView, UserViewSet,
     VehiclePartViewSet, MaintenanceRecordViewSet,
-    ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView
+    ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView,
+    WhatsAppFlowViewSet
 )
 
 router = DefaultRouter()
@@ -20,6 +21,7 @@ router.register(r'users', UserViewSet)
 router.register(r'vehicle-parts', VehiclePartViewSet, basename='vehiclepart')
 router.register(r'maintenance-records', MaintenanceRecordViewSet, basename='maintenancerecord')
 router.register(r'scheduled-maintenance', ScheduledMaintenanceViewSet, basename='scheduledmaintenance')
+router.register(r'whatsapp-flows', WhatsAppFlowViewSet, basename='whatsappflow')
 
 urlpatterns = [
     path('dashboard-stats/', DashboardStatsView.as_view(), name='dashboard_stats'),

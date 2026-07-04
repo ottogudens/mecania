@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
-    WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance
+    WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
+    WhatsAppFlow, WhatsAppSession
 )
 
 
@@ -58,3 +59,11 @@ class ScheduledMaintenanceAdmin(admin.ModelAdmin):
     list_display = ('maintenance_type', 'vehicle', 'due_date', 'due_mileage', 'status')
     list_filter = ('status', 'maintenance_type')
     search_fields = ('vehicle__license_plate', 'description')
+
+
+@admin.register(WhatsAppFlow)
+class WhatsAppFlowAdmin(admin.ModelAdmin):
+    list_display = ('name', 'trigger_type', 'action_type', 'is_active', 'created_at')
+    list_filter = ('trigger_type', 'action_type', 'is_active')
+    search_fields = ('name', 'keywords', 'response_text')
+
