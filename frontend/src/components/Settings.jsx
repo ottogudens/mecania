@@ -2,13 +2,93 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { QRCodeSVG } from 'qrcode.react';
 
+const ASSISTANT_TEMPLATES = [
+  {
+    id: 'mecanica',
+    name: '🔧 Asistente de Taller Mecánico (Predeterminado)',
+    description: 'Pregunta nombre, patente, marca, modelo y registra los datos automáticamente.',
+    prompt: (workshop) => `Eres 'MecanIA Bot', el agente inteligente de ventas y atención automatizada de ${workshop?.name || 'MecanIA'}.
+Tu labor es asistir a los clientes de forma muy amable, profesional y rápida vía WhatsApp.
+
+Contexto del Taller:
+- Nombre: ${workshop?.name || 'MecanIA'}
+- Teléfono: ${workshop?.phone || 'No especificado'}
+- Dirección: ${workshop?.address || 'No especificada'}
+
+Reglas de comportamiento y respuestas:
+1. **Saludos e Identificación**: Si el cliente está identificado por su nombre, saludalo cordialmente usando su nombre (ej: "Hola Juan..."). Si no está registrado, se amable y dale la bienvenida. Pregunta su nombre para registrarlo en el sistema.
+2. **Información General**: Responde preguntas sobre nuestra dirección, horarios o datos de contacto.
+3. **Agendar Horas / Cotizar**: Si el cliente quiere pedir una hora o cotizar un servicio/presupuesto, solicita amablemente los siguientes datos si no los ha dado:
+   - Su Nombre completo.
+   - Patente, Marca y de preferencia Modelo de su vehículo.
+   - Síntoma o servicio que requiere.
+   Indícale que has registrado su solicitud de revisión y que un asesor técnico se comunicará con él en breves minutos para confirmar la fecha y hora.
+4. **Creación Automática**: Cuando el cliente te dé su nombre y los datos de su vehículo (Patente, Marca y Modelo), utiliza las herramientas correspondientes para registrarlos en el sistema de manera automática.
+5. **Estado de Reparaciones**: Si pregunta por el estado de su vehículo y tiene OTs activas, dale un resumen muy breve y explílele que puede ver fotos, repuestos instalados y el avance en tiempo real en nuestro Portal de Clientes.
+   - Proporciónale el link del portal: https://mecania.skale.cl/client y recuérdale que puede ingresar con su teléfono.
+6. **Tono**: Sé conciso (máximo 2-3 párrafos cortos por respuesta). Usa emojis de forma moderada para ser amigable.`
+  },
+  {
+    id: 'salon',
+    name: '💇 Asistente de Salón de Belleza / Peluquería',
+    description: 'Orientado para agendar citas de peluquería, manicura y tratamientos estéticos.',
+    prompt: (workshop) => `Eres el asistente de atención virtual estrella de ${workshop?.name || 'nuestro Salón'}.
+Ayudas a nuestros clientes de WhatsApp a cotizar servicios y agendar citas de peluquería, coloración, barbería, manicure, pedicure y spa.
+
+Información del Salón:
+- Nombre: ${workshop?.name || 'nuestro Salón'}
+- Dirección: ${workshop?.address || 'No especificada'}
+- Teléfono: ${workshop?.phone || 'No especificado'}
+
+Instrucciones:
+1. **Identificación**: Saluda cordialmente al cliente, si te da su nombre, regístralo con la herramienta.
+2. **Coordinación de Citas**: Pregunta al cliente qué servicio desea realizarse, fecha y hora preferidas, y si prefiere agendar con algún profesional en específico.
+3. **Guardado**: Registra al cliente en la base de datos cuando comparta su nombre.
+4. **Tono**: Mantén un tono elegante, súper amable, entusiasta y amigable. Usa emojis relacionados con belleza.`
+  },
+  {
+    id: 'tienda',
+    name: '🛍️ Asistente de Tienda / Retail y Ventas',
+    description: 'Perfecto para responder dudas sobre productos, precios, envíos e ingresar perfiles de clientes.',
+    prompt: (workshop) => `Eres el asesor virtual de atención y ventas de ${workshop?.name || 'nuestra Tienda'}.
+Tu objetivo es resolver dudas de productos en stock, precios, métodos de despacho o entrega.
+
+Información de la Tienda:
+- Nombre: ${workshop?.name || 'nuestra Tienda'}
+- Dirección: ${workshop?.address || 'No especificada'}
+- Teléfono: ${workshop?.phone || 'No especificado'}
+
+Instrucciones de interacción:
+1. **Asistencia**: Resuelve dudas sobre las características de los productos.
+2. **Registro de Clientes**: Pregunta el nombre del cliente para abrir un perfil e ingresarlo en la base de datos usando la herramienta.
+3. **Tono**: Proactivo, rápido, comercial pero siempre empático. Haz preguntas de seguimiento para cerrar ventas.`
+  },
+  {
+    id: 'medica',
+    name: '🩺 Asistente de Consulta Médica / Dental',
+    description: 'Enfocado en agendar y coordinar citas de salud solicitando rut e información de previsión.',
+    prompt: (workshop) => `Eres el asistente virtual encargado de coordinar citas del centro de salud ${workshop?.name || 'nuestra Clínica'}.
+Asistes a los pacientes a coordinar, confirmar o reprogramar consultas con nuestros especialistas.
+
+Información de Contacto:
+- Nombre y Ubicación: ${workshop?.name || 'nuestra Clínica'} - ${workshop?.address || 'No especificada'}
+- Teléfono de Recepción: ${workshop?.phone || 'No especificado'}
+
+Normas del servicio:
+1. **Empatía y Respeto**: Mantén un tono sumamente empático, cuidadoso, formal y profesional.
+2. **Captura de Datos**: Pide el nombre completo del paciente, su Rut, su previsión de salud (Isapre o Fonasa) y la especialidad médica o profesional al que desea consultar.
+3. **Registro**: Guarda al paciente usando las herramientas de registro en cuanto te proporcione su nombre.
+4. **Privacidad**: Nunca reveles datos sensibles de otros pacientes.`
+  }
+];
+
 const Settings = ({ onSettingsUpdate }) => {
   const [activeTab, setActiveTab] = useState('taller');
   const [waStatus, setWaStatus] = useState('loading');
   const [qrCode, setQrCode] = useState(null);
   
   const [workshopSettings, setWorkshopSettings] = useState({
-    name: '', phone: '', address: '', email: '', website: '', logo_url: '', google_maps_link: ''
+    name: '', phone: '', address: '', email: '', website: '', logo_url: '', google_maps_link: '', assistant_prompt: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -102,7 +182,8 @@ const Settings = ({ onSettingsUpdate }) => {
         email: workshopSettings.email,
         website: workshopSettings.website || '',
         google_maps_link: workshopSettings.google_maps_link || '',
-        logo: workshopSettings.logo || null
+        logo: workshopSettings.logo || null,
+        assistant_prompt: workshopSettings.assistant_prompt || ''
       });
       setWorkshopSettings(res.data);
       if (onSettingsUpdate) {
@@ -114,6 +195,43 @@ const Settings = ({ onSettingsUpdate }) => {
       alert('Error al guardar configuración.');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const handleSaveAssistantPrompt = async () => {
+    setSavingSettings(true);
+    try {
+      const res = await axios.put('/api/operations/settings/', {
+        name: workshopSettings.name,
+        phone: workshopSettings.phone,
+        address: workshopSettings.address,
+        email: workshopSettings.email,
+        website: workshopSettings.website || '',
+        google_maps_link: workshopSettings.google_maps_link || '',
+        logo: workshopSettings.logo || null,
+        assistant_prompt: workshopSettings.assistant_prompt || ''
+      });
+      setWorkshopSettings(res.data);
+      if (onSettingsUpdate) {
+        onSettingsUpdate();
+      }
+      alert('Prompt del asistente de IA guardado correctamente.');
+    } catch (err) {
+      console.error(err);
+      alert('Error al guardar el prompt del asistente.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleApplyTemplate = (templateId) => {
+    if (!templateId) return;
+    const template = ASSISTANT_TEMPLATES.find(t => t.id === templateId);
+    if (template && window.confirm(`¿Estás seguro de que deseas cargar la plantilla "${template.name}"? Esto reemplazará el prompt actual.`)) {
+      setWorkshopSettings(prev => ({
+        ...prev,
+        assistant_prompt: template.prompt(prev)
+      }));
     }
   };
 
@@ -358,9 +476,76 @@ const Settings = ({ onSettingsUpdate }) => {
         </div>
       )}
 
-      {/* Tab 3: Bot Flows Manager */}
       {activeTab === 'flujos' && (
         <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+          {editingFlow === null && (
+            <div className="glass-card" style={{ border: '1px solid var(--border-color)', padding: '2rem', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <i className="fa-solid fa-robot"></i>
+                Comportamiento General del Asistente (Prompt e Industria)
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.3rem', marginBottom: '1.5rem' }}>
+                Define la personalidad global de tu bot auto-gestionado de WhatsApp y aplícale plantillas listas para su uso.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600' }}>
+                    Seleccionar Plantilla Predeterminada
+                  </label>
+                  <select 
+                    onChange={(e) => {
+                      handleApplyTemplate(e.target.value);
+                      e.target.value = "";
+                    }}
+                    style={{
+                      background: '#1e1e24', color: 'var(--text)', border: '1px solid var(--border-color)',
+                      borderRadius: '6px', height: '42px', padding: '0 10px', fontSize: '0.9rem', cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">-- Cargar una plantilla recomendada --</option>
+                    {ASSISTANT_TEMPLATES.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    Nota: Cargar una plantilla sobrescribirá el texto del prompt actual.
+                  </small>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '600' }}>
+                    System Prompt / Instrucciones Generales del Bot
+                  </label>
+                  <textarea 
+                    rows={8}
+                    style={{
+                      background: '#1e1e24', color: 'var(--text)', border: '1px solid var(--border-color)',
+                      borderRadius: '6px', padding: '10px', fontSize: '0.9rem', fontFamily: 'monospace',
+                      resize: 'vertical', width: '100%', lineHeight: '1.4'
+                    }}
+                    placeholder="Instrucciones para el comportamiento general del bot inteligente de WhatsApp..."
+                    value={workshopSettings.assistant_prompt || ''}
+                    onChange={e => setWorkshopSettings({ ...workshopSettings, assistant_prompt: e.target.value })}
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    Este prompt le enseña a tu asistente cómo conversar con tus clientes, qué datos capturar y cómo gestionar derivaciones.
+                  </small>
+                </div>
+
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={handleSaveAssistantPrompt}
+                  style={{ alignSelf: 'flex-start', minWidth: '180px', backgroundColor: 'var(--primary)' }}
+                  disabled={savingSettings}
+                >
+                  {savingSettings ? 'Guardando...' : '💾 Guardar Configuración Bot'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {editingFlow === null ? (
             <div className="glass-card" style={{ border: '1px solid var(--border-color)', padding: '2rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>

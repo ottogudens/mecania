@@ -79,6 +79,26 @@ const ChargeWorkOrder = () => {
   const [msg, setMsg]           = useState(null);
   const [loading, setLoading]   = useState(false);
 
+  // List of active invoices/OTs
+  const [activeInvoices, setActiveInvoices] = useState([]);
+  const [loadingActive, setLoadingActive] = useState(false);
+
+  const fetchActiveInvoices = async () => {
+    setLoadingActive(true);
+    try {
+      const { data } = await axios.get('/api/finance/invoices/active_pos/', { headers: authHeader() });
+      setActiveInvoices(data);
+    } catch (e) {
+      console.error("Error al cargar OTs activas:", e);
+    } finally {
+      setLoadingActive(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveInvoices();
+  }, []);
+
   const lookup = async () => {
     if (!search.trim()) return;
     setLoading(true); setMsg(null); setInvoice(null);
@@ -92,7 +112,7 @@ const ChargeWorkOrder = () => {
       setInvoice(data);
       setAmount(String(parseFloat(data.total_amount) - parseFloat(data.amount_paid)));
     } catch (e) {
-      setMsg({ type: 'error', text: e.response?.data?.error || 'OT no encontrada.' });
+      setMsg({ type: 'error', text: e.response?.data?.error || 'OT no encontrada o ya entregada.' });
     } finally { setLoading(false); }
   };
 
@@ -109,6 +129,7 @@ const ChargeWorkOrder = () => {
       setInvoice(data.invoice);
       setMsg({ type: 'ok', text: `✅ Cobro de ${fmt(amount)} registrado correctamente.` });
       setAmount(String(parseFloat(data.invoice.total_amount) - parseFloat(data.invoice.amount_paid)));
+      fetchActiveInvoices(); // Actualizar grilla
     } catch (e) {
       setMsg({ type: 'error', text: e.response?.data?.error || 'Error al registrar cobro.' });
     } finally { setLoading(false); }
@@ -124,9 +145,17 @@ const ChargeWorkOrder = () => {
       }, { headers: authHeader() });
       setInvoice(data);
       setMsg({ type: 'ok', text: '✅ Factura cancelada. El stock fue revertido si correspondía.' });
+      fetchActiveInvoices(); // Actualizar grilla
     } catch (e) {
       setMsg({ type: 'error', text: e.response?.data?.error || 'Error al cancelar.' });
     } finally { setLoading(false); }
+  };
+
+  const selectInvoice = (inv) => {
+    setInvoice(inv);
+    setMsg(null);
+    setAmount(String(parseFloat(inv.total_amount) - parseFloat(inv.amount_paid)));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const isPaid = invoice?.status === 'PAID';
@@ -176,93 +205,197 @@ const ChargeWorkOrder = () => {
         }}>{msg.text}</div>
       )}
 
-      {invoice && (
-        <>
-          <InvoiceSummary invoice={invoice} />
+      {/* Grid de OTs y Checkout Split */}
+      <div style={{ display: 'grid', gridTemplateColumns: invoice ? '1.2fr 1fr' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
+        
+        {/* Grilla principal de OTs activas */}
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, color: 'var(--primary-color)' }}>📋 Órdenes de Trabajo Activas</h3>
+            <button className="btn btn-outline" onClick={fetchActiveInvoices} disabled={loadingActive} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
+              {loadingActive ? 'Cargando...' : '🔄 Actualizar'}
+            </button>
+          </div>
 
-          {!isPaid && !isCancelled && balance > 0 && (
-            <div className="glass-card" style={{ marginBottom: '1rem' }}>
-              <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)' }}>💳 Registrar Pago</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    MONTO A COBRAR
-                  </label>
-                  <input
-                    className="glass-input"
-                    type="number"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    style={{ width: '100%' }}
-                  />
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                    Saldo pendiente: {fmt(balance)}
+          {loadingActive && activeInvoices.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+              Cargando OTs activas...
+            </div>
+          ) : activeInvoices.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+              No se encontraron órdenes de trabajo activas cobrables.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '10px 8px' }}>OT #</th>
+                    <th style={{ padding: '10px 8px' }}>Patente</th>
+                    <th style={{ padding: '10px 8px' }}>Cliente</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>Total</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>Abonado</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>Saldo</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'center' }}>Estado</th>
+                    <th style={{ padding: '10px 8px', textAlign: 'right' }}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeInvoices.map(inv => {
+                    const st = STATUS_LABELS[inv.status] || { label: inv.status, cls: 'pending' };
+                    const isSelected = invoice && invoice.id === inv.id;
+                    const bal = parseFloat(inv.total_amount) - parseFloat(inv.amount_paid);
+
+                    return (
+                      <tr 
+                        key={inv.id} 
+                        style={{ 
+                          borderBottom: '1px solid var(--border-color)',
+                          backgroundColor: isSelected ? 'rgba(102,252,241,0.08)' : 'transparent',
+                          transition: 'background-color 0.2s',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => selectInvoice(inv)}
+                      >
+                        <td style={{ padding: '12px 8px', fontWeight: 'bold' }}>#{inv.work_order}</td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <span className="badge" style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                            {inv.vehicle_license_plate || '—'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '130px' }}>
+                          {inv.client_name || 'Sin Cliente'}
+                        </td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: '500' }}>{fmt(inv.total_amount)}</td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--status-green)' }}>{fmt(inv.amount_paid)}</td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right', color: 'var(--status-yellow)', fontWeight: 'bold' }}>{fmt(bal)}</td>
+                        <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                          <span className={`badge ${st.cls}`} style={{ fontSize: '0.75rem', padding: '2px 6px' }}>{st.label}</span>
+                        </td>
+                        <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                          <button 
+                            className="btn" 
+                            style={{ 
+                              padding: '4px 10px', 
+                              fontSize: '0.8rem', 
+                              backgroundColor: isSelected ? 'var(--primary-color)' : 'var(--secondary-color)',
+                              color: '#000'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectInvoice(inv);
+                            }}
+                          >
+                            {isSelected ? 'Seleccionada' : 'Cobrar'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Panel lateral de checkout de cobro */}
+        {invoice && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.25s ease-out' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h4 style={{ margin: 0, color: 'var(--text-muted)' }}>Checkout Seleccionado</h4>
+              <button 
+                onClick={() => setInvoice(null)} 
+                style={{ background: 'transparent', border: 'none', color: 'var(--status-red)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.9rem' }}
+              >
+                ✕ Limpiar Selección
+              </button>
+            </div>
+            
+            <InvoiceSummary invoice={invoice} />
+
+            {!isPaid && !isCancelled && balance > 0 && (
+              <div className="glass-card" style={{ padding: '1.25rem' }}>
+                <h3 style={{ marginBottom: '1rem', color: 'var(--primary-color)', fontSize: '1.15rem' }}>💳 Registrar Pago / Abono</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      MONTO A COBRAR (Abono)
+                    </label>
+                    <input
+                      className="glass-input"
+                      type="number"
+                      value={amount}
+                      onChange={e => setAmount(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                      Saldo restante: {fmt(balance)}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      REFERENCIA / VOUCHER
+                    </label>
+                    <input
+                      className="glass-input"
+                      placeholder="Opcional"
+                      value={reference}
+                      onChange={e => setRef(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
                   </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    REFERENCIA / VOUCHER
-                  </label>
-                  <input
-                    className="glass-input"
-                    placeholder="Opcional"
-                    value={reference}
-                    onChange={e => setRef(e.target.value)}
-                    style={{ width: '100%' }}
-                  />
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+                  {PAYMENT_METHODS.map(pm => (
+                    <button key={pm.value}
+                      onClick={() => setMethod(pm.value)}
+                      style={{
+                        padding: '0.5rem 1rem', borderRadius: 8, cursor: 'pointer',
+                        border: `2px solid ${method === pm.value ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                        background: method === pm.value ? 'rgba(102,252,241,0.15)' : 'transparent',
+                        color: method === pm.value ? 'var(--primary-color)' : 'var(--text-muted)',
+                        fontWeight: method === pm.value ? 700 : 400, transition: 'all 0.2s',
+                        fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+                      }}
+                    >{pm.label}</button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button className="btn" style={{ flex: 1 }} onClick={charge} disabled={loading}>
+                    {loading ? 'Procesando...' : `💰 Registrar Pago de ${fmt(amount)}`}
+                  </button>
+                  <button className="btn btn-outline" style={{ color: 'var(--status-red)', borderColor: 'var(--status-red)' }}
+                    onClick={cancel} disabled={loading}>
+                    ✕ Cancelar Factura
+                  </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                {PAYMENT_METHODS.map(pm => (
-                  <button key={pm.value}
-                    onClick={() => setMethod(pm.value)}
-                    style={{
-                      padding: '0.6rem 1.2rem', borderRadius: 8, cursor: 'pointer',
-                      border: `2px solid ${method === pm.value ? 'var(--primary-color)' : 'var(--border-color)'}`,
-                      background: method === pm.value ? 'rgba(102,252,241,0.15)' : 'transparent',
-                      color: method === pm.value ? 'var(--primary-color)' : 'var(--text-muted)',
-                      fontWeight: method === pm.value ? 700 : 400, transition: 'all 0.2s',
-                      fontFamily: 'Outfit, sans-serif', fontSize: '0.9rem'
-                    }}
-                  >{pm.label}</button>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button className="btn" style={{ flex: 1 }} onClick={charge} disabled={loading}>
-                  {loading ? 'Procesando...' : `💰 Cobrar ${fmt(amount)}`}
-                </button>
-                <button className="btn btn-outline" style={{ color: 'var(--status-red)', borderColor: 'var(--status-red)' }}
-                  onClick={cancel} disabled={loading}>
-                  ✕ Cancelar Factura
-                </button>
-              </div>
-            </div>
-          )}
+            )}
 
-          {(isPaid) && (
-            <div style={{ textAlign: 'center', padding: '1rem' }}>
-              <p style={{ color: 'var(--status-green)', fontWeight: 600, marginBottom: '0.75rem' }}>
-                ✅ Esta factura ya está completamente pagada.
-              </p>
-              <button className="btn" onClick={async () => {
-                try {
-                  const res = await axios.get(`/api/finance/invoices/${invoice.id}/pdf/`, {
-                    headers: authHeader(), responseType: 'blob'
-                  });
-                  const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-                  window.open(url, '_blank');
-                } catch { alert('Error al generar PDF.'); }
-              }}>🖨️ Ver / Imprimir Boleta</button>
-            </div>
-          )}
-          {(isCancelled) && (
-            <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--status-red)', fontWeight: 600 }}>
-              ✕ Esta factura fue cancelada.
-            </div>
-          )}
-        </>
-      )}
-    </div>
+            {(isPaid) && (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '1.5rem' }}>
+                <p style={{ color: 'var(--status-green)', fontWeight: 600, marginBottom: '0.75rem' }}>
+                  ✅ Esta factura ya está completamente pagada.
+                </p>
+                <button className="btn" onClick={async () => {
+                  try {
+                    const res = await axios.get(`/api/finance/invoices/${invoice.id}/pdf/`, {
+                      headers: authHeader(), responseType: 'blob'
+                    });
+                    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                    window.open(url, '_blank');
+                  } catch { alert('Error al generar PDF.'); }
+                }}>🖨️ Ver / Imprimir Boleta</button>
+              </div>
+            )}
+            {(isCancelled) && (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--status-red)', fontWeight: 600 }}>
+                ✕ Esta factura fue cancelada.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
   );
 };
 

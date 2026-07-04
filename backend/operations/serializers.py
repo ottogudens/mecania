@@ -13,7 +13,7 @@ class WorkshopSettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkshopSettings
-        fields = ['name', 'logo', 'logo_url', 'phone', 'address', 'email', 'website', 'google_maps_link']
+        fields = ['name', 'logo', 'logo_url', 'phone', 'address', 'email', 'website', 'google_maps_link', 'assistant_prompt']
     
     def get_logo_url(self, obj):
         return obj.logo

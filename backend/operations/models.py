@@ -17,6 +17,11 @@ class WorkshopSettings(models.Model):
     email = models.EmailField(blank=True)
     website = models.URLField(blank=True)
     google_maps_link = models.URLField(blank=True, null=True, help_text="Enlace de ubicación en Google Maps")
+    assistant_prompt = models.TextField(
+        blank=True, 
+        default='', 
+        help_text="Prompt del sistema para el comportamiento general del asistente de IA."
+    )
 
     def save(self, *args, **kwargs):
         self.pk = 1 # Singleton

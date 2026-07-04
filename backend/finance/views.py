@@ -145,6 +145,28 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Invoice.objects.all().order_by('-created_at')
     serializer_class = InvoiceSerializer
 
+    @action(detail=False, methods=['get'], pagination_class=None)
+    def active_pos(self, request):
+        """
+        Retorna todas las facturas asociadas a órdenes de trabajo activas,
+        y también realiza la sincronización de las mismas antes de retornar.
+        """
+        try:
+            active_wos = WorkOrder.objects.exclude(status__in=['DELIVERED', 'CANCELLED'])
+            for wo in active_wos:
+                get_or_create_invoice_for_work_order(wo)
+        except POSError:
+            # Si la caja no está abierta, no forzamos la sincronización de facturas,
+            # pero igual retornamos las pre-existentes de OTs activas.
+            pass
+            
+        active_invoices = Invoice.objects.filter(
+            work_order__status__in=['PENDING', 'IN_PROGRESS', 'COMPLETED']
+        ).order_by('-created_at')
+        
+        serializer = self.get_serializer(active_invoices, many=True)
+        return Response(serializer.data)
+
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     """Solo lectura — los pagos se crean vía POSChargeView."""
