@@ -47,6 +47,9 @@ function startWatchingSession() {
 
     fs.watch(AUTH_DIR, async (eventType, filename) => {
         if (!filename) return;
+        // Ignorar archivos temporales de pre-keys para evitar saturar el backend con miles de peticiones innecesarias
+        if (filename.startsWith('pre-key-')) return;
+        
         const filepath = path.join(AUTH_DIR, filename);
         
         try {
@@ -72,6 +75,37 @@ function startWatchingSession() {
         }
     });
     console.log('Monitoreo y persistencia de sesión activado.');
+}
+
+// Limpia las credenciales locales y de la base de datos si la conexión fue cerrada por logout o conflicto
+async function clearSession() {
+    console.log('Limpiando sesión local y remota por cierre de conexión/logout...');
+    connectionStatus = 'disconnected';
+    currentQr = null;
+    
+    // 1. Borrar archivos locales de sesión
+    if (fs.existsSync(AUTH_DIR)) {
+        try {
+            const files = fs.readdirSync(AUTH_DIR);
+            for (const file of files) {
+                const filepath = path.join(AUTH_DIR, file);
+                if (fs.statSync(filepath).isFile()) {
+                    fs.unlinkSync(filepath);
+                }
+            }
+            console.log('Archivos de sesión local eliminados.');
+        } catch (err) {
+            console.error('Error al borrar archivos locales de sesión:', err.message);
+        }
+    }
+    
+    // 2. Borrar sesión en la base de datos de Django
+    try {
+        await axios.delete(`${BACKEND_URL}/api/operations/whatsapp-session/`);
+        console.log('Sesión remota eliminada de la base de datos.');
+    } catch (err) {
+        console.error('Error al eliminar sesión remota de la base de datos:', err.message);
+    }
 }
 
 async function connectToWhatsApp() {
@@ -102,9 +136,16 @@ async function connectToWhatsApp() {
         if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQr = null;
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            const statusCode = lastDisconnect.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
             console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
-            if (shouldReconnect) {
+            
+            if (statusCode === DisconnectReason.loggedOut || (lastDisconnect.error && lastDisconnect.error.message?.includes('conflict'))) {
+                // Si la sesión fue cerrada o removida por conflicto, limpiamos credenciales para poder re-escanear QR
+                clearSession().then(() => {
+                    connectToWhatsApp();
+                });
+            } else if (shouldReconnect) {
                 connectToWhatsApp();
             }
         } else if (connection === 'open') {

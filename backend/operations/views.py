@@ -1095,3 +1095,8 @@ class WhatsAppSessionView(APIView):
         )
         return Response({'success': True, 'action': 'saved'})
 
+    def delete(self, request):
+        from .models import WhatsAppSession
+        WhatsAppSession.objects.all().delete()
+        return Response({'success': True, 'action': 'cleared'})
+
