@@ -46,6 +46,35 @@ async function syncSessionFromDB() {
     }
 }
 
+let pendingSync = {};
+let syncTimeout = null;
+
+async function flushSync() {
+    if (Object.keys(pendingSync).length === 0) return;
+    
+    const batch = { ...pendingSync };
+    pendingSync = {};
+    syncTimeout = null;
+    
+    try {
+        console.log(`Sincronizando lote de ${Object.keys(batch).length} archivos con el backend...`);
+        await axios.post(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
+            batch: batch
+        });
+    } catch (err) {
+        console.error('Error al sincronizar lote de sesión de WhatsApp:', err.message);
+        // Volver a encolar para reintento en el siguiente ciclo
+        pendingSync = { ...batch, ...pendingSync };
+        scheduleSync();
+    }
+}
+
+function scheduleSync() {
+    if (!syncTimeout) {
+        syncTimeout = setTimeout(flushSync, 2000);
+    }
+}
+
 // Inicia el monitor del directorio local para sincronizar escrituras/eliminaciones en Django
 function startWatchingSession() {
     if (!fs.existsSync(AUTH_DIR)) {
@@ -54,8 +83,6 @@ function startWatchingSession() {
 
     fs.watch(AUTH_DIR, async (eventType, filename) => {
         if (!filename) return;
-        // Ignorar archivos temporales de pre-keys para evitar saturar el backend con miles de peticiones innecesarias
-        if (filename.startsWith('pre-key-')) return;
         
         const filepath = path.join(AUTH_DIR, filename);
         
@@ -65,23 +92,19 @@ function startWatchingSession() {
                 const stats = fs.statSync(filepath);
                 if (stats.isFile()) {
                     const content = fs.readFileSync(filepath, 'utf-8');
-                    await axios.post(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
-                        key: filename,
-                        data: content
-                    });
+                    pendingSync[filename] = content;
+                    scheduleSync();
                 }
             } else {
                 // Archivo eliminado
-                await axios.post(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
-                    key: filename,
-                    data: ''
-                });
+                pendingSync[filename] = ''; // Indicar eliminación
+                scheduleSync();
             }
         } catch (err) {
-            console.error(`Error al sincronizar archivo de sesión (${filename}):`, err.message);
+            console.error(`Error al preparar sincronización del archivo (${filename}):`, err.message);
         }
     });
-    console.log('Monitoreo y persistencia de sesión activado.');
+    console.log('Monitoreo y persistencia de sesión en lote (batch) activado.');
 }
 
 // Limpia las credenciales locales y de la base de datos si la conexión fue cerrada por logout o conflicto

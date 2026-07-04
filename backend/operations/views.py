@@ -1079,6 +1079,22 @@ class WhatsAppSessionView(APIView):
 
     def post(self, request):
         from .models import WhatsAppSession
+        
+        batch = request.data.get('batch')
+        if batch and isinstance(batch, dict):
+            # Usar una transacción para insertar/eliminar todo en una sola operación de base de datos
+            from django.db import transaction
+            with transaction.atomic():
+                for key, data in batch.items():
+                    if data is None or data == '':
+                        WhatsAppSession.objects.filter(key=key).delete()
+                    else:
+                        WhatsAppSession.objects.update_or_create(
+                            key=key,
+                            defaults={'data': data}
+                        )
+            return Response({'success': True, 'action': 'batch_saved'})
+
         key = request.data.get('key')
         data = request.data.get('data')
 
