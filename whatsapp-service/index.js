@@ -21,6 +21,13 @@ let connectionStatus = 'disconnected';
 // Descarga sesión guardada desde la base de datos de Django
 async function syncSessionFromDB() {
     try {
+        // Si ya existe el archivo de credenciales local creds.json, priorizamos la sesión local y no sobrescribimos
+        const credsFile = path.join(AUTH_DIR, 'creds.json');
+        if (fs.existsSync(credsFile)) {
+            console.log('Sesión local activa encontrada (creds.json). Omitiendo descarga para evitar pérdidas de vinculación.');
+            return;
+        }
+
         console.log('Descargando sesión de WhatsApp desde la base de datos...');
         const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`);
         const files = response.data;
@@ -33,7 +40,7 @@ async function syncSessionFromDB() {
             const filepath = path.join(AUTH_DIR, filename);
             fs.writeFileSync(filepath, content, 'utf-8');
         }
-        console.log(`Sesión descargada. ${Object.keys(files).length} archivos sincronizados.`);
+        console.log(`Sesión descargada de la base de datos. ${Object.keys(files).length} archivos sincronizados.`);
     } catch (err) {
         console.error('Error al descargar sesión de WhatsApp:', err.message);
     }
@@ -138,15 +145,20 @@ async function connectToWhatsApp() {
             currentQr = null;
             const statusCode = lastDisconnect.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            console.log('connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+            console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting: ', shouldReconnect);
             
-            if (statusCode === DisconnectReason.loggedOut || (lastDisconnect.error && lastDisconnect.error.message?.includes('conflict'))) {
-                // Si la sesión fue cerrada o removida por conflicto, limpiamos credenciales para poder re-escanear QR
+            // Solo limpiar las credenciales locales y de DB de forma automática si es un logout explícito (desconexión manual)
+            if (statusCode === DisconnectReason.loggedOut) {
+                console.log('Logout manual detectado. Limpiando credenciales...');
                 clearSession().then(() => {
                     connectToWhatsApp();
                 });
             } else if (shouldReconnect) {
-                connectToWhatsApp();
+                // Para cualquier otro error (timeout, conflicto transitorio por reinicio rápido), reintentamos conectar conservando la sesión
+                console.log('Desconexión temporal. Intentando reconectar en 3 segundos...');
+                setTimeout(() => {
+                    connectToWhatsApp();
+                }, 3000);
             }
         } else if (connection === 'open') {
             connectionStatus = 'connected';
@@ -232,6 +244,26 @@ app.post('/api/send-message', async (req, res) => {
     } catch (error) {
         console.error('Error sending message:', error);
         return res.status(500).json({ error: 'Failed to send message', details: error.message });
+    }
+});
+
+app.post('/api/logout', async (req, res) => {
+    try {
+        console.log('Solicitud manual de desconexión recibida...');
+        if (sock) {
+            try {
+                await sock.logout();
+            } catch (err) {
+                console.error('Error al ejecutar logout en socket, procediendo con limpieza manual:', err.message);
+            }
+        }
+        await clearSession();
+        // Generar un nuevo QR y restablecer conexión como disconnected de cero
+        connectToWhatsApp();
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('Error al desconectar manualmente:', error);
+        return res.status(500).json({ error: 'Failed to logout', details: error.message });
     }
 });
 

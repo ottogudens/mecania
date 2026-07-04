@@ -157,6 +157,20 @@ const Settings = ({ onSettingsUpdate }) => {
     }
   };
 
+  const handleWhatsAppLogout = async () => {
+    if (!window.confirm('¿Estás seguro de que deseas desconectar tu cuenta de WhatsApp? Se desactivarán las respuestas automáticas.')) return;
+    try {
+      const baseUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+      await axios.post(`${baseUrl}/api/logout`);
+      setWaStatus('disconnected');
+      alert('WhatsApp desconectado correctamente.');
+    } catch (err) {
+      console.error("Error al desconectar WhatsApp:", err);
+      alert('Error al enviar la solicitud de desconexión al servicio de WhatsApp.');
+    }
+  };
+
+
   return (
     <div className="settings-page" style={{ animation: 'fadeIn 0.5s ease-out' }}>
       <div className="header" style={{ marginBottom: '2rem' }}>
@@ -291,10 +305,33 @@ const Settings = ({ onSettingsUpdate }) => {
 
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '260px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
               {waStatus === 'connected' ? (
-                <div style={{ textAlign: 'center', color: '#10b981' }}>
+                <div style={{ textAlign: 'center', color: '#10b981', padding: '1rem' }}>
                   <i className="fa-solid fa-circle-check" style={{ fontSize: '4rem', marginBottom: '1rem' }}></i>
                   <h4>WhatsApp Vinculado</h4>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>El servicio de mensajería está activo e interactuando.</p>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>El servicio de mensajería está activo e interactuando.</p>
+                  
+                  <button 
+                    onClick={handleWhatsAppLogout}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      fontSize: '0.9rem',
+                      transition: 'background-color 0.2s',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = '#ef4444'}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                    Desconectar WhatsApp
+                  </button>
                 </div>
               ) : waStatus === 'qr_ready' && qrCode ? (
                 <div style={{ padding: '1rem', background: 'white', borderRadius: '12px', display: 'inline-block' }}>
