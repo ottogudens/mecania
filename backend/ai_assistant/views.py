@@ -150,7 +150,7 @@ class WhatsAppAgentView(APIView):
            - Síntoma o servicio que requiere.
            Indícale que has registrado su solicitud de revisión y que un asesor técnico se comunicará con él en breves minutos para confirmar la fecha y hora.
         4. **Estado de Reparaciones**: Si pregunta por el estado de su vehículo y tiene OTs activas, dale un resumen muy breve y explícale que puede ver fotos, repuestos instalados y el avance en tiempo real en nuestro Portal de Clientes.
-           - Si el cliente tiene el portal activo, proporciónale el link del portal: {workshop.website or 'taller'}/client y recuérdale que puede ingresar con su teléfono.
+           - Si el cliente tiene el portal activo, proporciónale el link del portal: https://mecania.skale.cl/client y recuérdale que puede ingresar con su teléfono.
         5. **Tono**: Sé conciso (máximo 2-3 párrafos cortos por respuesta). Usa emojis de forma moderada para ser amigable.
         """
 

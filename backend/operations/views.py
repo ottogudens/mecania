@@ -45,14 +45,8 @@ class ClientViewSet(viewsets.ModelViewSet):
 
         # Construir URL del portal de manera segura y pública
         workshop = WorkshopSettings.load()
-        frontend_base = os.environ.get('FRONTEND_URL', '')
-        if not frontend_base and workshop.website:
-            frontend_base = workshop.website
-        
-        if frontend_base:
-            portal_url = f"{frontend_base.rstrip('/')}/client"
-        else:
-            portal_url = request.build_absolute_uri('/client')
+        frontend_base = os.environ.get('FRONTEND_URL', '').strip() or 'https://mecania.skale.cl'
+        portal_url = f"{frontend_base.rstrip('/')}/client"
 
         workshop_name = workshop.name or 'MecanIA'
 
@@ -115,14 +109,8 @@ class ClientViewSet(viewsets.ModelViewSet):
         client.save(update_fields=['pin_hash', 'portal_enabled'])
 
         workshop = WorkshopSettings.load()
-        frontend_base = os.environ.get('FRONTEND_URL', '')
-        if not frontend_base and workshop.website:
-            frontend_base = workshop.website
-        
-        if frontend_base:
-            portal_url = f"{frontend_base.rstrip('/')}/client"
-        else:
-            portal_url = request.build_absolute_uri('/client')
+        frontend_base = os.environ.get('FRONTEND_URL', '').strip() or 'https://mecania.skale.cl'
+        portal_url = f"{frontend_base.rstrip('/')}/client"
 
         workshop_name = workshop.name or 'MecanIA'
 
