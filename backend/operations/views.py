@@ -14,7 +14,7 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
     WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer,
