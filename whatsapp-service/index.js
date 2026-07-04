@@ -11,7 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 const AUTH_DIR = 'auth_info_baileys';
 
 let sock = null;
@@ -36,11 +36,16 @@ async function syncSessionFromDB() {
             fs.mkdirSync(AUTH_DIR, { recursive: true });
         }
         
+        let count = 0;
         for (const [filename, content] of Object.entries(files)) {
+            const isReallyEssential = filename === 'creds.json' || filename.startsWith('app-state-sync-key-');
+            if (!isReallyEssential) continue;
+            
             const filepath = path.join(AUTH_DIR, filename);
             fs.writeFileSync(filepath, content, 'utf-8');
+            count++;
         }
-        console.log(`Sesión descargada de la base de datos. ${Object.keys(files).length} archivos sincronizados.`);
+        console.log(`Sesión descargada de la base de datos. ${count} archivos esenciales sincronizados.`);
     } catch (err) {
         console.error('Error al descargar sesión de WhatsApp:', err.message);
     }
@@ -83,6 +88,9 @@ function startWatchingSession() {
 
     fs.watch(AUTH_DIR, async (eventType, filename) => {
         if (!filename) return;
+        
+        const isEssential = filename === 'creds.json' || filename.startsWith('app-state-sync-key-');
+        if (!isEssential) return;
         
         const filepath = path.join(AUTH_DIR, filename);
         
