@@ -66,9 +66,11 @@ const Settings = ({ onSettingsUpdate }) => {
     setLoadingFlows(true);
     try {
       const res = await axios.get('/api/operations/whatsapp-flows/');
-      setFlows(res.data);
+      const data = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      setFlows(data);
     } catch (err) {
       console.error("Error fetching flows:", err);
+      setFlows([]);
     } finally {
       setLoadingFlows(false);
     }

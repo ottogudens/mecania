@@ -1106,5 +1106,6 @@ class WhatsAppFlowViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = WhatsAppFlowSerializer
     queryset = WhatsAppFlow.objects.all().order_by('id')
+    pagination_class = None
 
 
