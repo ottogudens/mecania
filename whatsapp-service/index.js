@@ -272,7 +272,8 @@ connectToWhatsApp();
 app.get('/api/status', (req, res) => {
     res.json({
         status: connectionStatus,
-        qr: currentQr
+        qr: currentQr,
+        user: sock ? sock.user : null
     });
 });
 
