@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const clientToken = () => sessionStorage.getItem('clientToken');
+const clientToken = () => localStorage.getItem('clientToken');
 const clientAuth = () => ({ Authorization: `ClientToken ${clientToken()}` });
 const fmt = (n) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
@@ -26,10 +26,20 @@ const MAINT_STATUS = {
 
 // ─── Pantalla de Login ────────────────────────────────────────────────────────
 const LoginScreen = ({ onLogin }) => {
-  const [phone, setPhone] = useState('');
+  const savedPhone = localStorage.getItem('clientPhone') || '';
+  const savedName = localStorage.getItem('clientName') || '';
+
+  const [useFastLogin, setUseFastLogin] = useState(!!savedPhone && !!savedName);
+  const [phone, setPhone] = useState(savedPhone);
   const [pin, setPin] = useState(['', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Auto focus pin input when component mounts or mode switches
+  useEffect(() => {
+    const firstPin = document.getElementById('pin-0');
+    if (firstPin) firstPin.focus();
+  }, [useFastLogin]);
 
   const handlePinChange = (index, value) => {
     if (value.length > 1) return;
@@ -53,23 +63,38 @@ const LoginScreen = ({ onLogin }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const pinStr = pin.join('');
-    if (!phone.trim() || pinStr.length !== 4) return;
+    const targetPhone = useFastLogin ? savedPhone : phone;
+    if (!targetPhone.trim() || pinStr.length !== 4) return;
 
     setLoading(true);
     setError('');
     try {
       const { data } = await axios.post(`${API}/api/operations/client/auth/`, {
-        phone: phone.trim(),
+        phone: targetPhone.trim(),
         pin: pinStr,
       });
-      sessionStorage.setItem('clientToken', data.token);
-      sessionStorage.setItem('clientName', data.client_name);
+      localStorage.setItem('clientToken', data.token);
+      localStorage.setItem('clientName', data.client_name);
+      localStorage.setItem('clientPhone', targetPhone.trim());
       onLogin(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Error al iniciar sesión.');
+      setPin(['', '', '', '']);
+      const firstPin = document.getElementById('pin-0');
+      if (firstPin) firstPin.focus();
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSwitchUser = () => {
+    localStorage.removeItem('clientPhone');
+    localStorage.removeItem('clientName');
+    localStorage.removeItem('clientToken');
+    setPhone('');
+    setPin(['', '', '', '']);
+    setUseFastLogin(false);
+    setError('');
   };
 
   return (
@@ -88,13 +113,28 @@ const LoginScreen = ({ onLogin }) => {
           <span style={{ fontSize: '2rem' }}>🚗</span>
         </div>
 
-        <h2 style={{
-          color: '#fff', fontSize: '1.8rem', fontWeight: 600, marginBottom: '0.5rem',
-          fontFamily: 'Outfit, sans-serif',
-        }}>Portal de Clientes</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.5 }}>
-          Ingresa tu teléfono y PIN para acceder a la ficha técnica de tus vehículos.
-        </p>
+        {useFastLogin ? (
+          <>
+            <h2 style={{
+              color: '#fff', fontSize: '1.8rem', fontWeight: 600, marginBottom: '0.5rem',
+              fontFamily: 'Outfit, sans-serif',
+            }}>¡Hola de nuevo!</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.5 }}>
+              Bienvenido de vuelta, <strong style={{ color: '#fff' }}>{savedName}</strong>.<br />
+              Ingresa tu PIN para acceder a tu portal.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 style={{
+              color: '#fff', fontSize: '1.8rem', fontWeight: 600, marginBottom: '0.5rem',
+              fontFamily: 'Outfit, sans-serif',
+            }}>Portal de Clientes</h2>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: 1.5 }}>
+              Ingresa tu teléfono y PIN para acceder a la ficha técnica de tus vehículos.
+            </p>
+          </>
+        )}
 
         {error && (
           <div style={{
@@ -106,31 +146,34 @@ const LoginScreen = ({ onLogin }) => {
 
         <form onSubmit={handleSubmit}>
           {/* Phone input */}
-          <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-            <span style={{
-              position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)',
-              color: '#25D366', fontSize: '1.2rem',
-            }}>📱</span>
-            <input
-              type="tel"
-              placeholder="+56 9 1234 5678"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              style={{
-                width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: 12,
-                border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(15,23,42,0.6)',
-                color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '1rem',
-                outline: 'none', transition: 'border-color 0.3s',
-              }}
-              required
-            />
-          </div>
+          {!useFastLogin && (
+            <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+              <span style={{
+                position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)',
+                color: '#25D366', fontSize: '1.2rem',
+              }}>📱</span>
+              <input
+                type="tel"
+                placeholder="+56 9 1234 5678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                style={{
+                  width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: 12,
+                  border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(15,23,42,0.6)',
+                  color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '1rem',
+                  outline: 'none', transition: 'border-color 0.3s',
+                }}
+                required
+              />
+            </div>
+          )}
 
           {/* PIN inputs */}
           <div style={{ marginBottom: '1.5rem' }}>
             <label style={{
               display: 'block', marginBottom: 10, color: 'var(--text-muted)',
               fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: 1,
+              textAlign: useFastLogin ? 'center' : 'left',
             }}>PIN de acceso</label>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
               {pin.map((digit, i) => (
@@ -169,6 +212,21 @@ const LoginScreen = ({ onLogin }) => {
             {loading ? 'Verificando...' : '🔓 Ingresar al Portal'}
           </button>
         </form>
+
+        {useFastLogin && (
+          <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+            <button
+              onClick={handleSwitchUser}
+              style={{
+                background: 'none', border: 'none', color: '#3b82f6',
+                fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem',
+                cursor: 'pointer', textDecoration: 'underline', padding: 0
+              }}
+            >
+              ¿No eres {savedName}? Ingresar con otro teléfono
+            </button>
+          </div>
+        )}
 
         <p style={{
           marginTop: '1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)',
@@ -603,6 +661,13 @@ const ClientDashboard = ({ clientName, onLogout }) => {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
 
+  // States for PIN changing modal
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [newPin, setNewPin] = useState(['', '', '', '']);
+  const [pinChangeError, setPinChangeError] = useState('');
+  const [pinChangeSuccess, setPinChangeSuccess] = useState('');
+  const [changingPin, setChangingPin] = useState(false);
+
   useEffect(() => {
     const handleBeforeInstall = (e) => {
       e.preventDefault();
@@ -613,6 +678,16 @@ const ClientDashboard = ({ clientName, onLogout }) => {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
+  // Auto focus modal first PIN input
+  useEffect(() => {
+    if (showPinModal) {
+      setTimeout(() => {
+        const input = document.getElementById('newpin-0');
+        if (input) input.focus();
+      }, 100);
+    }
+  }, [showPinModal]);
+
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
@@ -622,6 +697,50 @@ const ClientDashboard = ({ clientName, onLogout }) => {
     }
     setDeferredPrompt(null);
     setShowInstallBanner(false);
+  };
+
+  const handleNewPinChange = (index, value) => {
+    if (value.length > 1) return;
+    const nPin = [...newPin];
+    nPin[index] = value;
+    setNewPin(nPin);
+    if (value && index < 3) {
+      const nextInput = document.getElementById(`newpin-${index + 1}`);
+      if (nextInput) nextInput.focus();
+    }
+  };
+
+  const handleNewPinKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !newPin[index] && index > 0) {
+      const prevInput = document.getElementById(`newpin-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
+  };
+
+  const submitPinChange = async (e) => {
+    e.preventDefault();
+    const pinStr = newPin.join('');
+    if (pinStr.length !== 4) return;
+    setChangingPin(true);
+    setPinChangeError('');
+    setPinChangeSuccess('');
+    try {
+      await axios.post(`${API}/api/operations/client/change-pin/`, {
+        pin: pinStr
+      }, {
+        headers: clientAuth()
+      });
+      setPinChangeSuccess('¡PIN actualizado de forma segura!');
+      setTimeout(() => {
+        setShowPinModal(false);
+        setNewPin(['', '', '', '']);
+        setPinChangeSuccess('');
+      }, 2000);
+    } catch (err) {
+      setPinChangeError(err.response?.data?.error || 'No se pudo actualizar el PIN.');
+    } finally {
+      setChangingPin(false);
+    }
   };
 
   const fetchData = useCallback(async () => {
@@ -687,14 +806,109 @@ const ClientDashboard = ({ clientName, onLogout }) => {
             Consulta la ficha técnica y estado de tus vehículos.
           </p>
         </div>
-        <button
-          onClick={onLogout}
-          className="btn btn-outline"
-          style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#ef4444', fontSize: '0.85rem' }}
-        >
-          Cerrar Sesión
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowPinModal(true)}
+            className="btn btn-outline"
+            style={{ borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa', fontSize: '0.85rem' }}
+          >
+            🔐 Cambiar PIN
+          </button>
+          <button
+            onClick={onLogout}
+            className="btn btn-outline"
+            style={{ borderColor: 'rgba(239,68,68,0.4)', color: '#ef4444', fontSize: '0.85rem' }}
+          >
+            Cerrar Sesión
+          </button>
+        </div>
       </div>
+
+      {showPinModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 1000, padding: '1rem'
+        }}>
+          <div className="glass-card" style={{ maxWidth: 400, width: '100%', padding: '2rem', textAlign: 'center' }}>
+            <h3 style={{ color: '#fff', margin: '0 0 0.5rem 0', fontSize: '1.5rem', fontFamily: 'Outfit, sans-serif' }}>Crear tu nuevo PIN</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.4 }}>
+              Define un PIN de 4 dígitos propio. Lo usarás en tu próximo re-ingreso.
+            </p>
+
+            {pinChangeError && (
+              <div style={{
+                color: '#fca5a5', background: 'rgba(248,113,113,0.1)',
+                padding: '0.75rem 1rem', borderRadius: 8, marginBottom: '1rem',
+                border: '1px solid rgba(248,113,113,0.2)', fontSize: '0.85rem',
+              }}>{pinChangeError}</div>
+            )}
+
+            {pinChangeSuccess && (
+              <div style={{
+                color: '#86efac', background: 'rgba(34,197,94,0.1)',
+                padding: '0.75rem 1rem', borderRadius: 8, marginBottom: '1rem',
+                border: '1px solid rgba(34,197,94,0.2)', fontSize: '0.85rem',
+              }}>{pinChangeSuccess}</div>
+            )}
+
+            <form onSubmit={submitPinChange}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                {newPin.map((digit, i) => (
+                  <input
+                    key={i}
+                    id={`newpin-${i}`}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleNewPinChange(i, e.target.value.replace(/\D/g, ''))}
+                    onKeyDown={(e) => handleNewPinKeyDown(i, e)}
+                    className="client-pin-input"
+                    style={{
+                      borderColor: digit ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.1)',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = 'rgba(139,92,246,0.8)'}
+                    onBlur={(e) => e.target.style.borderColor = digit ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.1)'}
+                    required
+                  />
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    setNewPin(['', '', '', '']);
+                    setPinChangeError('');
+                    setPinChangeSuccess('');
+                  }}
+                  className="btn btn-outline"
+                  style={{ flex: 1, borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
+                  disabled={changingPin}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn"
+                  style={{
+                    flex: 1,
+                    background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)',
+                    border: 'none',
+                    opacity: newPin.join('').length !== 4 || changingPin ? 0.5 : 1,
+                  }}
+                  disabled={newPin.join('').length !== 4 || changingPin}
+                >
+                  {changingPin ? 'Guardando...' : 'Confirmar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showInstallBanner && (
         <div className="glass-card client-install-banner">
@@ -751,7 +965,7 @@ const ClientDashboard = ({ clientName, onLogout }) => {
 // ─── Componente Principal ────────────────────────────────────────────────────
 const ClientPortal = () => {
   const [authenticated, setAuthenticated] = useState(!!clientToken());
-  const [clientName, setClientName] = useState(sessionStorage.getItem('clientName') || '');
+  const [clientName, setClientName] = useState(localStorage.getItem('clientName') || '');
 
   const handleLogin = (data) => {
     setAuthenticated(true);
@@ -759,10 +973,8 @@ const ClientPortal = () => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('clientToken');
-    sessionStorage.removeItem('clientName');
+    localStorage.removeItem('clientToken');
     setAuthenticated(false);
-    setClientName('');
   };
 
   if (!authenticated) {

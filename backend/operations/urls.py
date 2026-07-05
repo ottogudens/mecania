@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     ClientViewSet, VehicleViewSet, WorkOrderViewSet, 
     WorkOrderItemViewSet, VisualInspectionViewSet, 
-    CustomAuthToken, ClientAuthToken, ClientDataView, ClientVehicleDetailView,
+    CustomAuthToken, ClientAuthToken, ClientDataView, ClientVehicleDetailView, ClientChangePinView,
     AIDiagnosticsView, AITranscribeView, WorkshopSettingsView,
     DashboardStatsView, UserViewSet,
     VehiclePartViewSet, MaintenanceRecordViewSet,
@@ -31,6 +31,7 @@ urlpatterns = [
     # Client portal endpoints (public, token-based auth)
     path('client/auth/', ClientAuthToken.as_view(), name='client_auth'),
     path('client/login/', ClientAuthToken.as_view(), name='client_login'),  # backward compat
+    path('client/change-pin/', ClientChangePinView.as_view(), name='client_change_pin'),
     path('client/data/', ClientDataView.as_view(), name='client_data'),
     path('client/vehicles/<int:pk>/', ClientVehicleDetailView.as_view(), name='client_vehicle_detail'),
     # AI endpoints

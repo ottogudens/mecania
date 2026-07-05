@@ -537,6 +537,34 @@ class ClientAuthToken(APIView):
         })
 
 
+class ClientChangePinView(APIView):
+    """
+    Permite al cliente cambiar su PIN desde el portal.
+    POST /api/operations/client/change-pin/
+    Header: Authorization: ClientToken <token>
+    body: {"pin": "1234"}
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request, *args, **kwargs):
+        client_id = _extract_client_id(request)
+        if not client_id:
+            return Response({'error': 'Token inválido o expirado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        client = Client.objects.filter(id=client_id).first()
+        if not client:
+            return Response({'error': 'Cliente no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        new_pin = request.data.get('pin', '').strip()
+        if not new_pin or not new_pin.isdigit() or len(new_pin) != 4:
+            return Response({'error': 'El PIN debe ser numérico y tener 4 dígitos.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        client.set_pin(new_pin)
+        client.save(update_fields=['pin_hash'])
+        return Response({'success': True, 'message': 'PIN cambiado con éxito.'})
+
+
 class ClientDataView(APIView):
     """
     Dashboard del portal de clientes — lista de vehículos del cliente autenticado.

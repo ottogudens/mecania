@@ -258,7 +258,8 @@ app.post('/api/send-message', async (req, res) => {
         }
 
         // Format number to JID
-        const jid = `${number}@s.whatsapp.net`;
+        const cleanNumber = String(number).replace(/\D/g, '');
+        const jid = `${cleanNumber}@s.whatsapp.net`;
         
         if (documentUrl) {
             await sock.sendMessage(jid, { 
