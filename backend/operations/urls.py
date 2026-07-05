@@ -8,7 +8,8 @@ from .views import (
     DashboardStatsView, UserViewSet,
     VehiclePartViewSet, MaintenanceRecordViewSet,
     ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView,
-    WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView
+    WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView,
+    WhatsAppLogoutView
 )
 
 router = DefaultRouter()
@@ -43,5 +44,6 @@ urlpatterns = [
     path('whatsapp-messages/', WhatsAppMessageListView.as_view(), name='whatsapp_messages'),
     path('whatsapp-messages/chats/', WhatsAppChatListView.as_view(), name='whatsapp_chats'),
     path('whatsapp-messages/send-manual/', WhatsAppManualSendView.as_view(), name='whatsapp_send_manual'),
+    path('whatsapp/logout/', WhatsAppLogoutView.as_view(), name='whatsapp_logout'),
     path('', include(router.urls)),
 ]

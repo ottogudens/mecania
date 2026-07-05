@@ -103,6 +103,9 @@ class InventoryDiscountOnCloseTests(TestCase):
 
 class POSCounterSaleTests(TestCase):
     def setUp(self):
+        self.user = User.objects.create_user(username="cashier_sale", password="password")
+        from finance.models import CashRegisterSession
+        CashRegisterSession.objects.create(opened_by=self.user)
         self.product = Product.objects.create(name="Aceite 5W30", sku="AC-001", stock_quantity=20, price=Decimal("12000"))
         self.category = ServiceCategory.objects.create(name="Mantenimiento")
         self.service = Service.objects.create(
@@ -137,6 +140,9 @@ class POSCounterSaleTests(TestCase):
 
 class POSChargeAndCancelTests(TestCase):
     def setUp(self):
+        self.user = User.objects.create_user(username="cashier_charge", password="password")
+        from finance.models import CashRegisterSession
+        CashRegisterSession.objects.create(opened_by=self.user)
         self.product = Product.objects.create(name="Bujía", sku="BJ-001", stock_quantity=10, price=Decimal("3000"))
         self.invoice = create_counter_sale(client_id=None, items=[{"product_id": self.product.id, "quantity": 1}])
 
@@ -179,6 +185,9 @@ class POSChargeAndCancelTests(TestCase):
 
 class POSWorkOrderFlowTests(TestCase):
     def setUp(self):
+        self.user = User.objects.create_user(username="cashier_wo", password="password")
+        from finance.models import CashRegisterSession
+        CashRegisterSession.objects.create(opened_by=self.user)
         self.client_obj = Client.objects.create(first_name="Carla", last_name="Ruiz", phone="+56933333333")
         self.vehicle = Vehicle.objects.create(
             license_plate="LMN345", make="Suzuki", model="Swift", year=2021, client=self.client_obj,

@@ -280,8 +280,7 @@ const Settings = ({ onSettingsUpdate }) => {
   const handleWhatsAppLogout = async () => {
     if (!window.confirm('¿Estás seguro de que deseas desconectar tu cuenta de WhatsApp? Se desactivarán las respuestas automáticas.')) return;
     try {
-      const baseUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-      await axios.post(`${baseUrl}/api/logout`);
+      await axios.post('/api/operations/whatsapp/logout/');
       setWaStatus('disconnected');
       alert('WhatsApp desconectado correctamente.');
     } catch (err) {

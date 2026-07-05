@@ -3,7 +3,10 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 from django.contrib.auth.models import User
-from operations.models import Client, WhatsAppMessage
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+from operations.models import Client, WhatsAppMessage, WhatsAppSession
 from operations.views import _make_client_token
 
 class ClientAuthTestCase(TestCase):
@@ -153,3 +156,157 @@ class WhatsAppMessageTestCase(TestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertEqual(response.data['text'], 'Mensaje manual de prueba')
             self.assertEqual(response.data['sender'], 'operator')
+
+
+class MecaniaSecurityResilienceTestCase(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        self.client_user = Client.objects.create(
+            first_name="Juanito",
+            last_name="Prez",
+            phone="+56911112222",
+            portal_enabled=True
+        )
+    
+    def test_whatsapp_session_security_key(self):
+        url = reverse('whatsapp_session')
+        old_internal_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        settings.INTERNAL_API_KEY = "test-secret-key-12345"
+        
+        # Unauthorized request
+        response = self.api_client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+        # Authorized request with incorrect key
+        response = self.api_client.get(url, HTTP_X_MECANIA_SECRET_KEY="wrong-key")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        
+        # Authorized request with correct key
+        response = self.api_client.get(url, HTTP_X_MECANIA_SECRET_KEY="test-secret-key-12345")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Restore settings
+        settings.INTERNAL_API_KEY = old_internal_key
+
+    def test_whatsapp_session_encryption_and_decryption(self):
+        url = reverse('whatsapp_session')
+        old_internal_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        settings.INTERNAL_API_KEY = "test-secret-key-12345"
+        
+        # Save a session
+        post_data = {
+            "key": "test_creds.json",
+            "data": "my-secret-session-info-data-payload"
+        }
+        response = self.api_client.post(
+            url, post_data, format='json', HTTP_X_MECANIA_SECRET_KEY="test-secret-key-12345"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["action"], "saved")
+        
+        # Verify it is encrypted in the database
+        session_db = WhatsAppSession.objects.get(key="test_creds.json")
+        self.assertNotEqual(session_db.data, "my-secret-session-info-data-payload")
+        self.assertNotIn("my-secret-session-info-data-payload", session_db.data)
+        
+        # Verify it is decrypted when retrieved
+        response_get = self.api_client.get(
+            url, HTTP_X_MECANIA_SECRET_KEY="test-secret-key-12345"
+        )
+        self.assertEqual(response_get.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_get.data["test_creds.json"], "my-secret-session-info-data-payload")
+        
+        # Restore settings
+        settings.INTERNAL_API_KEY = old_internal_key
+
+    def test_whatsapp_manual_send_silences_bot(self):
+        url = reverse('whatsapp_send_manual')
+        
+        from unittest.mock import patch, MagicMock
+        with patch('requests.post') as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {"success": True}
+            mock_post.return_value = mock_response
+            
+            # User must be authenticated to send manual message
+            self.user = User.objects.create_superuser(
+                username="tech1", email="tech1@example.com", password="password"
+            )
+            self.api_client.force_authenticate(user=self.user)
+            
+            # Initially not silenced
+            self.assertFalse(self.client_user.bot_silenced_until and self.client_user.bot_silenced_until > timezone.now())
+            
+            # Send message
+            data = {'phone': '+56911112222', 'text': 'Mensaje manual'}
+            response = self.api_client.post(url, data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            
+            # Refresh client, should be silenced now
+            self.client_user.refresh_from_db()
+            self.assertTrue(self.client_user.bot_silenced_until and self.client_user.bot_silenced_until > timezone.now())
+            
+            # Check silenced duration is about 2 hours
+            time_diff = self.client_user.bot_silenced_until - timezone.now()
+            self.assertTrue(timedelta(hours=1, minutes=58) < time_diff <= timedelta(hours=2))
+
+    def test_whatsapp_agent_bot_silencing(self):
+        url = reverse('ai-whatsapp-agent')
+        old_internal_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        settings.INTERNAL_API_KEY = "test-secret-key-12345"
+        
+        # 1. Silenced client does not call OpenAI and return reply: None
+        self.client_user.bot_silenced_until = timezone.now() + timedelta(hours=2)
+        self.client_user.save()
+        
+        data = {
+            'number': '+56911112222',
+            'text': 'Hola bot silenciado'
+        }
+        # Call agent
+        response = self.api_client.post(
+            url, data, format='json', HTTP_X_MECANIA_SECRET_KEY="test-secret-key-12345"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["reply"])
+        
+        # 2. Key check in WhatsAppAgentView
+        response_auth = self.api_client.post(
+            url, data, format='json', HTTP_X_MECANIA_SECRET_KEY="wrong-key"
+        )
+        self.assertEqual(response_auth.status_code, status.HTTP_403_FORBIDDEN)
+        
+        settings.INTERNAL_API_KEY = old_internal_key
+
+    def test_whatsapp_logout_proxy(self):
+        url = reverse('whatsapp_logout')
+        from unittest.mock import patch, MagicMock
+        with patch('requests.post') as mock_post:
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_post.return_value = mock_resp
+            
+            # 1. Unauthenticated request should fail
+            self.api_client.force_authenticate(user=None)  # Remove authentication
+            response = self.api_client.post(url, format='json')
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+            
+            # 2. Authenticated request sends key to whatsapp service
+            user = User.objects.create_user(username="tech2", password="password")
+            self.api_client.force_authenticate(user=user)
+            
+            old_internal_key = getattr(settings, 'INTERNAL_API_KEY', None)
+            settings.INTERNAL_API_KEY = "test-secret-key-12345"
+            
+            try:
+                response = self.api_client.post(url, format='json')
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(response.data["success"], True)
+                
+                # Verify Mock was called with correct header
+                mock_post.assert_called_once()
+                called_kwargs = mock_post.call_args[1]
+                self.assertEqual(called_kwargs['headers']['X-Mecania-Secret-Key'], "test-secret-key-12345")
+            finally:
+                settings.INTERNAL_API_KEY = old_internal_key

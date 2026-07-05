@@ -334,7 +334,7 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
     }
 });
 
-app.post('/api/logout', async (req, res) => {
+app.post('/api/logout', requireInternalKey, async (req, res) => {
     try {
         console.log('Solicitud manual de desconexión recibida...');
         if (sock) {
