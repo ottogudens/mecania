@@ -46,14 +46,13 @@ async function syncSessionFromDB() {
         
         let count = 0;
         for (const [filename, content] of Object.entries(files)) {
-            const isReallyEssential = filename === 'creds.json' || filename.startsWith('app-state-sync-key-');
-            if (!isReallyEssential) continue;
+            if (!filename.endsWith('.json')) continue;
             
             const filepath = path.join(AUTH_DIR, filename);
             fs.writeFileSync(filepath, content, 'utf-8');
             count++;
         }
-        console.log(`Sesión descargada de la base de datos. ${count} archivos esenciales sincronizados.`);
+        console.log(`Sesión descargada de la base de datos. ${count} archivos de autenticación sincronizados.`);
     } catch (err) {
         console.error('Error al descargar sesión de WhatsApp:', err.message);
     }
@@ -88,39 +87,21 @@ function scheduleSync() {
     }
 }
 
-// Inicia el monitor del directorio local para sincronizar escrituras/eliminaciones en Django
-function startWatchingSession() {
-    if (!fs.existsSync(AUTH_DIR)) {
-        fs.mkdirSync(AUTH_DIR, { recursive: true });
-    }
-
-    fs.watch(AUTH_DIR, async (eventType, filename) => {
-        if (!filename) return;
-        
-        const isEssential = filename === 'creds.json' || filename.startsWith('app-state-sync-key-');
-        if (!isEssential) return;
-        
-        const filepath = path.join(AUTH_DIR, filename);
-        
-        try {
-            if (fs.existsSync(filepath)) {
-                // Archivo creado o modificado
-                const stats = fs.statSync(filepath);
-                if (stats.isFile()) {
-                    const content = fs.readFileSync(filepath, 'utf-8');
-                    pendingSync[filename] = content;
-                    scheduleSync();
-                }
-            } else {
-                // Archivo eliminado
-                pendingSync[filename] = ''; // Indicar eliminación
-                scheduleSync();
-            }
-        } catch (err) {
-            console.error(`Error al preparar sincronización del archivo (${filename}):`, err.message);
+// Prepara la sincronización del archivo local especifico en la base de datos
+async function syncFileToDB(filename) {
+    if (!filename.endsWith('.json')) return;
+    const filepath = path.join(AUTH_DIR, filename);
+    try {
+        if (fs.existsSync(filepath)) {
+            const content = fs.readFileSync(filepath, 'utf-8');
+            pendingSync[filename] = content;
+        } else {
+            pendingSync[filename] = ''; // Indicar eliminación
         }
-    });
-    console.log('Monitoreo y persistencia de sesión en lote (batch) activado.');
+        scheduleSync();
+    } catch (err) {
+        console.error(`Error preparando sincronización de archivo (${filename}):`, err.message);
+    }
 }
 
 // Limpia las credenciales locales y de la base de datos si la conexión fue cerrada por logout o conflicto
@@ -158,10 +139,27 @@ async function connectToWhatsApp() {
     // 1. Descargar credenciales persistentes antes de conectar
     await syncSessionFromDB();
 
-    // 2. Iniciar monitoreo del disco local
-    startWatchingSession();
-
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+
+    // Instalar ganchos (hooks) explícitos para sincronizar el estado Baileys en caliente
+    const originalSaveCreds = saveCreds;
+    const wrappedSaveCreds = async () => {
+        await originalSaveCreds();
+        await syncFileToDB('creds.json');
+    };
+
+    const originalSetKeys = state.keys.set;
+    state.keys.set = async (data) => {
+        await originalSetKeys(data);
+        const syncTasks = [];
+        for (const category in data) {
+            for (const id in data[category]) {
+                const filename = `${category}-${id}.json`;
+                syncTasks.push(syncFileToDB(filename));
+            }
+        }
+        await Promise.all(syncTasks);
+    };
 
     sock = makeWASocket({
         auth: state,
@@ -206,7 +204,7 @@ async function connectToWhatsApp() {
         }
     });
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', wrappedSaveCreds);
 
     // Escuchar mensajes entrantes de clientes para automatizar el agente de ventas con IA
     sock.ev.on('messages.upsert', async (m) => {
