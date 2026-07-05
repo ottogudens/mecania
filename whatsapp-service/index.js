@@ -26,35 +26,38 @@ let sock = null;
 let currentQr = null;
 let connectionStatus = 'disconnected';
 
-// Descarga sesión guardada desde la base de datos de Django
+// Descarga sesión guardada desde la base de datos de Django con reintentos robustos en caso de fallo de red/servidor
 async function syncSessionFromDB() {
-    try {
-        // Si ya existe el archivo de credenciales local creds.json, priorizamos la sesión local y no sobrescribimos
-        const credsFile = path.join(AUTH_DIR, 'creds.json');
-        if (fs.existsSync(credsFile)) {
-            console.log('Sesión local activa encontrada (creds.json). Omitiendo descarga para evitar pérdidas de vinculación.');
-            return;
-        }
+    const credsFile = path.join(AUTH_DIR, 'creds.json');
+    if (fs.existsSync(credsFile)) {
+        console.log('Sesión local activa encontrada (creds.json). Omitiendo descarga para evitar pérdidas de vinculación.');
+        return;
+    }
 
-        console.log('Descargando sesión de WhatsApp desde la base de datos...');
-        const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`);
-        const files = response.data;
-        
-        if (!fs.existsSync(AUTH_DIR)) {
-            fs.mkdirSync(AUTH_DIR, { recursive: true });
-        }
-        
-        let count = 0;
-        for (const [filename, content] of Object.entries(files)) {
-            if (!filename.endsWith('.json')) continue;
+    while (true) {
+        try {
+            console.log('Descargando sesión de WhatsApp desde la base de datos...');
+            const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`, { timeout: 10000 });
+            const files = response.data;
             
-            const filepath = path.join(AUTH_DIR, filename);
-            fs.writeFileSync(filepath, content, 'utf-8');
-            count++;
+            if (!fs.existsSync(AUTH_DIR)) {
+                fs.mkdirSync(AUTH_DIR, { recursive: true });
+            }
+            
+            let count = 0;
+            for (const [filename, content] of Object.entries(files)) {
+                if (!filename.endsWith('.json')) continue;
+                
+                const filepath = path.join(AUTH_DIR, filename);
+                fs.writeFileSync(filepath, content, 'utf-8');
+                count++;
+            }
+            console.log(`Sesión descargada de la base de datos. ${count} archivos de autenticación sincronizados.`);
+            break; // Descarga exitosa, salir del bucle
+        } catch (err) {
+            console.error('Error al descargar sesión de WhatsApp, reintentando en 5 segundos:', err.message);
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
-        console.log(`Sesión descargada de la base de datos. ${count} archivos de autenticación sincronizados.`);
-    } catch (err) {
-        console.error('Error al descargar sesión de WhatsApp:', err.message);
     }
 }
 
