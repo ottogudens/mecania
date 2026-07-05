@@ -135,6 +135,31 @@ async function clearSession() {
     }
 }
 
+function getMessageText(message) {
+    if (!message) return '';
+    if (message.ephemeralMessage?.message) {
+        message = message.ephemeralMessage.message;
+    }
+    if (message.viewOnceMessage?.message) {
+        message = message.viewOnceMessage.message;
+    }
+    if (message.viewOnceMessageV2?.message) {
+        message = message.viewOnceMessageV2.message;
+    }
+    if (message.documentWithCaptionMessage?.message) {
+        message = message.documentWithCaptionMessage.message;
+    }
+    return message.conversation || 
+           message.extendedTextMessage?.text || 
+           message.imageMessage?.caption || 
+           message.videoMessage?.caption ||
+           message.documentMessage?.caption ||
+           message.buttonsResponseMessage?.selectedButtonId ||
+           message.listResponseMessage?.singleSelectReply?.selectedRowId ||
+           message.templateButtonReplyMessage?.selectedId ||
+           '';
+}
+
 async function connectToWhatsApp() {
     // 1. Descargar credenciales persistentes antes de conectar
     await syncSessionFromDB();
@@ -217,7 +242,7 @@ async function connectToWhatsApp() {
             if (!senderJid || !senderJid.endsWith('@s.whatsapp.net')) return;
 
             // Extraer texto
-            const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+            const text = getMessageText(msg.message);
             if (!text || text.trim() === '') return;
 
             console.log(`Mensaje entrante de ${senderJid}: "${text}"`);
@@ -234,7 +259,7 @@ async function connectToWhatsApp() {
                 await sock.sendMessage(senderJid, { text: replyText });
             }
         } catch (err) {
-            console.error('Error al responder mensaje vía IA:', err.message);
+            console.error('Error al responder mensaje vía IA:', err.message, err.response?.data || err);
         }
     });
 }

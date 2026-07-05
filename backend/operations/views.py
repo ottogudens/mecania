@@ -1211,11 +1211,19 @@ class WhatsAppChatListView(APIView):
                     "vehicles": vehicles_list
                 }
 
+            client_name = client_info["name"] if client_info else "Desconocido"
+            client_id = client_info["id"] if client_info else None
+            vehicles_list = client_info["vehicles"] if client_info else []
+
             chats.append({
                 "phone": phone,
                 "last_message": last_msg.text if last_msg else "",
                 "last_sender": last_msg.sender if last_msg else "client",
                 "last_timestamp": chat['last_timestamp'],
+                "last_time": chat['last_timestamp'].isoformat() if chat['last_timestamp'] else None,
+                "client_name": client_name,
+                "client_id": client_id,
+                "vehicles": vehicles_list,
                 "client": client_info
             })
 
@@ -1227,11 +1235,17 @@ class WhatsAppMessageListView(APIView):
 
     def get(self, request):
         from .models import WhatsAppMessage
-        phone = request.query_params.get('phone')
+        from django.db.models import Q
+        phone = request.query_params.get('phone', '').strip().replace(' ', '+')
         if not phone:
             return Response({'error': 'Parámetro phone es requerido'}, status=400)
 
-        messages = WhatsAppMessage.objects.filter(phone=phone).order_by('timestamp')
+        if phone.startswith('+'):
+            alt_phone = phone[1:]
+        else:
+            alt_phone = '+' + phone
+
+        messages = WhatsAppMessage.objects.filter(Q(phone=phone) | Q(phone=alt_phone)).order_by('timestamp')
         serializer = WhatsAppMessageSerializer(messages, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
