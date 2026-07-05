@@ -20,7 +20,17 @@ if (!tempBackendUrl) {
     }
 }
 const BACKEND_URL = tempBackendUrl;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'mecania-default-internal-secret-token-key-2026';
 const AUTH_DIR = 'auth_info_baileys';
+
+// Middleware for validating internal API Requests from Django
+function requireInternalKey(req, res, next) {
+    const providedKey = req.headers['x-mecania-secret-key'];
+    if (INTERNAL_API_KEY && providedKey !== INTERNAL_API_KEY) {
+        return res.status(403).json({ error: 'Unauthorized: invalid or missing API Key' });
+    }
+    next();
+}
 
 let sock = null;
 let currentQr = null;
@@ -37,7 +47,10 @@ async function syncSessionFromDB() {
     while (true) {
         try {
             console.log('Descargando sesión de WhatsApp desde la base de datos...');
-            const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`, { timeout: 10000 });
+            const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
+                headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
+                timeout: 10000
+            });
             const files = response.data;
             
             if (!fs.existsSync(AUTH_DIR)) {
@@ -75,6 +88,8 @@ async function flushSync() {
         console.log(`Sincronizando lote de ${Object.keys(batch).length} archivos con el backend...`);
         await axios.post(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
             batch: batch
+        }, {
+            headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY }
         });
     } catch (err) {
         console.error('Error al sincronizar lote de sesión de WhatsApp:', err.message);
@@ -131,7 +146,9 @@ async function clearSession() {
     
     // 2. Borrar sesión en la base de datos de Django
     try {
-        await axios.delete(`${BACKEND_URL}/api/operations/whatsapp-session/`);
+        await axios.delete(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
+            headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY }
+        });
         console.log('Sesión remota eliminada de la base de datos.');
     } catch (err) {
         console.error('Error al eliminar sesión remota de la base de datos:', err.message);
@@ -254,7 +271,10 @@ async function connectToWhatsApp() {
             const response = await axios.post(`${BACKEND_URL}/api/ai/whatsapp-agent/`, {
                 number: senderJid,
                 text: text
-            }, { timeout: 15000 });
+            }, {
+                headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
+                timeout: 15000
+            });
 
             if (response.data && response.data.reply) {
                 const replyText = response.data.reply;
@@ -280,7 +300,7 @@ app.get('/api/status', (req, res) => {
     });
 });
 
-app.post('/api/send-message', async (req, res) => {
+app.post('/api/send-message', requireInternalKey, async (req, res) => {
     try {
         const { number, text, documentUrl, fileName } = req.body;
         

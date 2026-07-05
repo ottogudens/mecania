@@ -1099,13 +1099,58 @@ class WhatsAppSessionView(APIView):
     permission_classes = []
     authentication_classes = []
 
+    def _validate_internal_key(self, request):
+        from django.conf import settings
+        expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        provided_key = request.headers.get('X-Mecania-Secret-Key') or request.META.get('HTTP_X_MECANIA_SECRET_KEY')
+        if expected_key and provided_key != expected_key:
+            return False
+        return True
+
+    def _encrypt_data(self, data):
+        import base64
+        from cryptography.fernet import Fernet
+        from django.conf import settings
+        if not data:
+            return data
+        key = settings.SECRET_KEY.encode('utf-8')
+        if len(key) < 32:
+            key = key.ljust(32, b'\0')
+        else:
+            key = key[:32]
+        b64_key = base64.urlsafe_b64encode(key)
+        f = Fernet(b64_key)
+        return f.encrypt(data.encode('utf-8')).decode('utf-8')
+
+    def _decrypt_data(self, data):
+        import base64
+        from cryptography.fernet import Fernet
+        from django.conf import settings
+        if not data:
+            return data
+        key = settings.SECRET_KEY.encode('utf-8')
+        if len(key) < 32:
+            key = key.ljust(32, b'\0')
+        else:
+            key = key[:32]
+        b64_key = base64.urlsafe_b64encode(key)
+        f = Fernet(b64_key)
+        try:
+            return f.decrypt(data.encode('utf-8')).decode('utf-8')
+        except Exception:
+            return data
+
     def get(self, request):
+        if not self._validate_internal_key(request):
+            return Response({'error': 'Unauthorized'}, status=403)
         from .models import WhatsAppSession
         sessions = WhatsAppSession.objects.all()
-        data = {s.key: s.data for s in sessions}
+        data = {s.key: self._decrypt_data(s.data) for s in sessions}
         return Response(data)
 
     def post(self, request):
+        if not self._validate_internal_key(request):
+            return Response({'error': 'Unauthorized'}, status=403)
         from .models import WhatsAppSession
         
         batch = request.data.get('batch')
@@ -1117,9 +1162,10 @@ class WhatsAppSessionView(APIView):
                     if data is None or data == '':
                         WhatsAppSession.objects.filter(key=key).delete()
                     else:
+                        encrypted_data = self._encrypt_data(data)
                         WhatsAppSession.objects.update_or_create(
                             key=key,
-                            defaults={'data': data}
+                            defaults={'data': encrypted_data}
                         )
             return Response({'success': True, 'action': 'batch_saved'})
 
@@ -1134,13 +1180,16 @@ class WhatsAppSessionView(APIView):
             WhatsAppSession.objects.filter(key=key).delete()
             return Response({'success': True, 'action': 'deleted'})
 
+        encrypted_data = self._encrypt_data(data)
         session_obj, created = WhatsAppSession.objects.update_or_create(
             key=key,
-            defaults={'data': data}
+            defaults={'data': encrypted_data}
         )
         return Response({'success': True, 'action': 'saved'})
 
     def delete(self, request):
+        if not self._validate_internal_key(request):
+            return Response({'error': 'Unauthorized'}, status=403)
         from .models import WhatsAppSession
         WhatsAppSession.objects.all().delete()
         return Response({'success': True, 'action': 'cleared'})
@@ -1267,14 +1316,26 @@ class WhatsAppManualSendView(APIView):
             suffix = clean_num[-8:]
             client_obj = Client.objects.filter(phone__icontains=suffix).first()
 
+        if client_obj:
+            from django.utils import timezone
+            from datetime import timedelta
+            client_obj.bot_silenced_until = timezone.now() + timedelta(hours=2)
+            client_obj.save(update_fields=['bot_silenced_until'])
+
         try:
             base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
             whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
 
+            from django.conf import settings
+            expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+            headers = {}
+            if expected_key:
+                headers['X-Mecania-Secret-Key'] = expected_key
+
             resp = requests.post(whatsapp_service_url, json={
                 "number": phone,
                 "text": text,
-            }, timeout=10)
+            }, headers=headers, timeout=10)
 
             msg = WhatsAppMessage.objects.create(
                 phone=phone,
@@ -1288,7 +1349,6 @@ class WhatsAppManualSendView(APIView):
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 return Response({'error': f'El microservicio respondió con status: {resp.status_code}'}, status=status.HTTP_502_BAD_GATEWAY)
-
         except Exception as e:
             return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

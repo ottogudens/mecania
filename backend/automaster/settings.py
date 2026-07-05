@@ -27,6 +27,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY', default='django-insecure-dev-only-change-in-production!!')
+INTERNAL_API_KEY = env('INTERNAL_API_KEY', default='mecania-default-internal-secret-token-key-2026')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=True)

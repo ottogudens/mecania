@@ -82,6 +82,14 @@ class WhatsAppAgentView(APIView):
 
     def post(self, request):
         import json
+        
+        # Validar la clave secreta interna
+        from django.conf import settings
+        expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        provided_key = request.headers.get('X-Mecania-Secret-Key') or request.META.get('HTTP_X_MECANIA_SECRET_KEY')
+        if expected_key and provided_key != expected_key:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
         number = request.data.get('number', '').strip()
         text = request.data.get('text', '').strip()
 
@@ -97,8 +105,19 @@ class WhatsAppAgentView(APIView):
         # Buscar cliente por teléfono (flexibilidad de búsqueda con/sin +)
         from operations.models import Client, WorkshopSettings, WorkOrder, WhatsAppFlow, Vehicle, validate_license_plate, WhatsAppMessage
         from django.core.exceptions import ValidationError
+        from django.utils import timezone
         
         client_obj = Client.objects.filter(phone__icontains=clean_num[-8:]).first()
+
+        # Si el bot está silenciado para este cliente por intervención humana reciente, no responder
+        if client_obj and client_obj.bot_silenced_until and client_obj.bot_silenced_until > timezone.now():
+            WhatsAppMessage.objects.create(
+                phone=clean_num,
+                client=client_obj,
+                sender='client',
+                text=text
+            )
+            return Response({"reply": None}, status=status.HTTP_200_OK)
 
         # Guardar el mensaje entrante del cliente
         WhatsAppMessage.objects.create(

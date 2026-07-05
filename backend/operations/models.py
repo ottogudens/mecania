@@ -54,6 +54,11 @@ class Client(models.Model):
         default=False,
         help_text="Indica si el cliente tiene acceso al portal.",
     )
+    bot_silenced_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Silencia el asistente de IA para este cliente hasta esta fecha/hora."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def set_pin(self, raw_pin):
