@@ -95,10 +95,30 @@ class WhatsAppAgentView(APIView):
             clean_num = '+' + clean_num
 
         # Buscar cliente por teléfono (flexibilidad de búsqueda con/sin +)
-        from operations.models import Client, WorkshopSettings, WorkOrder, WhatsAppFlow, Vehicle, validate_license_plate
+        from operations.models import Client, WorkshopSettings, WorkOrder, WhatsAppFlow, Vehicle, validate_license_plate, WhatsAppMessage
         from django.core.exceptions import ValidationError
         
         client_obj = Client.objects.filter(phone__icontains=clean_num[-8:]).first()
+
+        # Guardar el mensaje entrante del cliente
+        WhatsAppMessage.objects.create(
+            phone=clean_num,
+            client=client_obj,
+            sender='client',
+            text=text
+        )
+
+        def save_and_response(reply_text, extra_props=None):
+            WhatsAppMessage.objects.create(
+                phone=clean_num,
+                client=client_obj,
+                sender='assistant',
+                text=reply_text
+            )
+            data = {"reply": reply_text}
+            if extra_props:
+                data.update(extra_props)
+            return Response(data, status=status.HTTP_200_OK)
 
         # Buscar coincidencias con los flujos activos configurados (similar al sistema de keywords/flows de BuilderBot)
         active_flows = WhatsAppFlow.objects.filter(is_active=True)
@@ -129,7 +149,7 @@ class WhatsAppAgentView(APIView):
         # Procesar flujos con respuestas estáticas o acciones directas
         if matched_flow:
             if matched_flow.action_type == 'static':
-                return Response({"reply": matched_flow.response_text}, status=status.HTTP_200_OK)
+                return save_and_response(matched_flow.response_text)
                 
             elif matched_flow.action_type == 'portal_link':
                 if client_obj:
@@ -139,13 +159,13 @@ class WhatsAppAgentView(APIView):
                 
                 if matched_flow.response_text.strip():
                     reply_msg = matched_flow.response_text.replace('{link}', 'https://mecania.skale.cl/client')
-                return Response({"reply": reply_msg}, status=status.HTTP_200_OK)
+                return save_and_response(reply_msg)
                 
             elif matched_flow.action_type == 'human_transfer':
                 reply_msg = "He pausado la automatización y he notificado a nuestro equipo. Un asesor técnico se comunicará contigo en breves minutos."
                 if matched_flow.response_text.strip():
                     reply_msg = matched_flow.response_text
-                return Response({"reply": reply_msg, "action": "human_transfer"}, status=status.HTTP_200_OK)
+                return save_and_response(reply_msg, {"action": "human_transfer"})
 
         # 2. Recolectar contexto del cliente y vehículos
         client_context = "Cliente: Anónimo / No registrado.\n"
@@ -346,14 +366,13 @@ class WhatsAppAgentView(APIView):
                         model = func_args.get("model")
                         year = func_args.get("year")
 
-                        # Re-buscar el cliente en caso de que se haya creado en una llamada previa de esta misma interacción
+                        # Re-buscar el cliente
                         current_client = Client.objects.filter(phone__icontains=clean_num[-8:]).first()
 
                         if not current_client:
                             tool_result = "Error: Primero debes registrar los datos del cliente (nombre y apellido) usando register_client, antes de registrar el vehículo."
                         else:
                             try:
-                                # Validar formato patente chilena
                                 validate_license_plate(raw_plate)
 
                                 vehicle_obj, v_created = Vehicle.objects.update_or_create(
@@ -393,7 +412,16 @@ class WhatsAppAgentView(APIView):
             else:
                 reply = assistant_msg.content
 
-            return Response({"reply": reply}, status=status.HTTP_200_OK)
+            return save_and_response(reply)
         except Exception as e:
-            return Response({"error": f"Error de IA: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # Fallback robusto en caso de error de OpenAI
+            # Buscar el flujo de respuesta por defecto (Fallback / Default)
+            fallback_flow = WhatsAppFlow.objects.filter(is_active=True, trigger_type='default').first()
+            if fallback_flow and fallback_flow.response_text.strip():
+                reply = fallback_flow.response_text
+            else:
+                reply = f"Hola, gracias por comunicarte con {workshop.name or 'nuestro taller'}. En este momento estamos experimentando una conexión lenta. Si tienes alguna urgencia, por favor llámanos directamente al número {workshop.phone or 'de contacto'} o visítanos en {workshop.address or 'nuestro taller'}. ¡Estaremos encantados de ayudarte!"
+            
+            return save_and_response(reply, {"openai_error": str(e)})
+
 

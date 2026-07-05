@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
     WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
-    WhatsAppFlow, WhatsAppSession
+    WhatsAppFlow, WhatsAppSession, WhatsAppMessage
 )
 
 
@@ -66,4 +66,12 @@ class WhatsAppFlowAdmin(admin.ModelAdmin):
     list_display = ('name', 'trigger_type', 'action_type', 'is_active', 'created_at')
     list_filter = ('trigger_type', 'action_type', 'is_active')
     search_fields = ('name', 'keywords', 'response_text')
+
+
+@admin.register(WhatsAppMessage)
+class WhatsAppMessageAdmin(admin.ModelAdmin):
+    list_display = ('sender', 'phone', 'client', 'timestamp')
+    list_filter = ('sender', 'timestamp')
+    search_fields = ('phone', 'text', 'client__first_name', 'client__last_name')
+
 

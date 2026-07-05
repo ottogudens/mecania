@@ -19,6 +19,7 @@ import UserManager from './components/UserManager';
 import MechanicPortal from './components/MechanicPortal';
 import MobileScanner from './components/MobileScanner';
 import { ToastProvider } from './components/Toast';
+import WhatsAppChat from './components/WhatsAppChat';
 
 /* ── Icons (inline SVG, no extra dep) ── */
 const Icon = ({ path, size = 18, ...props }) => (
@@ -51,7 +52,8 @@ const ICONS = {
   menu:       'M4 6h16M4 12h16M4 18h16',
   car:        'M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2h-2M14 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM5 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
   users:      'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm14 0-3 3m0 0-3-3m3 3V8',
-  scan:       'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z'
+  scan:       'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10z',
+  chat:       'M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z'
 };
 
 const NAV_ITEMS = [
@@ -62,6 +64,7 @@ const NAV_ITEMS = [
   { id: 'scan',       label: 'Escanear Stock',      icon: 'scan' },
   { id: 'clients',    label: 'Clientes',            icon: 'clients' },
   { id: 'vehicles',   label: 'Vehículos',           icon: 'car' },
+  { id: 'whatsapp_chat', label: 'Chat de WhatsApp', icon: 'chat' },
   { id: 'finance',    label: 'Finanzas',            icon: 'finance' },
   { id: 'pos',        label: 'Punto de Venta',      icon: 'pos' },
   { id: 'history',    label: 'Caja / Historial',    icon: 'history' },
@@ -78,6 +81,7 @@ const PAGE_TITLES = {
   scan:       { title: 'Escanear Stock',      subtitle: 'Busca, edita o actualiza el stock con tu cámara móvil' },
   clients:    { title: 'Clientes',            subtitle: 'Directorio y contacto de clientes' },
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
+  whatsapp_chat: { title: 'Chat de WhatsApp', subtitle: 'Atención al cliente y control del asistente de IA' },
   finance:    { title: 'Finanzas',            subtitle: 'Boletas, facturas y pagos del taller' },
   pos:        { title: 'Punto de Venta',      subtitle: 'Caja rápida y venta directa de repuestos' },
   history:    { title: 'Control de Caja y Ventas',    subtitle: 'Arqueo de caja, reporte X e historial de pagos' },
@@ -120,7 +124,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 
         <nav className="sidebar-nav">
           <div className="nav-section-label">Principal</div>
-          {NAV_ITEMS.slice(0, 7).map(item => (
+          {NAV_ITEMS.slice(0, 8).map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -135,7 +139,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           ))}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas</div>
-          {NAV_ITEMS.slice(7, 11).map(item => (
+          {NAV_ITEMS.slice(8, 12).map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -150,7 +154,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           ))}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Sistema</div>
-          {NAV_ITEMS.slice(11).map(item => (
+          {NAV_ITEMS.slice(12).map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -218,6 +222,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     scan:       <MobileScanner />,
     clients:    <ClientList />,
     vehicles:   <VehicleList />,
+    whatsapp_chat: <WhatsAppChat />,
     finance:    <FinanceDashboard />,
     pos:        <POSDashboard onNavigate={setActiveTab} />,
     history:    <CashRegister />,

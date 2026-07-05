@@ -358,3 +358,25 @@ class WhatsAppFlow(models.Model):
         return f"{self.name} ({self.get_trigger_type_display()} -> {self.get_action_type_display()})"
 
 
+class WhatsAppMessage(models.Model):
+    SENDER_CHOICES = [
+        ('client', 'Cliente'),
+        ('assistant', 'Asistente IA'),
+        ('operator', 'Operador Humano')
+    ]
+    phone = models.CharField(max_length=50, help_text="Número de teléfono del remitente o destinatario.")
+    client = models.ForeignKey(Client, on_delete=models.SET_NULL, null=True, blank=True, related_name='whatsapp_messages')
+    sender = models.CharField(max_length=20, choices=SENDER_CHOICES, default='client')
+    text = models.TextField(help_text="Contenido del mensaje.")
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['timestamp']
+        verbose_name = "Mensaje de WhatsApp"
+        verbose_name_plural = "Mensajes de WhatsApp"
+
+    def __str__(self):
+        return f"{self.sender} -> {self.phone} ({self.timestamp})"
+
+
+

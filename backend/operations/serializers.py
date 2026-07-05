@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
     WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
-    WhatsAppFlow
+    WhatsAppFlow, WhatsAppMessage
 )
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -195,4 +195,19 @@ class WhatsAppFlowSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhatsAppFlow
         fields = '__all__'
+
+
+class WhatsAppMessageSerializer(serializers.ModelSerializer):
+    client_name = serializers.SerializerMethodField(read_only=True)
+    sender_display = serializers.CharField(source='get_sender_display', read_only=True)
+
+    class Meta:
+        model = WhatsAppMessage
+        fields = ['id', 'phone', 'client', 'client_name', 'sender', 'sender_display', 'text', 'timestamp']
+
+    def get_client_name(self, obj):
+        if obj.client:
+            return f"{obj.client.first_name} {obj.client.last_name}"
+        return None
+
 

@@ -8,7 +8,7 @@ from .views import (
     DashboardStatsView, UserViewSet,
     VehiclePartViewSet, MaintenanceRecordViewSet,
     ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView,
-    WhatsAppFlowViewSet
+    WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView
 )
 
 router = DefaultRouter()
@@ -39,5 +39,9 @@ urlpatterns = [
     path('ai-transcribe/', AITranscribeView.as_view(), name='ai_transcribe'),
     # WhatsApp session persistence
     path('whatsapp-session/', WhatsAppSessionView.as_view(), name='whatsapp_session'),
+    # WhatsApp Chat history and manual messaging
+    path('whatsapp-messages/', WhatsAppMessageListView.as_view(), name='whatsapp_messages'),
+    path('whatsapp-messages/chats/', WhatsAppChatListView.as_view(), name='whatsapp_chats'),
+    path('whatsapp-messages/send-manual/', WhatsAppManualSendView.as_view(), name='whatsapp_send_manual'),
     path('', include(router.urls)),
 ]

@@ -14,12 +14,12 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
     WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer,
     VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer,
-    WhatsAppFlowSerializer
+    WhatsAppFlowSerializer, WhatsAppMessageSerializer
 )
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
@@ -1151,5 +1151,132 @@ class WhatsAppFlowViewSet(viewsets.ModelViewSet):
     serializer_class = WhatsAppFlowSerializer
     queryset = WhatsAppFlow.objects.all().order_by('id')
     pagination_class = None
+
+
+class WhatsAppChatListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Max
+        from .models import WhatsAppMessage, Client
+
+        # Obtener los números de teléfono únicos y su último mensaje timestamp
+        chats_qs = WhatsAppMessage.objects.values('phone').annotate(
+            last_timestamp=Max('timestamp')
+        ).order_by('-last_timestamp')
+
+        chats = []
+        for chat in chats_qs:
+            phone = chat['phone']
+            last_msg = WhatsAppMessage.objects.filter(phone=phone).order_by('-timestamp').first()
+
+            # Intentar encontrar el cliente correspondiente
+            clean_num = ''.join(filter(str.isdigit, phone))
+            client_obj = None
+            if len(clean_num) >= 8:
+                suffix = clean_num[-8:]
+                client_obj = Client.objects.filter(phone__icontains=suffix).first()
+
+            client_info = None
+            if client_obj:
+                vehicles_list = []
+                try:
+                    for v in client_obj.vehicles.all():
+                        vehicles_list.append({
+                            "id": v.id,
+                            "make": v.make,
+                            "model": v.model,
+                            "year": v.year,
+                            "license_plate": v.license_plate
+                        })
+                except Exception:
+                    # Fallback in case relationship name is different
+                    try:
+                        for v in client_obj.vehicle_set.all():
+                            vehicles_list.append({
+                                "id": v.id,
+                                "make": v.make,
+                                "model": v.model,
+                                "year": v.year,
+                                "license_plate": v.license_plate
+                            })
+                    except Exception:
+                        pass
+
+                client_info = {
+                    "id": client_obj.id,
+                    "name": f"{client_obj.first_name} {client_obj.last_name}",
+                    "email": client_obj.email,
+                    "phone": client_obj.phone,
+                    "vehicles": vehicles_list
+                }
+
+            chats.append({
+                "phone": phone,
+                "last_message": last_msg.text if last_msg else "",
+                "last_sender": last_msg.sender if last_msg else "client",
+                "last_timestamp": chat['last_timestamp'],
+                "client": client_info
+            })
+
+        return Response(chats, status=status.HTTP_200_OK)
+
+
+class WhatsAppMessageListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import WhatsAppMessage
+        phone = request.query_params.get('phone')
+        if not phone:
+            return Response({'error': 'Parámetro phone es requerido'}, status=400)
+
+        messages = WhatsAppMessage.objects.filter(phone=phone).order_by('timestamp')
+        serializer = WhatsAppMessageSerializer(messages, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class WhatsAppManualSendView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import WhatsAppMessage, Client
+        phone = request.data.get('phone')
+        text = request.data.get('text')
+
+        if not phone or not text:
+            return Response({'error': 'phone y text son requeridos'}, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_num = ''.join(filter(str.isdigit, phone))
+        client_obj = None
+        if len(clean_num) >= 8:
+            suffix = clean_num[-8:]
+            client_obj = Client.objects.filter(phone__icontains=suffix).first()
+
+        try:
+            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+
+            resp = requests.post(whatsapp_service_url, json={
+                "number": phone,
+                "text": text,
+            }, timeout=10)
+
+            msg = WhatsAppMessage.objects.create(
+                phone=phone,
+                client=client_obj,
+                sender='operator',
+                text=text
+            )
+
+            if resp.status_code == 200:
+                serializer = WhatsAppMessageSerializer(msg)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': f'El microservicio respondió con status: {resp.status_code}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        except Exception as e:
+            return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 

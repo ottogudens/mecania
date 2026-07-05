@@ -11,7 +11,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
+let tempBackendUrl = process.env.BACKEND_URL || '';
+if (!tempBackendUrl) {
+    if (process.env.RAILWAY_SERVICE_BACKEND_URL) {
+        tempBackendUrl = `https://${process.env.RAILWAY_SERVICE_BACKEND_URL}`;
+    } else {
+        tempBackendUrl = 'http://localhost:8000';
+    }
+}
+const BACKEND_URL = tempBackendUrl;
 const AUTH_DIR = 'auth_info_baileys';
 
 let sock = null;
