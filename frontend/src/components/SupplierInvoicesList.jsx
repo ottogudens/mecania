@@ -51,9 +51,9 @@ export default function SupplierInvoicesList() {
         axios.get('/api/finance/suppliers/'),
         axios.get('/api/finance/supplier-payments/forecast/')
       ]);
-      setInvoices(invRes.data);
-      setSuppliers(supRes.data);
-      setForecast(foreRes.data);
+      setInvoices(invRes.data.results || invRes.data);
+      setSuppliers(supRes.data.results || supRes.data);
+      setForecast(foreRes.data.results || foreRes.data);
     } catch (err) {
       console.error(err);
       showToast('Error al cargar facturas y proyecciones.', 'error');

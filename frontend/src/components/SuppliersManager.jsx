@@ -26,7 +26,7 @@ export default function SuppliersManager() {
     try {
       setLoading(true);
       const res = await axios.get('/api/finance/suppliers/');
-      setSuppliers(res.data);
+      setSuppliers(res.data.results || res.data);
     } catch (err) {
       console.error(err);
       showToast('Error al cargar proveedores.', 'error');
