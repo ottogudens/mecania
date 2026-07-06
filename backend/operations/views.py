@@ -23,6 +23,82 @@ from .serializers import (
 )
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
+def draw_pdf_header_and_footer(canvas_obj, settings, title, doc_num, date_str, page_num=1):
+    from reportlab.lib import colors
+    import base64
+    import io
+    from reportlab.lib.utils import ImageReader
+
+    W, H = 612, 792 # letter size
+
+    # Top Teal colored band
+    canvas_obj.setFillColor(colors.HexColor('#0d9488'))
+    canvas_obj.rect(0, H - 8, W, 8, fill=1, stroke=0)
+
+    # Render logo if available
+    logo_drawn = False
+    if settings.logo:
+        try:
+            logo_str = settings.logo.strip()
+            # Handle Data URL format
+            if logo_str.startswith('data:image'):
+                if ';base64,' in logo_str:
+                    header, data = logo_str.split(';base64,', 1)
+                    decoded = base64.b64decode(data)
+                    img = ImageReader(io.BytesIO(decoded))
+                    canvas_obj.drawImage(img, 45, H - 75, width=60, height=60, preserveAspectRatio=True, mask='auto')
+                    logo_drawn = True
+            else:
+                # Handle raw base64 (fallback)
+                decoded = base64.b64decode(logo_str)
+                img = ImageReader(io.BytesIO(decoded))
+                canvas_obj.drawImage(img, 45, H - 75, width=60, height=60, preserveAspectRatio=True, mask='auto')
+                logo_drawn = True
+        except Exception as e:
+            print("Logo parsing in PDF failed:", e)
+
+    # Draw Workshop Information
+    text_x = 115 if logo_drawn else 45
+    canvas_obj.setFillColor(colors.HexColor('#0f172a')) # Dark Slate
+    canvas_obj.setFont("Helvetica-Bold", 16)
+    canvas_obj.drawString(text_x, H - 42, settings.name)
+
+    canvas_obj.setFont("Helvetica", 9)
+    canvas_obj.setFillColor(colors.HexColor('#475569')) # Muted Slate
+    contact_parts = []
+    if settings.phone: contact_parts.append(f"Teléfono: {settings.phone}")
+    if settings.email: contact_parts.append(f"Email: {settings.email}")
+    canvas_obj.drawString(text_x, H - 56, " | ".join(contact_parts))
+    if settings.address:
+        canvas_obj.drawString(text_x, H - 70, settings.address)
+
+    # Draw Document Title & Date (Right aligned)
+    canvas_obj.setFillColor(colors.HexColor('#0d9488')) # Accent Teal
+    canvas_obj.setFont("Helvetica-Bold", 13)
+    canvas_obj.drawRightString(W - 45, H - 35, title.upper())
+
+    canvas_obj.setFillColor(colors.HexColor('#0f172a'))
+    canvas_obj.setFont("Helvetica-Bold", 12)
+    canvas_obj.drawRightString(W - 45, H - 50, doc_num)
+
+    canvas_obj.setFont("Helvetica", 9)
+    canvas_obj.setFillColor(colors.HexColor('#475569'))
+    canvas_obj.drawRightString(W - 45, H - 65, date_str)
+
+    # Draw decorative header/content divider bar
+    canvas_obj.setStrokeColor(colors.HexColor('#cbd5e1'))
+    canvas_obj.setLineWidth(1)
+    canvas_obj.line(45, H - 85, W - 45, H - 85)
+
+    # Standard Footer
+    canvas_obj.setFillColor(colors.HexColor('#64748b'))
+    canvas_obj.setStrokeColor(colors.HexColor('#cbd5e1'))
+    canvas_obj.setLineWidth(0.5)
+    canvas_obj.line(45, 45, W - 45, 45)
+    canvas_obj.drawString(45, 32, f"Documento de confianza generado por {settings.name} — MecanIA")
+    canvas_obj.drawRightString(W - 45, 32, f"Pág. {page_num}")
+
+
 class ClientViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = Client.objects.all().order_by('-id')
@@ -312,70 +388,89 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
 
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer, pagesize=letter)
-        
-        # Header
+        W, H = letter
+
         from operations.models import WorkshopSettings
         settings = WorkshopSettings.load()
-        if settings.logo:
-            try:
-                import base64
-                import io
-                from reportlab.lib.utils import ImageReader
-                
-                # Check if it is a base64 data URL
-                if settings.logo.startswith('data:image'):
-                    header, data = settings.logo.split(';base64,')
-                    decoded = base64.b64decode(data)
-                    img = ImageReader(io.BytesIO(decoded))
-                    p.drawImage(img, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
-            except Exception as e:
-                print("PDF Logo drawing failed:", e)
         
-        p.setFont("Helvetica-Bold", 24)
-        p.drawString(160, 750, settings.name)
-        p.setFont("Helvetica", 12)
-        p.drawString(160, 730, f"Teléfono: {settings.phone} | Email: {settings.email}")
-        p.drawString(160, 715, settings.address)
+        # Header using unified template
+        draw_pdf_header_and_footer(p, settings, "Orden de Trabajo", f"OT #{work_order.id}", f"Fecha: {work_order.created_at.strftime('%d/%m/%Y') if work_order.created_at else ''}", 1)
         
-        # Title
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(50, 680, f"Orden de Trabajo #{work_order.id}")
+        # Client and Vehicle Box
+        p.setFillColor(colors.HexColor('#f8fafc'))
+        p.setStrokeColor(colors.HexColor('#e2e8f0'))
+        p.roundRect(45, 595, 522, 75, 4, fill=True, stroke=True)
         
-        # Client and Vehicle Info
-        p.setFont("Helvetica", 12)
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(55, 652, "INFORMACIÓN DEL CLIENTE")
+        p.drawString(305, 652, "INFORMACIÓN DEL VEHÍCULO")
+        
+        p.setFont("Helvetica", 9)
+        p.setFillColor(colors.HexColor('#334155'))
         client_name = f"{client.first_name} {client.last_name}" if client else "Desconocido"
-        p.drawString(50, 650, f"Cliente: {client_name}")
-        p.drawString(50, 630, f"Vehículo: {vehicle.make} {vehicle.model} - Patente: {vehicle.license_plate}")
-        p.drawString(50, 610, f"Estado: {work_order.get_status_display()}")
+        client_phone = client.phone if client else "No registrado"
+        client_email = client.email if client else "No registrado"
+        p.drawString(55, 636, f"Nombre: {client_name}")
+        p.drawString(55, 622, f"Teléfono: {client_phone}")
+        p.drawString(55, 608, f"Email: {client_email}")
+        
+        p.drawString(305, 636, f"Placa Patente: {vehicle.license_plate}")
+        p.drawString(305, 622, f"Marca / Modelo: {vehicle.make} {vehicle.model}")
+        p.drawString(305, 608, f"Año / Estado: {vehicle.year} - {work_order.get_status_display()}")
         
         # Table Header
-        y = 570
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(50, y, "Descripción")
-        p.drawString(300, y, "Cantidad")
-        p.drawString(400, y, "Precio Unitario")
-        p.drawString(500, y, "Total")
-        p.line(50, y-5, 550, y-5)
+        y = 560
+        p.setFillColor(colors.HexColor('#1e293b'))
+        p.rect(45, y - 6, 522, 20, fill=True, stroke=False)
+        p.setFillColor(colors.white)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(55, y, "Descripción")
+        p.drawString(320, y, "Cant.")
+        p.drawRightString(460, y, "Precio Unitario")
+        p.drawRightString(550, y, "Total")
         
         # Items
-        y -= 25
-        p.setFont("Helvetica", 12)
+        y -= 22
+        p.setFont("Helvetica", 9)
         total_amount = 0
+        idx = 0
         for item in items:
             item_total = item.quantity * item.unit_price
             total_amount += item_total
-            p.drawString(50, y, str(item.description)[:35])
-            p.drawString(300, y, str(item.quantity))
-            p.drawString(400, y, f"${item.unit_price}")
-            p.drawString(500, y, f"${item_total}")
+            
+            # Alternating background colors for rows
+            if idx % 2 == 0:
+                p.setFillColor(colors.HexColor('#f8fafc'))
+            else:
+                p.setFillColor(colors.white)
+            p.rect(45, y - 4, 522, 18, fill=True, stroke=False)
+            
+            p.setFillColor(colors.HexColor('#1e293b'))
+            p.drawString(55, y, str(item.description)[:45])
+            p.drawString(320, y, f"{item.quantity}")
+            p.drawRightString(460, y, f"${item.unit_price:,.0f}")
+            p.drawRightString(550, y, f"${item_total:,.0f}")
             y -= 20
+            idx += 1
         
-        # Total
-        p.line(50, y-5, 550, y-5)
-        y -= 25
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(400, y, "Total:")
-        p.drawString(500, y, f"${total_amount}")
+        # Totals Section
+        y -= 10
+        p.setStrokeColor(colors.HexColor('#cbd5e1'))
+        p.setLineWidth(1)
+        p.line(45, y, 567, y)
+        y -= 22
+        p.setFont("Helvetica-Bold", 12)
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.drawRightString(460, y, "Monto Total:")
+        p.setFillColor(colors.HexColor('#0d9488'))
+        p.drawRightString(550, y, f"${total_amount:,.0f}")
+        
+        # Bottom text
+        y -= 45
+        p.setFillColor(colors.HexColor('#475569'))
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(45, y, "** Gracias por confiar en nuestro servicio técnico **")
         
         p.showPage()
         p.save()
@@ -427,39 +522,11 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
         
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer, pagesize=letter)
+        W, H = letter
         
         # Draw Header/Footer Helper
         def draw_header_footer(c, page_num):
-            # Header Logo
-            if settings.logo and settings.logo.startswith('data:image'):
-                try:
-                    header, data = settings.logo.split(';base64,')
-                    decoded = base64.b64decode(data)
-                    img = ImageReader(io.BytesIO(decoded))
-                    c.drawImage(img, 50, 715, width=80, preserveAspectRatio=True, mask='auto')
-                except Exception as e:
-                    print("VisualInspection PDF settings logo failed:", e)
-                    
-            c.setFont("Helvetica-Bold", 16)
-            c.setFillColor(colors.HexColor('#1e293b')) # Slate
-            c.drawString(140, 755, settings.name or "MecanIA Workshop")
-            
-            c.setFont("Helvetica", 9)
-            c.setFillColor(colors.HexColor('#64748b'))
-            c.drawString(140, 740, f"Teléfono: {settings.phone or ''} | Email: {settings.email or ''}")
-            c.drawString(140, 725, settings.address or '')
-            
-            # Line separator
-            c.setStrokeColor(colors.HexColor('#cbd5e1'))
-            c.setLineWidth(1)
-            c.line(50, 710, 562, 710)
-            
-            # Footer
-            c.setFillColor(colors.HexColor('#64748b'))
-            c.setStrokeColor(colors.HexColor('#cbd5e1'))
-            c.line(50, 45, 562, 45)
-            c.drawString(50, 32, "Informe generado por MecanIA - Sistema de Gestión de Talleres")
-            c.drawRightString(562, 32, f"Pág. {page_num}")
+            draw_pdf_header_and_footer(c, settings, "Informe de Inspección", f"INS-{inspection.id}", f"Fecha: {inspection.created_at.strftime('%d/%m/%Y') if inspection.created_at else ''}", page_num)
             
         page_num = 1
         draw_header_footer(p, page_num)

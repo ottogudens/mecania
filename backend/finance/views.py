@@ -6,7 +6,82 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
 from django.utils import timezone
-from operations.models import WorkOrder
+from operations.models import WorkOrder, WorkshopSettings
+
+def draw_pdf_header_and_footer(canvas_obj, settings, title, doc_num, date_str, page_num=1):
+    from reportlab.lib import colors
+    import base64
+    import io
+    from reportlab.lib.utils import ImageReader
+
+    W, H = 612, 792 # letter size
+
+    # Top Teal colored band
+    canvas_obj.setFillColor(colors.HexColor('#0d9488'))
+    canvas_obj.rect(0, H - 8, W, 8, fill=1, stroke=0)
+
+    # Render logo if available
+    logo_drawn = False
+    if settings.logo:
+        try:
+            logo_str = settings.logo.strip()
+            # Handle Data URL format
+            if logo_str.startswith('data:image'):
+                if ';base64,' in logo_str:
+                    header, data = logo_str.split(';base64,', 1)
+                    decoded = base64.b64decode(data)
+                    img = ImageReader(io.BytesIO(decoded))
+                    canvas_obj.drawImage(img, 45, H - 75, width=60, height=60, preserveAspectRatio=True, mask='auto')
+                    logo_drawn = True
+            else:
+                # Handle raw base64 (fallback)
+                decoded = base64.b64decode(logo_str)
+                img = ImageReader(io.BytesIO(decoded))
+                canvas_obj.drawImage(img, 45, H - 75, width=60, height=60, preserveAspectRatio=True, mask='auto')
+                logo_drawn = True
+        except Exception as e:
+            print("Logo parsing in PDF failed:", e)
+
+    # Draw Workshop Information
+    text_x = 115 if logo_drawn else 45
+    canvas_obj.setFillColor(colors.HexColor('#0f172a')) # Dark Slate
+    canvas_obj.setFont("Helvetica-Bold", 16)
+    canvas_obj.drawString(text_x, H - 42, settings.name)
+
+    canvas_obj.setFont("Helvetica", 9)
+    canvas_obj.setFillColor(colors.HexColor('#475569')) # Muted Slate
+    contact_parts = []
+    if settings.phone: contact_parts.append(f"Teléfono: {settings.phone}")
+    if settings.email: contact_parts.append(f"Email: {settings.email}")
+    canvas_obj.drawString(text_x, H - 56, " | ".join(contact_parts))
+    if settings.address:
+        canvas_obj.drawString(text_x, H - 70, settings.address)
+
+    # Draw Document Title & Date (Right aligned)
+    canvas_obj.setFillColor(colors.HexColor('#0d9488')) # Accent Teal
+    canvas_obj.setFont("Helvetica-Bold", 13)
+    canvas_obj.drawRightString(W - 45, H - 35, title.upper())
+
+    canvas_obj.setFillColor(colors.HexColor('#0f172a'))
+    canvas_obj.setFont("Helvetica-Bold", 12)
+    canvas_obj.drawRightString(W - 45, H - 50, doc_num)
+
+    canvas_obj.setFont("Helvetica", 9)
+    canvas_obj.setFillColor(colors.HexColor('#475569'))
+    canvas_obj.drawRightString(W - 45, H - 65, date_str)
+
+    # Draw decorative header/content divider bar
+    canvas_obj.setStrokeColor(colors.HexColor('#cbd5e1'))
+    canvas_obj.setLineWidth(1)
+    canvas_obj.line(45, H - 85, W - 45, H - 85)
+
+    # Standard Footer
+    canvas_obj.setFillColor(colors.HexColor('#64748b'))
+    canvas_obj.setStrokeColor(colors.HexColor('#cbd5e1'))
+    canvas_obj.setLineWidth(0.5)
+    canvas_obj.line(45, 45, W - 45, 45)
+    canvas_obj.drawString(45, 32, f"Documento de confianza generado por {settings.name} — MecanIA")
+    canvas_obj.drawRightString(W - 45, 32, f"Pág. {page_num}")
 from .models import (
     Invoice, InvoiceLineItem, Payment, CashRegisterSession,
     Supplier, SupplierInvoice, SupplierPaymentDocument, CashMovement
@@ -367,153 +442,127 @@ class InvoicePDFView(APIView):
         p = canvas.Canvas(buffer, pagesize=letter)
         W, H = letter  # 612 x 792 pts
 
-        # ── encabezado ──────────────────────────────────────────────────────
-        p.setFillColorRGB(0.07, 0.07, 0.1)
-        p.rect(0, H - 90, W, 90, fill=1, stroke=0)
+        settings = WorkshopSettings.load()
 
-        p.setFillColorRGB(0.4, 0.98, 0.95)
-        p.setFont("Helvetica-Bold", 26)
-        p.drawString(45, H - 48, "MecanIA")
+        # Header using unified template
+        draw_pdf_header_and_footer(p, settings, "Boleta / Factura", f"BOLETA #{invoice.id}", invoice.created_at.strftime("%d/%m/%Y %H:%M"), 1)
 
-        p.setFillColorRGB(0.77, 0.77, 0.78)
-        p.setFont("Helvetica", 10)
-        p.drawString(45, H - 66, "Taller Automotriz Inteligente")
-
-        # número de documento
-        doc_label = f"BOLETA #{invoice.id}"
-        p.setFillColorRGB(1, 1, 1)
-        p.setFont("Helvetica-Bold", 13)
-        p.drawRightString(W - 45, H - 42, doc_label)
-        p.setFont("Helvetica", 9)
-        p.setFillColorRGB(0.77, 0.77, 0.78)
-        p.drawRightString(W - 45, H - 58, invoice.created_at.strftime("%d/%m/%Y %H:%M"))
-
-        # ── origen ───────────────────────────────────────────────────────────
-        y = H - 115
-        p.setFillColorRGB(0.07, 0.07, 0.1)
-        p.rect(40, y - 8, W - 80, 26, fill=1, stroke=0)
-        p.setFillColorRGB(0.4, 0.98, 0.95)
+        # Client and Vehicle Box
+        p.setFillColor(colors.HexColor('#f8fafc'))
+        p.setStrokeColor(colors.HexColor('#e2e8f0'))
+        p.roundRect(45, 595, 522, 75, 4, fill=True, stroke=True)
+        
+        p.setFillColor(colors.HexColor('#0f172a'))
         p.setFont("Helvetica-Bold", 10)
-        origen = (
-            f"Orden de Trabajo #{invoice.work_order_id}"
-            if invoice.work_order_id
-            else "Venta de Mostrador"
-        )
-        p.drawString(50, y + 4, origen.upper())
-        if invoice.work_order_id:
-            plate = invoice.work_order.vehicle.license_plate if invoice.work_order else "–"
-            p.setFillColorRGB(0.77, 0.77, 0.78)
-            p.setFont("Helvetica", 9)
-            p.drawRightString(W - 50, y + 4, f"Patente: {plate}")
-
-        # ── cliente ──────────────────────────────────────────────────────────
-        y -= 40
-        p.setFillColorRGB(0.2, 0.2, 0.25)
-        p.setFont("Helvetica-Bold", 9)
-        p.drawString(50, y, "CLIENTE")
-        p.setFillColorRGB(0.93, 0.93, 0.94)
-        p.setFont("Helvetica", 10)
+        p.drawString(55, 652, "DURANTE LA TRANSACCIÓN")
+        p.drawString(305, 652, "CLIENTE / FACTURACIÓN")
+        
+        p.setFont("Helvetica", 9)
+        p.setFillColor(colors.HexColor('#334155'))
+        
+        origen = f"Orden de Trabajo #{invoice.work_order_id}" if invoice.work_order_id else "Venta de Mostrador"
+        p.drawString(55, 636, f"Origen: {origen}")
+        if invoice.work_order_id and invoice.work_order.vehicle:
+            plate = invoice.work_order.vehicle.license_plate
+            p.drawString(55, 622, f"Patente Vehículo: {plate}")
+        else:
+            p.drawString(55, 622, "N/A")
+        p.drawString(55, 608, f"Fecha de Emisión: {invoice.created_at.strftime('%d/%m/%Y')}")
+        
         client_name = "–"
+        c = None
         if invoice.client_id:
             c = invoice.client
             client_name = f"{c.first_name} {c.last_name}"
         elif invoice.work_order_id and invoice.work_order.vehicle.client_id:
             c = invoice.work_order.vehicle.client
             client_name = f"{c.first_name} {c.last_name}"
-        p.drawString(50, y - 14, client_name)
+            
+        p.drawString(305, 636, f"Nombre: {client_name}")
+        p.drawString(305, 622, f"Teléfono: {c.phone if c else 'No registrado'}")
+        p.drawString(305, 608, f"Email: {c.email if c else 'No registrado'}")
 
-        # ── separador ────────────────────────────────────────────────────────
-        y -= 40
-        p.setStrokeColorRGB(0.27, 0.64, 0.62)
-        p.setLineWidth(0.5)
-        p.line(40, y, W - 40, y)
-
-        # ── cabecera de tabla ─────────────────────────────────────────────────
-        y -= 18
-        p.setFillColorRGB(0.13, 0.16, 0.20)
-        p.rect(40, y - 6, W - 80, 20, fill=1, stroke=0)
-        p.setFillColorRGB(0.4, 0.98, 0.95)
+        # Table Header
+        y = 560
+        p.setFillColor(colors.HexColor('#1e293b'))
+        p.rect(45, y - 6, 522, 20, fill=True, stroke=False)
+        p.setFillColor(colors.white)
         p.setFont("Helvetica-Bold", 9)
-        cols = [(50, "DESCRIPCIÓN"), (330, "CANT."), (390, "P. UNITARIO"), (490, "TOTAL")]
-        for cx, lbl in cols:
-            p.drawString(cx, y + 2, lbl)
+        p.drawString(55, y, "Descripción")
+        p.drawString(320, y, "Cant.")
+        p.drawRightString(460, y, "Precio Unitario")
+        p.drawRightString(550, y, "Total")
 
-        # ── ítems ─────────────────────────────────────────────────────────────
+        # Items
         items = list(invoice.get_line_items())
         y -= 22
         p.setFont("Helvetica", 9)
-        row_fill = [(0.97, 0.97, 0.98), (1, 1, 1)]
-        for idx, item in enumerate(items):
-            row_h = 18
-            p.setFillColorRGB(*row_fill[idx % 2])
-            p.rect(40, y - 4, W - 80, row_h, fill=1, stroke=0)
-            p.setFillColorRGB(0.1, 0.1, 0.12)
+        idx = 0
+        for item in items:
+            # Alternating background colors for rows
+            if idx % 2 == 0:
+                p.setFillColor(colors.HexColor('#f8fafc'))
+            else:
+                p.setFillColor(colors.white)
+            p.rect(45, y - 4, 522, 18, fill=True, stroke=False)
+            
+            p.setFillColor(colors.HexColor('#1e293b'))
             desc = getattr(item, 'description', '') or ''
             if not desc:
-                # WorkOrderItem: usa product o description
                 desc = getattr(item, 'description', str(item))
-            p.drawString(50, y + 2, str(desc)[:48])
+            p.drawString(55, y, str(desc)[:45])
             qty = item.quantity if hasattr(item, 'quantity') else 1
             up = item.unit_price
             tot = item.total_price
-            p.drawString(335, y + 2, str(qty))
-            p.drawRightString(475, y + 2, f"${int(up):,}")
-            p.setFillColorRGB(0.07, 0.49, 0.47)
-            p.setFont("Helvetica-Bold", 9)
-            p.drawRightString(W - 48, y + 2, f"${int(tot):,}")
-            p.setFont("Helvetica", 9)
-            y -= row_h
+            p.drawString(320, y, f"{qty}")
+            p.drawRightString(460, y, f"${int(up):,}")
+            p.drawRightString(550, y, f"${int(tot):,}")
+            y -= 20
+            idx += 1
 
-        # ── totales ───────────────────────────────────────────────────────────
-        y -= 14
-        p.setStrokeColorRGB(0.27, 0.64, 0.62)
-        p.line(40, y, W - 40, y)
+        # Totals Section
+        y -= 10
+        p.setStrokeColor(colors.HexColor('#cbd5e1'))
+        p.setLineWidth(1)
+        p.line(45, y, 567, y)
 
         totals = [
             ("Subtotal", invoice.subtotal),
             ("IVA (19%)", invoice.tax_amount),
+            ("TOTAL", invoice.total_amount)
         ]
-        p.setFont("Helvetica", 10)
-        for lbl, val in totals:
+        
+        y -= 15
+        for label, val in totals:
+            if label == "TOTAL":
+                p.setFont("Helvetica-Bold", 12)
+                p.setFillColor(colors.HexColor('#0f172a'))
+                p.drawRightString(460, y, label)
+                p.setFillColor(colors.HexColor('#0d9488'))
+                p.drawRightString(550, y, f"${int(val):,}")
+            else:
+                p.setFont("Helvetica", 10)
+                p.setFillColor(colors.HexColor('#475569'))
+                p.drawRightString(460, y, label)
+                p.setFillColor(colors.HexColor('#1e293b'))
+                p.drawRightString(550, y, f"${int(val):,}")
             y -= 18
-            p.setFillColorRGB(0.4, 0.4, 0.45)
-            p.drawRightString(W - 120, y, lbl)
-            p.setFillColorRGB(0.1, 0.1, 0.12)
-            p.drawRightString(W - 48, y, f"${int(val):,}")
 
-        y -= 6
-        p.setStrokeColorRGB(0.07, 0.07, 0.1)
-        p.setLineWidth(1)
-        p.line(W - 200, y, W - 40, y)
-        y -= 20
-        p.setFont("Helvetica-Bold", 13)
-        p.setFillColorRGB(0.07, 0.07, 0.1)
-        p.drawRightString(W - 120, y, "TOTAL")
-        p.setFillColorRGB(0.07, 0.49, 0.47)
-        p.drawRightString(W - 48, y, f"${int(invoice.total_amount):,}")
-
-        # ── estado de pago ────────────────────────────────────────────────────
+        # --- payment badge ---
         if invoice.status == 'PAID':
-            y -= 28
-            p.setFillColorRGB(0.18, 0.78, 0.44)
-            p.roundRect(W - 160, y - 4, 118, 22, 6, fill=1, stroke=0)
-            p.setFillColorRGB(1, 1, 1)
-            p.setFont("Helvetica-Bold", 11)
-            p.drawCentredString(W - 101, y + 3, "✓ PAGADO")
-        elif invoice.status == 'PARTIALLY_PAID':
-            y -= 28
-            p.setFillColorRGB(0.94, 0.77, 0.06)
-            p.roundRect(W - 175, y - 4, 133, 22, 6, fill=1, stroke=0)
-            p.setFillColorRGB(0.1, 0.1, 0.1)
+            y -= 15
+            p.setFillColor(colors.HexColor('#10b981'))
+            p.roundRect(W - 160, y - 4, 115, 22, 4, fill=1, stroke=0)
+            p.setFillColor(colors.white)
             p.setFont("Helvetica-Bold", 10)
-            p.drawCentredString(W - 108, y + 3, f"ABONO: ${int(invoice.amount_paid):,}")
-
-        # ── pie ───────────────────────────────────────────────────────────────
-        p.setFillColorRGB(0.07, 0.07, 0.1)
-        p.rect(0, 0, W, 36, fill=1, stroke=0)
-        p.setFillColorRGB(0.4, 0.4, 0.45)
-        p.setFont("Helvetica", 8)
-        p.drawCentredString(W / 2, 14, "MecanIA — Taller Automotriz Inteligente | Documento generado electrónicamente")
+            p.drawCentredString(W - 102, y + 3, "✓ PAGADO")
+        elif invoice.status == 'PARTIALLY_PAID':
+            y -= 15
+            p.setFillColor(colors.HexColor('#f59e0b'))
+            p.roundRect(W - 175, y - 4, 130, 22, 4, fill=1, stroke=0)
+            p.setFillColor(colors.white)
+            p.setFont("Helvetica-Bold", 9)
+            p.drawCentredString(W - 110, y + 3, f"ABONO: ${int(invoice.amount_paid):,}")
 
         p.showPage()
         p.save()
@@ -666,58 +715,97 @@ class EstimateViewSet(viewsets.ModelViewSet):
         
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer, pagesize=letter)
-        
-        # Draw header with logo
+        W, H = letter
+
+        from operations.models import WorkshopSettings
         settings = WorkshopSettings.load()
-        if settings.logo:
-            try:
-                p.drawImage(settings.logo.path, 50, 700, width=100, preserveAspectRatio=True, mask='auto')
-            except Exception:
-                pass
-                
-        p.setFont("Helvetica-Bold", 24)
-        p.drawString(160, 750, settings.name)
-        p.setFont("Helvetica", 12)
-        p.drawString(160, 730, f"Teléfono: {settings.phone} | Email: {settings.email}")
-        p.drawString(160, 715, settings.address)
         
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(50, 660, f"Presupuesto #{estimate.id}")
+        # Header using unified template
+        draw_pdf_header_and_footer(p, settings, "Presupuesto", f"PRE-#{estimate.id}", estimate.created_at.strftime("%d/%m/%Y"), 1)
         
-        p.setFont("Helvetica", 12)
-        p.drawString(50, 630, f"Cliente: {estimate.client.first_name} {estimate.client.last_name}")
+        # Client and Vehicle Box
+        p.setFillColor(colors.HexColor('#f8fafc'))
+        p.setStrokeColor(colors.HexColor('#e2e8f0'))
+        p.roundRect(45, 595, 522, 75, 4, fill=True, stroke=True)
+        
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(55, 652, "INFORMACIÓN DEL CLIENTE")
+        p.drawString(305, 652, "INFORMACIÓN DE LA COTIZACIÓN")
+        
+        p.setFont("Helvetica", 9)
+        p.setFillColor(colors.HexColor('#334155'))
+        client_name = f"{estimate.client.first_name} {estimate.client.last_name}" if estimate.client else "Desconocido"
+        client_phone = estimate.client.phone if estimate.client else "No registrado"
+        p.drawString(55, 636, f"Nombre: {client_name}")
+        p.drawString(55, 622, f"Teléfono: {client_phone}")
+        p.drawString(55, 608, f"Email: {estimate.client.email if estimate.client else 'No registrado'}")
+        
+        vehicle_info = "Venta Mostrador / Sin Vehículo"
         if estimate.vehicle:
-            p.drawString(50, 610, f"Vehículo: {estimate.vehicle.make} {estimate.vehicle.model} - Patente: {estimate.vehicle.license_plate}")
-        p.drawString(400, 630, f"Fecha: {estimate.created_at.strftime('%Y-%m-%d')}")
+            vehicle_info = f"{estimate.vehicle.make} {estimate.vehicle.model} (Placa: {estimate.vehicle.license_plate})"
+        p.drawString(305, 636, f"Vehículo: {vehicle_info}")
+        p.drawString(305, 622, f"Fecha de Emisión: {estimate.created_at.strftime('%d/%m/%Y %H:%M')}")
+        p.drawString(305, 608, f"Estado / Tipo: {estimate.get_status_display()}")
         
-        y = 570
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(50, y, "Descripción")
-        p.drawString(300, y, "Cantidad")
-        p.drawString(400, y, "Precio Unit.")
-        p.drawString(500, y, "Total")
-        p.line(50, y-5, 550, y-5)
+        # Table Header
+        y = 560
+        p.setFillColor(colors.HexColor('#1e293b'))
+        p.rect(45, y - 6, 522, 20, fill=True, stroke=False)
+        p.setFillColor(colors.white)
+        p.setFont("Helvetica-Bold", 9)
+        p.drawString(55, y, "Descripción")
+        p.drawString(320, y, "Cant.")
+        p.drawRightString(460, y, "Precio Unit.")
+        p.drawRightString(550, y, "Total")
         
-        y -= 25
-        p.setFont("Helvetica", 12)
+        # Items
+        y -= 22
+        p.setFont("Helvetica", 9)
+        idx = 0
         for item in estimate.items.all():
-            p.drawString(50, y, str(item.description)[:35])
-            p.drawString(300, y, str(item.quantity))
-            p.drawString(400, y, f"${item.unit_price}")
-            p.drawString(500, y, f"${item.total_price}")
+            # Alternating background colors for rows
+            if idx % 2 == 0:
+                p.setFillColor(colors.HexColor('#f8fafc'))
+            else:
+                p.setFillColor(colors.white)
+            p.rect(45, y - 4, 522, 18, fill=True, stroke=False)
+            
+            p.setFillColor(colors.HexColor('#1e293b'))
+            p.drawString(55, y, str(item.description)[:45])
+            p.drawString(320, y, f"{item.quantity}")
+            p.drawRightString(460, y, f"${item.unit_price:,.0f}")
+            p.drawRightString(550, y, f"${item.total_price:,.0f}")
             y -= 20
+            idx += 1
+            
+        # Totals Section
+        y -= 10
+        p.setStrokeColor(colors.HexColor('#cbd5e1'))
+        p.setLineWidth(1)
+        p.line(45, y, 567, y)
         
-        p.line(50, y-5, 550, y-5)
-        y -= 25
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(380, y, "Subtotal:")
-        p.drawString(500, y, f"${estimate.subtotal}")
-        y -= 20
-        p.drawString(380, y, "IVA (19%):")
-        p.drawString(500, y, f"${estimate.tax_amount}")
-        y -= 20
-        p.drawString(380, y, "Total:")
-        p.drawString(500, y, f"${estimate.total_amount}")
+        totals = [
+            ("Subtotal:", estimate.subtotal),
+            ("IVA (19%):", estimate.tax_amount),
+            ("Monto Total:", estimate.total_amount)
+        ]
+        
+        y -= 15
+        for label, val in totals:
+            if label == "Monto Total:":
+                p.setFont("Helvetica-Bold", 12)
+                p.setFillColor(colors.HexColor('#0f172a'))
+                p.drawRightString(460, y, label)
+                p.setFillColor(colors.HexColor('#0d9488'))
+                p.drawRightString(550, y, f"${val:,.0f}")
+            else:
+                p.setFont("Helvetica", 10)
+                p.setFillColor(colors.HexColor('#475569'))
+                p.drawRightString(460, y, label)
+                p.setFillColor(colors.HexColor('#1e293b'))
+                p.drawRightString(550, y, f"${val:,.0f}")
+            y -= 18
         
         p.showPage()
         p.save()
@@ -727,6 +815,7 @@ class EstimateViewSet(viewsets.ModelViewSet):
         resp = HttpResponse(buffer, content_type='application/pdf')
         resp['Content-Disposition'] = f'inline; filename="Presupuesto_{estimate.id}.pdf"'
         return resp
+
 
 
 class SupplierViewSet(viewsets.ModelViewSet):
