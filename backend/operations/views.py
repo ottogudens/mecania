@@ -412,6 +412,231 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
         inspection.save()
         return Response(VisualInspectionSerializer(inspection).data)
 
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        import textwrap
+        import base64
+        from reportlab.lib.utils import ImageReader
+
+        inspection = self.get_object()
+        vehicle = inspection.vehicle
+        client = vehicle.client if vehicle else None
+        
+        # Load workshop settings
+        settings = WorkshopSettings.load()
+        
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        
+        # Draw Header/Footer Helper
+        def draw_header_footer(c, page_num):
+            # Header Logo
+            if settings.logo and settings.logo.startswith('data:image'):
+                try:
+                    header, data = settings.logo.split(';base64,')
+                    decoded = base64.b64decode(data)
+                    img = ImageReader(io.BytesIO(decoded))
+                    c.drawImage(img, 50, 715, width=80, preserveAspectRatio=True, mask='auto')
+                except Exception as e:
+                    print("VisualInspection PDF settings logo failed:", e)
+                    
+            c.setFont("Helvetica-Bold", 16)
+            c.setFillColor(colors.HexColor('#1e293b')) # Slate
+            c.drawString(140, 755, settings.name or "MecanIA Workshop")
+            
+            c.setFont("Helvetica", 9)
+            c.setFillColor(colors.HexColor('#64748b'))
+            c.drawString(140, 740, f"Teléfono: {settings.phone or ''} | Email: {settings.email or ''}")
+            c.drawString(140, 725, settings.address or '')
+            
+            # Line separator
+            c.setStrokeColor(colors.HexColor('#cbd5e1'))
+            c.setLineWidth(1)
+            c.line(50, 710, 562, 710)
+            
+            # Footer
+            c.setFillColor(colors.HexColor('#64748b'))
+            c.setStrokeColor(colors.HexColor('#cbd5e1'))
+            c.line(50, 45, 562, 45)
+            c.drawString(50, 32, "Informe generado por MecanIA - Sistema de Gestión de Talleres")
+            c.drawRightString(562, 32, f"Pág. {page_num}")
+            
+        page_num = 1
+        draw_header_footer(p, page_num)
+        
+        # Title
+        p.setFont("Helvetica-Bold", 12)
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.drawString(50, 680, "INFORME DE INSPECCIÓN VISUAL VEHICULAR")
+        
+        status_label = "Pendiente"
+        if inspection.status == 'IN_PROGRESS':
+            status_label = "En Proceso"
+        elif inspection.status == 'COMPLETED':
+            status_label = "Completada"
+            
+        p.setFont("Helvetica", 9)
+        p.setFillColor(colors.HexColor('#334155'))
+        p.drawRightString(562, 690, f"Fecha: {inspection.created_at.strftime('%d/%m/%Y')}")
+        p.drawRightString(562, 680, f"Estado: {status_label}")
+        
+        # Client & Vehicle Box
+        p.setFillColor(colors.HexColor('#f8fafc'))
+        p.setStrokeColor(colors.HexColor('#e2e8f0'))
+        p.rect(50, 580, 512, 85, fill=True, stroke=True)
+        
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(60, 650, "DATOS DEL VEHÍCULO")
+        p.drawString(320, 650, "DATOS DE LA INSPECCIÓN")
+        
+        p.setFont("Helvetica", 9)
+        p.setFillColor(colors.HexColor('#334155'))
+        plate = vehicle.license_plate if vehicle else "S/P"
+        make_model = f"{vehicle.make} {vehicle.model}" if vehicle else "S/D"
+        year = str(vehicle.year) if vehicle else "S/D"
+        vin = vehicle.vin if (vehicle and vehicle.vin) else "S/D"
+        
+        p.drawString(60, 634, f"Patente: {plate}")
+        p.drawString(60, 620, f"Vehículo: {make_model}")
+        p.drawString(60, 606, f"Año: {year}")
+        p.drawString(60, 592, f"VIN: {vin}")
+        
+        mechanic_name = f"{inspection.mechanic.first_name} {inspection.mechanic.last_name}" if (inspection.mechanic and inspection.mechanic.first_name) else (inspection.mechanic.username if inspection.mechanic else "No asignado")
+        owner_name = f"{client.first_name} {client.last_name}" if client else "Sin asignar"
+        owner_phone = client.phone if client else "S/D"
+        
+        p.drawString(320, 634, f"Cliente: {owner_name}")
+        p.drawString(320, 620, f"Contacto: {owner_phone}")
+        p.drawString(320, 606, f"Mecánico: {mechanic_name}")
+        p.drawString(320, 592, f"Ficha ID: INS-{inspection.id}")
+        
+        # General Observations Section
+        p.setFont("Helvetica-Bold", 10)
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.drawString(50, 548, "Observaciones Generales:")
+        p.setFont("Helvetica", 9)
+        p.setFillColor(colors.HexColor('#475569'))
+        obs_text = inspection.notes or "Sin notas generales."
+        wrapped_obs = textwrap.wrap(obs_text, width=100)
+        y_obs = 534
+        for line in wrapped_obs:
+            p.drawString(50, y_obs, line)
+            y_obs -= 13
+            
+        y_pos = y_obs - 10
+        # Line separating observations
+        p.setStrokeColor(colors.HexColor('#e2e8f0'))
+        p.line(50, y_pos+5, 562, y_pos+5)
+        
+        category_map = {
+            'engine': 'Motor (🔧)',
+            'brakes': 'Frenos (🛑)',
+            'suspension': 'Suspensión (↕️)',
+            'tires': 'Neumáticos (🛞)',
+            'lights': 'Luces (💡)',
+            'bodywork': 'Carrocería (🚗)',
+            'interior': 'Interior (💺)',
+            'exhaust': 'Escape (💨)'
+        }
+        
+        items_data = inspection.items_json or {}
+        
+        p.setFont("Helvetica-Bold", 11)
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.drawString(50, y_pos - 12, "ESTADO GENERAL DE COMPONENTES:")
+        y_pos -= 26
+        
+        # Iterate over checklist components
+        for c_id, c_label in category_map.items():
+            comp_data = items_data.get(c_id, {'status': 'OK', 'note': '', 'image': None})
+            status = comp_data.get('status', 'OK')
+            note = comp_data.get('note', '')
+            image_data = comp_data.get('image', None)
+            
+            wrapped_note = textwrap.wrap(note or "Sin observaciones particulares.", width=80)
+            lines_count = len(wrapped_note)
+            height_needed = 24 + (lines_count * 13)
+            if image_data and image_data.startswith('data:image'):
+                height_needed += 110
+                
+            # Handle page overflow
+            if y_pos - height_needed < 60:
+                p.showPage()
+                page_num += 1
+                draw_header_footer(p, page_num)
+                y_pos = 675
+                
+            # Component Background
+            p.setFillColor(colors.HexColor('#f1f5f9'))
+            p.rect(50, y_pos - 18, 512, 18, fill=True, stroke=False)
+            
+            p.setFillColor(colors.HexColor('#0f172a'))
+            p.setFont("Helvetica-Bold", 9)
+            p.drawString(55, y_pos - 13, c_label)
+            
+            # Status Badge
+            st_color = colors.HexColor('#10b981')
+            st_text = "Todo OK"
+            if status == 'WARNING':
+                st_color = colors.HexColor('#f59e0b')
+                st_text = "Advertencia"
+            elif status == 'CRITICAL':
+                st_color = colors.HexColor('#ef4444')
+                st_text = "Crítico / Falla"
+                
+            p.setFillColor(st_color)
+            p.rect(460, y_pos - 15, 92, 12, fill=True, stroke=False)
+            p.setFillColor(colors.white if status == 'CRITICAL' else colors.black)
+            p.setFont("Helvetica-Bold", 8)
+            p.drawCentredString(506, y_pos - 12, st_text)
+            
+            y_pos -= 28
+            p.setFont("Helvetica-Bold", 8)
+            p.setFillColor(colors.HexColor('#475569'))
+            p.drawString(55, y_pos + 12, "Diagnóstico:")
+            
+            p.setFont("Helvetica", 9)
+            p.setFillColor(colors.HexColor('#334155'))
+            y_note = y_pos + 12
+            for line in wrapped_note:
+                p.drawString(140, y_note, line)
+                y_note -= 13
+                
+            y_pos = y_note - 5
+            
+            # Draw base64 evidence if available
+            if image_data and image_data.startswith('data:image'):
+                try:
+                    header, data = image_data.split(';base64,')
+                    decoded = base64.b64decode(data)
+                    img = ImageReader(io.BytesIO(decoded))
+                    p.setStrokeColor(colors.HexColor('#cbd5e1'))
+                    p.rect(140, y_pos - 92, 125, 92, fill=False, stroke=True)
+                    p.drawImage(img, 140, y_pos - 92, width=125, height=92, preserveAspectRatio=True, mask='auto')
+                    y_pos -= 102
+                except Exception as e:
+                    print(f"Error drawing evidence image block {c_id}:", e)
+                    p.setFont("Helvetica-Oblique", 8)
+                    p.setFillColor(colors.HexColor('#94a3b8'))
+                    p.drawString(140, y_pos - 10, "[Error al procesar archivo de evidencia]")
+                    y_pos -= 18
+            else:
+                y_pos -= 5
+                
+            p.setStrokeColor(colors.HexColor('#e2e8f0'))
+            p.setLineWidth(0.5)
+            p.line(50, y_pos+5, 562, y_pos+5)
+            y_pos -= 8
+            
+        p.showPage()
+        p.save()
+        
+        buffer.seek(0)
+        resp = HttpResponse(buffer, content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="Inspeccion_{plate}_{inspection.id}.pdf"'
+        return resp
+
 class CustomAuthToken(APIView):
     """Login endpoint — public, no authentication required."""
     permission_classes = []

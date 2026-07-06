@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-from operations.models import Client, WhatsAppMessage, WhatsAppSession
+from operations.models import Client, WhatsAppMessage, WhatsAppSession, Vehicle, VisualInspection
 from operations.views import _make_client_token
 
 class ClientAuthTestCase(TestCase):
@@ -310,3 +310,45 @@ class MecaniaSecurityResilienceTestCase(TestCase):
                 self.assertEqual(called_kwargs['headers']['X-Mecania-Secret-Key'], "test-secret-key-12345")
             finally:
                 settings.INTERNAL_API_KEY = old_internal_key
+
+class VisualInspectionPDFTestCase(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        self.user = User.objects.create_user(
+            username="mechanic1", 
+            email="mech1@example.com", 
+            password="pwd"
+        )
+        self.api_client.force_authenticate(user=self.user)
+        
+        self.client_user = Client.objects.create(
+            first_name="Alfredo",
+            last_name="Casero",
+            phone="+56910101010",
+        )
+        
+        self.vehicle = Vehicle.objects.create(
+            license_plate="BBFF22",
+            make="Ford",
+            model="Fiesta",
+            year=2015,
+            client=self.client_user
+        )
+        
+        self.inspection = VisualInspection.objects.create(
+            vehicle=self.vehicle,
+            mechanic=self.user,
+            status='COMPLETED',
+            notes="Observaciones generales de prueba",
+            items_json={
+                "engine": {"status": "OK", "note": "Todo bien"},
+                "brakes": {"status": "CRITICAL", "note": "Pastillas desgastadas", "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}
+            }
+        )
+
+    def test_generate_pdf_success(self):
+        url = reverse('visualinspection-generate-pdf', args=[self.inspection.id])
+        response = self.api_client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(len(response.content) > 0)

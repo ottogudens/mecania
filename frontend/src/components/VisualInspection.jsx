@@ -397,6 +397,24 @@ const VisualInspection = () => {
     }
   };
 
+  const handleDownloadPDF = async (inspection) => {
+    if (!inspection) return;
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`/api/operations/inspections/${inspection.id}/generate_pdf/`, {
+        headers: { Authorization: `Token ${token}` },
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
+      toast({ title: 'PDF Generado', message: 'El informe de inspección se abrió en una nueva pestaña.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo generar el informe PDF.', type: 'error' });
+    }
+  };
+
   // Filter list
   const filteredInspections = inspections.filter(ins => {
     if (activeTab === 'pending') return ins.status === 'PENDING';
@@ -436,7 +454,10 @@ const VisualInspection = () => {
               <h3 style={{ margin: 0, color: 'var(--primary)' }}>Inspección Activa: {selectedInspection.vehicle_plate}</h3>
               <p style={{ margin: 0, color: 'var(--text-muted)' }}>{selectedInspection.vehicle_make} {selectedInspection.vehicle_model} | Estado: <strong>{selectedInspection.status}</strong></p>
             </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button className="btn btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => handleDownloadPDF(selectedInspection)}>
+                📄 Informe PDF
+              </button>
               {selectedInspection.status === 'IN_PROGRESS' && (
                 <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
                   ✓ Finalizar y Marcar Lista para Entrega
@@ -667,6 +688,9 @@ const VisualInspection = () => {
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <button className="btn btn-outline btn-sm" onClick={() => openAuditView(ins)}>
                             👁️ Ver Ficha
+                          </button>
+                          <button className="btn btn-outline btn-sm" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => handleDownloadPDF(ins)}>
+                            📄 PDF
                           </button>
                           <button className="btn btn-sm" style={{ backgroundColor: 'var(--secondary)', color: 'black' }} onClick={() => openEstimateDraft(ins)}>
                             💰 Presupuesto
