@@ -194,74 +194,76 @@ export default function SuppliersManager() {
           padding: '16px'
         }}>
           <div style={{
-            background: 'var(--bg-card, #fff)',
+            background: 'rgba(20, 20, 20, 0.95)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid var(--border-muted)',
             borderRadius: '16px',
             width: '100%',
             maxWidth: '500px',
             padding: '24px',
-            boxShadow: '0 12px 36px rgba(0,0,0,0.15)',
+            boxShadow: 'var(--shadow-lg)',
             position: 'relative'
           }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '1.3rem', fontWeight: 700 }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '1.3rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {editingId ? 'Editar Proveedor' : 'Nuevo Proveedor'}
             </h3>
             
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-muted)' }}>RUT Empresa</label>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-secondary)' }}>RUT Empresa</label>
                   <input
                     type="text"
                     placeholder="12.345.678-9"
                     value={rut}
                     onChange={handleRutChange}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                    className="glass-input"
                     required
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-muted)' }}>Razón Social / Nombre</label>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-secondary)' }}>Razón Social / Nombre</label>
                   <input
                     type="text"
                     placeholder="Ej. Distribuidora Repuestos SpA"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                    className="glass-input"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-muted)' }}>Correo Electrónico</label>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-secondary)' }}>Correo Electrónico</label>
                 <input
                   type="email"
                   placeholder="proveedor@empresa.cl"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                  className="glass-input"
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-muted)' }}>Vendedor / Contacto</label>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-secondary)' }}>Vendedor / Contacto</label>
                   <input
                     type="text"
                     placeholder="Nombre vendedor"
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                    className="glass-input"
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-muted)' }}>Teléfono Vendedor</label>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 650, marginBottom: '4px', color: 'var(--text-secondary)' }}>Teléfono Vendedor</label>
                   <input
                     type="text"
                     placeholder="+56912345678"
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                    className="glass-input"
                   />
                 </div>
               </div>
@@ -290,12 +292,7 @@ export default function SuppliersManager() {
       )}
 
       {/* Main suppliers list */}
-      <div className="card" style={{
-        background: 'var(--bg-card, #fff)',
-        borderRadius: '16px',
-        padding: '24px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-      }}>
+      <div className="glass-card">
         {loading ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Cargando catálogo...</div>
         ) : filteredSuppliers.length === 0 ? (
@@ -308,37 +305,37 @@ export default function SuppliersManager() {
               <div
                 key={supplier.id}
                 style={{
-                  border: '1px solid var(--border-color)',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: '12px',
                   padding: '20px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
-                  background: 'var(--bg-body, #fafafa)',
+                  background: 'var(--surface-2)',
                   transition: 'transform 0.2s ease',
                   position: 'relative'
                 }}
               >
                 <div>
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', background: 'var(--border-color)', padding: '2px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', background: 'rgba(255, 255, 255, 0.08)', padding: '2px 6px', borderRadius: '4px' }}>
                     {supplier.rut}
                   </span>
-                  <h4 style={{ margin: '8px 0 2px 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-color)' }}>
+                  <h4 style={{ margin: '8px 0 2px 0', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                     {supplier.company_name}
                   </h4>
                   {supplier.email && (
-                    <a href={`mailto:${supplier.email}`} style={{ fontSize: '0.85rem', color: 'var(--accent-color, #1e3c72)', textDecoration: 'none' }}>
+                    <a href={`mailto:${supplier.email}`} style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'none' }}>
                       {supplier.email}
                     </a>
                   )}
                 </div>
 
-                <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '10px', marginTop: 'auto' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600 }}>Contacto Comercial:</div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 650 }}>{supplier.contact_name || 'No especificado'}</div>
+                <div style={{ borderTop: '1px dashed var(--border-subtle)', paddingTop: '10px', marginTop: 'auto' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>Contacto Comercial:</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 650, color: 'var(--text-primary)' }}>{supplier.contact_name || 'No especificado'}</div>
                   {supplier.contact_phone && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{supplier.contact_phone}</span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{supplier.contact_phone}</span>
                       <a
                         href={`https://wa.me/${supplier.contact_phone.replace(/[^0-9]/g, '')}`}
                         target="_blank"
@@ -359,7 +356,7 @@ export default function SuppliersManager() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '10px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
                   <button
                     onClick={() => handleEdit(supplier)}
                     className="btn btn-ghost btn-sm"

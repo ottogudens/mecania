@@ -293,23 +293,18 @@ export default function SupplierInvoicesList() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             
             {/* Upload parsing card */}
-            <div className="card" style={{
-              background: 'var(--bg-card, #fff)',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-            }}>
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700 }}>Inteligencia DTE / Subir Facturas</h3>
-              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <div className="glass-card">
+              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Inteligencia DTE / Subir Facturas</h3>
+              <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                 Arrastre o seleccione el archivo DTE corporativo (.xml) o PDF digital para realizar la extracción automática mediante IA (GPT-4o-mini).
               </p>
               
               <div style={{
-                border: '2px dashed var(--border-color)',
+                border: '2px dashed var(--border-subtle)',
                 borderRadius: '12px',
                 padding: '30px',
                 textAlign: 'center',
-                background: 'var(--bg-body, #fafafa)',
+                background: 'var(--surface-2)',
                 position: 'relative',
                 cursor: 'pointer',
                 transition: 'border-color 0.2s ease'
@@ -442,24 +437,17 @@ export default function SupplierInvoicesList() {
             </div>
 
             {/* List panel */}
-            <div className="card" style={{
-              background: 'var(--bg-card, #fff)',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-            }}>
+            <div className="glass-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Historial de Facturas Compra</h3>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Historial de Facturas Compra</h3>
                 <input
                   type="text"
                   placeholder="Filtrar facturas..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  className="glass-input"
                   style={{
                     padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-color)',
-                    outline: 'none',
                     fontSize: '0.85rem'
                   }}
                 />
@@ -530,11 +518,7 @@ export default function SupplierInvoicesList() {
 
           {/* Right column: split payment details */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="card" style={{
-              background: 'var(--bg-card, #fff)',
-              borderRadius: '16px',
-              padding: '24px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+            <div className="glass-card" style={{
               position: 'sticky',
               top: '20px'
             }}>
@@ -691,20 +675,15 @@ export default function SupplierInvoicesList() {
       )}
 
       {activeTab === 'forecast' && (
-        <div className="card" style={{
-          background: 'var(--bg-card, #fff)',
-          borderRadius: '16px',
-          padding: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.03)'
-        }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700 }}>📅 Planificador de Caja / Proyección de Cobros</h3>
-          <p style={{ margin: '0 0 24px 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+        <div className="glass-card">
+          <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>📅 Planificador de Caja / Proyección de Cobros</h3>
+          <p style={{ margin: '0 0 24px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             Estatuto de caja futuro para los cheques y cobros documentados. Revisa los días con menor carga financiera para programar tus futuros cheques de manera segura.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {forecast.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', border: '2px dashed var(--border-color)', borderRadius: '12px' }}>
+              <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', border: '2px dashed var(--border-subtle)', borderRadius: '12px' }}>
                 No existen documentos pendientes de cobro para realizar proyección.
               </div>
             ) : (
@@ -717,15 +696,14 @@ export default function SupplierInvoicesList() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      border: '1px solid var(--border-color)',
+                      border: isHeavy ? '1px solid rgba(235, 87, 87, 0.3)' : '1px solid var(--border-subtle)',
                       borderRadius: '12px',
                       padding: '16px 20px',
-                      background: isHeavy ? 'rgba(235, 87, 87, 0.03)' : 'var(--bg-body, #fafafa)',
-                      borderColor: isHeavy ? 'rgba(235, 87, 87, 0.3)' : 'var(--border-color)'
+                      background: isHeavy ? 'rgba(235, 87, 87, 0.08)' : 'var(--surface-2)',
                     }}
                   >
                     <div>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 750, color: 'var(--text-color)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 750, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         📅 {new Date(day.payment_date + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         {isHeavy && (
                           <span style={{
@@ -746,11 +724,11 @@ export default function SupplierInvoicesList() {
                             key={idx}
                             style={{
                               fontSize: '0.75rem',
-                              background: '#fff',
-                              border: '1px solid var(--border-color)',
+                              background: 'rgba(255, 255, 255, 0.04)',
+                              border: '1px solid var(--border-subtle)',
                               padding: '2px 8px',
                               borderRadius: '4px',
-                              color: 'var(--text-muted)'
+                              color: 'var(--text-secondary)'
                             }}
                           >
                             🚪 {doc.supplier_name} - {doc.document_type} #{doc.document_number || 'S/N'}: <strong>{fmt(doc.amount)}</strong>
@@ -759,8 +737,8 @@ export default function SupplierInvoicesList() {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Monto Acumulado el Día</span>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: isHeavy ? 'var(--status-red)' : 'var(--text-color)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Monto Acumulado el Día</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 800, color: isHeavy ? 'var(--status-red)' : 'var(--text-primary)' }}>
                         {fmt(day.total_amount)}
                       </div>
                     </div>
@@ -774,10 +752,10 @@ export default function SupplierInvoicesList() {
             marginTop: '30px',
             padding: '16px',
             borderRadius: '12px',
-            background: 'rgba(30, 60, 114, 0.03)',
-            border: '2px dashed var(--accent-color, #1e3c72)',
+            background: 'rgba(234, 179, 8, 0.05)',
+            border: '1px dashed var(--secondary)',
             fontSize: '0.85rem',
-            color: 'var(--accent-color, #1e3c72)'
+            color: 'var(--secondary)'
           }}>
             💡 <strong>Consejo del Planificador Financiero:</strong> Si necesitas programar nuevos cheques, busca fechas que no figuren en la lista de arriba, o aquellas con menores montos acumulados. Esto protege el capital de trabajo de tu taller evitando sobregiros en la cuenta corriente.
           </div>

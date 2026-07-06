@@ -97,11 +97,12 @@ export default function CashMovements() {
       {/* Cash Box Banner */}
       {!loading && (
         <div style={{
-          background: activeSession ? 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)' : 'var(--bg-card-secondary, #fafafa)',
-          color: activeSession ? '#fff' : 'inherit',
+          background: activeSession ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(234, 179, 8, 0.15) 100%)' : 'var(--surface-1)',
+          color: 'var(--text-primary)',
           padding: '24px',
-          borderRadius: '16px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+          borderRadius: 'var(--radius-lg)',
+          border: activeSession ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid var(--border-subtle)',
+          boxShadow: 'var(--shadow-md)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -109,10 +110,10 @@ export default function CashMovements() {
           gap: '16px'
         }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>
+            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {activeSession ? 'Caja Abierta y Operando' : 'Caja Cerrada'}
             </h2>
-            <p style={{ margin: '6px 0 0 0', opacity: 0.85, fontSize: '0.9rem' }}>
+            <p style={{ margin: '6px 0 0 0', opacity: 0.85, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               {activeSession
                 ? `Turno iniciado por ${activeSession.opened_by_username} el ${new Date(activeSession.opened_at).toLocaleString()}`
                 : 'Debes abrir caja en el panel de turnos de caja para registrar movimientos asociados a un turno.'}
@@ -120,8 +121,8 @@ export default function CashMovements() {
           </div>
           {activeSession && (
             <div style={{ textAlign: 'right' }}>
-              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', tracking: '1px', opacity: 0.8 }}>Total Movimientos Manuales</span>
-              <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '2px' }}>
+              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', tracking: '1px', color: 'var(--text-secondary)' }}>Total Movimientos Manuales</span>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '2px', color: 'var(--text-primary)' }}>
                 {fmt(activeSession.total_inflow - activeSession.total_outflow)}
               </div>
             </div>
@@ -131,25 +132,21 @@ export default function CashMovements() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) 2fr', gap: '24px', flexWrap: 'wrap' }} className="responsive-grid-movements">
         {/* Registration Form Card */}
-        <div className="card" style={{
-          background: 'var(--bg-card, #fff)',
-          borderRadius: '16px',
-          padding: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        <div className="glass-card" style={{
           display: 'flex',
           flexDirection: 'column',
           height: 'fit-content'
         }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: 650, color: 'var(--text-color)' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: 650, color: 'var(--text-primary)' }}>
             Registrar Movimiento Manual
           </h3>
-          <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             Registra egresos de caja para compras menores, almuerzos, fletes o ingresos extraordinarios.
           </p>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 Tipo de Movimiento
               </label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -160,9 +157,9 @@ export default function CashMovements() {
                     padding: '10px',
                     borderRadius: '8px',
                     border: '2px dashed var(--border-color)',
-                    background: movementType === 'OUT' ? 'rgba(235, 87, 87, 0.08)' : 'transparent',
+                    background: movementType === 'OUT' ? 'var(--status-red-dim)' : 'transparent',
                     borderColor: movementType === 'OUT' ? 'var(--status-red)' : 'var(--border-color)',
-                    color: movementType === 'OUT' ? 'var(--status-red)' : 'var(--text-color)',
+                    color: movementType === 'OUT' ? 'var(--status-red)' : 'var(--text-secondary)',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
@@ -177,9 +174,9 @@ export default function CashMovements() {
                     padding: '10px',
                     borderRadius: '8px',
                     border: '2px dashed var(--border-color)',
-                    background: movementType === 'IN' ? 'rgba(39, 174, 96, 0.08)' : 'transparent',
+                    background: movementType === 'IN' ? 'var(--status-green-dim)' : 'transparent',
                     borderColor: movementType === 'IN' ? 'var(--status-green)' : 'var(--border-color)',
-                    color: movementType === 'IN' ? 'var(--status-green)' : 'var(--text-color)',
+                    color: movementType === 'IN' ? 'var(--status-green)' : 'var(--text-secondary)',
                     fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
@@ -191,11 +188,11 @@ export default function CashMovements() {
             </div>
 
             <div>
-              <label htmlFor="mov-amount" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <label htmlFor="mov-amount" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 Monto
               </label>
               <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700 }}>$</span>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-primary)' }}>$</span>
                 <input
                   id="mov-amount"
                   type="number"
@@ -203,12 +200,9 @@ export default function CashMovements() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   disabled={submitting}
+                  className="glass-input"
                   style={{
-                    width: '100%',
-                    padding: '10px 10px 10px 24px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border-color)',
-                    outline: 'none',
+                    paddingLeft: '24px',
                     fontSize: '1rem',
                   }}
                 />
@@ -216,7 +210,7 @@ export default function CashMovements() {
             </div>
 
             <div>
-              <label htmlFor="mov-desc" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-muted)' }}>
+              <label htmlFor="mov-desc" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 Descripción / Glosa
               </label>
               <textarea
@@ -226,12 +220,8 @@ export default function CashMovements() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={submitting}
+                className="glass-input"
                 style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  outline: 'none',
                   fontSize: '0.9rem',
                   resize: 'none',
                 }}
@@ -260,15 +250,11 @@ export default function CashMovements() {
         </div>
 
         {/* History List Card */}
-        <div className="card" style={{
-          background: 'var(--bg-card, #fff)',
-          borderRadius: '16px',
-          padding: '24px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+        <div className="glass-card" style={{
           display: 'flex',
           flexDirection: 'column'
         }}>
-          <h3 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: 650, color: 'var(--text-color)' }}>
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1.2rem', fontWeight: 650, color: 'var(--text-primary)' }}>
             Historial de Movimientos de Caja
           </h3>
 
