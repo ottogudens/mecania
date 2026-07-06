@@ -51,7 +51,9 @@ const MobileScanner = () => {
       { 
         fps: 10, 
         qrbox: { width: 280, height: 180 },
-        aspectRatio: 1.777778
+        videoConstraints: {
+          facingMode: { ideal: "environment" }
+        }
       },
       /* verbose= */ false
     );

@@ -102,7 +102,7 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
             'expected_cash_drawer': float(session.opening_amount + cash_total + inflow - outflow)
         }
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='x-report')
     def x_report(self, request):
         """Genera el reporte X para la caja abierta actual (sin cerrarla)."""
         session = CashRegisterSession.objects.filter(status='OPEN').first()
