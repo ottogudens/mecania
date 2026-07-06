@@ -713,6 +713,10 @@ class EstimateViewSet(viewsets.ModelViewSet):
     def pdf(self, request, pk=None):
         estimate = self.get_object()
         
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib import colors
+
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer, pagesize=letter)
         W, H = letter
