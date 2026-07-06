@@ -69,7 +69,7 @@ const WorkOrderList = () => {
 
     // WebSocket connection for real-time updates
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+    let backendHost = import.meta.env.VITE_BACKEND_HOST || (import.meta.env.DEV ? 'localhost:8080' : window.location.host);
     backendHost = backendHost.replace(/^https?:\/\//, '');
     const wsUrl = `${wsProtocol}//${backendHost}/ws/work_orders/`;
     

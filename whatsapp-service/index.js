@@ -16,7 +16,7 @@ if (!tempBackendUrl) {
     if (process.env.RAILWAY_SERVICE_BACKEND_URL) {
         tempBackendUrl = `https://${process.env.RAILWAY_SERVICE_BACKEND_URL}`;
     } else {
-        tempBackendUrl = 'http://localhost:8000';
+        tempBackendUrl = 'http://localhost:8080';
     }
 }
 const BACKEND_URL = tempBackendUrl;
@@ -283,6 +283,58 @@ async function connectToWhatsApp() {
             }
         } catch (err) {
             console.error('Error al responder mensaje vía IA:', err.message, err.response?.data || err);
+        }
+    });
+
+    // Sincronizar historial de conversaciones (messaging-history.set) al vincular/conectar
+    sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
+        try {
+            console.log(`Recibido evento messaging-history.set. Procesando ${messages ? messages.length : 0} mensajes del historial...`);
+            if (!messages || messages.length === 0) return;
+
+            const formattedMessages = [];
+
+            for (const msg of messages) {
+                if (!msg.message || !msg.key) continue;
+
+                const remoteJid = msg.key.remoteJid;
+                if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) continue;
+
+                const text = getMessageText(msg.message);
+                if (!text || text.trim() === '') continue;
+
+                // De historia, asumimos 'assistant' si es de nosotros, 'client' si no.
+                const sender = msg.key.fromMe ? 'assistant' : 'client';
+                const timestamp = msg.messageTimestamp ? Number(msg.messageTimestamp) : Math.floor(Date.now() / 1000);
+
+                formattedMessages.push({
+                    phone: remoteJid,
+                    text: text,
+                    sender: sender,
+                    timestamp: timestamp
+                });
+            }
+
+            if (formattedMessages.length > 0) {
+                console.log(`Enviando ${formattedMessages.length} mensajes históricos al backend en lotes...`);
+                const batchSize = 100;
+                for (let i = 0; i < formattedMessages.length; i += batchSize) {
+                    const batch = formattedMessages.slice(i, i + batchSize);
+                    try {
+                        const response = await axios.post(`${BACKEND_URL}/api/operations/whatsapp-messages/sync/`, {
+                            messages: batch
+                        }, {
+                            headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
+                            timeout: 30000
+                        });
+                        console.log(`Lote de sincronización enviado: +${response.data?.created || 0} creados.`);
+                    } catch (batchErr) {
+                        console.error('Error al enviar lote de sincronización de mensajes:', batchErr.message, batchErr.response?.data || batchErr);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error en el listener de messaging-history.set:', err.message, err);
         }
     });
 }

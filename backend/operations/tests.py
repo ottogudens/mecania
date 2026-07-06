@@ -352,3 +352,76 @@ class VisualInspectionPDFTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response['Content-Type'], 'application/pdf')
         self.assertTrue(len(response.content) > 0)
+
+
+class WhatsAppMessageSyncTestCase(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        self.client_user = Client.objects.create(
+            first_name="Juan",
+            last_name="Perez",
+            phone="+56911112222",
+        )
+
+    def test_whatsapp_message_sync(self):
+        url = reverse('whatsapp_messages_sync')
+        old_internal_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        settings.INTERNAL_API_KEY = "test-sync-key-999"
+
+        try:
+            # 1. Test unauthorized access
+            data = {"messages": []}
+            response = self.api_client.post(url, data, format='json')
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+            # 2. Test authorized bulk sync
+            timestamp_unix = 1783307597
+            messages = [
+                {
+                    "phone": "56911112222@s.whatsapp.net",
+                    "text": "Hola, necesito sincronizar este mensaje",
+                    "sender": "client",
+                    "timestamp": timestamp_unix
+                },
+                {
+                    "phone": "56911112222@s.whatsapp.net",
+                    "text": "Respuesta sincronizada",
+                    "sender": "assistant",
+                    "timestamp": timestamp_unix + 10
+                }
+            ]
+
+            response = self.api_client.post(
+                url, 
+                {"messages": messages}, 
+                format='json',
+                HTTP_X_MECANIA_SECRET_KEY="test-sync-key-999"
+            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertEqual(response.data["created"], 2)
+
+            # Verify saved messages
+            from operations.models import WhatsAppMessage
+            db_messages = list(WhatsAppMessage.objects.filter(phone="+56911112222").order_by('timestamp'))
+            self.assertEqual(len(db_messages), 2)
+            self.assertEqual(db_messages[0].text, "Hola, necesito sincronizar este mensaje")
+            self.assertEqual(db_messages[0].sender, "client")
+            self.assertEqual(db_messages[0].client, self.client_user)
+
+            import datetime
+            dt_expected_0 = datetime.datetime.fromtimestamp(timestamp_unix, tz=datetime.timezone.utc)
+            self.assertEqual(db_messages[0].timestamp, dt_expected_0)
+
+            # 3. Test de-duplication (resending the same messages)
+            response_dup = self.api_client.post(
+                url, 
+                {"messages": messages}, 
+                format='json',
+                HTTP_X_MECANIA_SECRET_KEY="test-sync-key-999"
+            )
+            self.assertEqual(response_dup.status_code, status.HTTP_200_OK)
+            self.assertEqual(response_dup.data["created"], 0)
+
+        finally:
+            settings.INTERNAL_API_KEY = old_internal_key
+

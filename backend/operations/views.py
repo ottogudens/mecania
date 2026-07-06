@@ -1577,6 +1577,80 @@ class WhatsAppManualSendView(APIView):
         except Exception as e:
             return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class WhatsAppMessageSyncView(APIView):
+    """
+    Recibe un lote de mensajes sincronizados de WhatsApp desde el microservicio
+    y los guarda en la base de datos de manera masiva, asociándolos a los clientes correctos.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        from django.conf import settings
+        expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        provided_key = request.headers.get('X-Mecania-Secret-Key') or request.META.get('HTTP_X_MECANIA_SECRET_KEY')
+        if expected_key and provided_key != expected_key:
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        messages_data = request.data.get('messages', [])
+        if not isinstance(messages_data, list):
+            return Response({"error": "messages must be a list"}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import WhatsAppMessage, Client
+        from django.utils import timezone
+        import datetime
+
+        created_count = 0
+        clients_cache = {}
+
+        def get_client(phone_str):
+            clean_num = ''.join(filter(str.isdigit, phone_str))
+            if len(clean_num) < 8:
+                return None
+            suffix = clean_num[-8:]
+            if suffix not in clients_cache:
+                client_obj = Client.objects.filter(phone__icontains=suffix).first()
+                clients_cache[suffix] = client_obj
+            return clients_cache[suffix]
+
+        for item in messages_data:
+            phone = item.get('phone', '').strip()
+            text = item.get('text', '').strip()
+            sender = item.get('sender', 'client') # client, assistant, operator
+            timestamp_unix = item.get('timestamp')
+
+            if not phone or not text or timestamp_unix is None:
+                continue
+
+            clean_num = phone.replace('@s.whatsapp.net', '')
+            if not clean_num.startswith('+'):
+                clean_num = '+' + clean_num
+
+            client_obj = get_client(clean_num)
+
+            dt_utc = datetime.datetime.fromtimestamp(timestamp_unix, tz=datetime.timezone.utc)
+            start_dt = dt_utc - datetime.timedelta(seconds=5)
+            end_dt = dt_utc + datetime.timedelta(seconds=5)
+
+            exists = WhatsAppMessage.objects.filter(
+                phone=clean_num,
+                text=text,
+                sender=sender,
+                timestamp__range=(start_dt, end_dt)
+            ).exists()
+
+            if not exists:
+                msg = WhatsAppMessage.objects.create(
+                    phone=clean_num,
+                    client=client_obj,
+                    sender=sender,
+                    text=text
+                )
+                WhatsAppMessage.objects.filter(id=msg.id).update(timestamp=dt_utc)
+                created_count += 1
+
+        return Response({"success": True, "created": created_count}, status=status.HTTP_200_OK)
+
 
 class WhatsAppLogoutView(APIView):
     permission_classes = [IsAuthenticated]

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '');
 const clientToken = () => localStorage.getItem('clientToken');
 const clientAuth = () => ({ Authorization: `ClientToken ${clientToken()}` });
 const fmt = (n) =>
@@ -763,7 +763,7 @@ const ClientDashboard = ({ clientName, onLogout }) => {
   // WebSocket for real-time updates
   useEffect(() => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let backendHost = import.meta.env.VITE_BACKEND_HOST || 'localhost:8000';
+    let backendHost = import.meta.env.VITE_BACKEND_HOST || (import.meta.env.DEV ? 'localhost:8080' : window.location.host);
     backendHost = backendHost.replace(/^https?:\/\//, '');
     const wsUrl = `${wsProtocol}//${backendHost}/ws/work_orders/`;
 

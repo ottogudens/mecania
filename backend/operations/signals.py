@@ -13,7 +13,7 @@ def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.get_or_create(user=instance, defaults={'role': 'ADMIN' if instance.is_superuser else 'MECHANIC'})
 
-WHATSAPP_SERVICE_URL = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3000/api/send-message')
+WHATSAPP_SERVICE_URL = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001/api/send-message')
 
 @receiver(post_save, sender=WorkOrder)
 def notify_client_on_status_change(sender, instance, created, **kwargs):
@@ -53,9 +53,14 @@ def notify_client_on_status_change(sender, instance, created, **kwargs):
     try:
         payload = {
             "number": phone,
-            "message": message
+            "text": message
         }
+        headers = {}
+        expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+        if expected_key:
+            headers['X-Mecania-Secret-Key'] = expected_key
+
         # We don't block the Django thread for too long
-        requests.post(WHATSAPP_SERVICE_URL, json=payload, timeout=5)
+        requests.post(WHATSAPP_SERVICE_URL, json=payload, headers=headers, timeout=5)
     except Exception as e:
         print(f"Error sending WhatsApp notification: {str(e)}")
