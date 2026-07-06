@@ -248,18 +248,27 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
   const pageInfo = PAGE_TITLES[activeTab] || { title: '', subtitle: '' };
 
   const PANELS = {
-    finance_billing: <FinanceDashboard />,
-    finance_cash_register: <CashRegister />,
-    finance_cash_movements: <CashMovements />,
-    finance_suppliers: <SuppliersManager />,
-    finance_supplier_invoices: <SupplierInvoicesList />,
+    dashboard:                  <DashboardHome />,
+    orders:                     <WorkOrderList />,
+    inspection:                 <VisualInspection />,
+    inventory:                  <InventoryDashboard />,
+    scan:                       <MobileScanner />,
+    clients:                    <ClientList />,
+    vehicles:                   <VehicleList />,
+    whatsapp_chat:              <WhatsAppChat />,
 
-    finance:    <FinanceDashboard />,
-    pos:        <POSDashboard onNavigate={setActiveTab} />,
-    history:    <CashRegister />,
-    estimates:  <EstimatesDashboard />,
-    settings:   <Settings onSettingsUpdate={onSettingsUpdate} />,
-    users:      <UserManager />,
+    finance_billing:            <FinanceDashboard />,
+    finance_cash_register:      <CashRegister />,
+    finance_cash_movements:     <CashMovements />,
+    finance_suppliers:          <SuppliersManager />,
+    finance_supplier_invoices:  <SupplierInvoicesList />,
+
+    finance:                    <FinanceDashboard />,
+    pos:                        <POSDashboard onNavigate={setActiveTab} />,
+    history:                    <CashRegister />,
+    estimates:                  <EstimatesDashboard />,
+    settings:                   <Settings onSettingsUpdate={onSettingsUpdate} />,
+    users:                      <UserManager />,
   };
 
   return (
