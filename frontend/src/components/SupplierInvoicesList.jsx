@@ -563,13 +563,13 @@ export default function SupplierInvoicesList() {
                   {/* Registered payment documents */}
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', fontWeight: 750 }}>Documentos / Cheques Asociados ({selectedInvoice.payment_documents?.length || 0})</h4>
                   
-                  {selectedInvoice.payment_documents?.length === 0 ? (
+                  {!selectedInvoice.payment_documents || selectedInvoice.payment_documents.length === 0 ? (
                     <div style={{ padding: '16px', border: '1px dashed var(--border-color)', borderRadius: '8px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '20px' }}>
                       No hay ningún cheque o transferencia ingresado para esta factura.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                      {selectedInvoice.payment_documents.map(doc => (
+                      {selectedInvoice.payment_documents?.map(doc => (
                         <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '10px 12px', background: 'var(--bg-body, #fafafa)', fontSize: '0.8rem' }}>
                           <div>
                             <span style={{ fontWeight: 700 }}>{doc.document_type} {doc.document_number ? `N° ${doc.document_number}` : ''}</span>

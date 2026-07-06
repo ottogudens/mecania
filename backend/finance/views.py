@@ -965,26 +965,46 @@ class SupplierPaymentForecastView(APIView):
         today = date.today()
         end_date = today + timedelta(days=45)
         
-        # Query planned payments in the range
+        # Query planned payments in the range with related models for supplier details
         payments = SupplierPaymentDocument.objects.filter(
             payment_date__gte=today,
             payment_date__lte=end_date,
             status='PENDING'
-        ).values('payment_date').annotate(total_amount=Sum('amount')).order_by('payment_date')
+        ).select_related('invoice', 'invoice__supplier').order_by('payment_date')
         
-        # Build dictionary from query
-        data_dict = {p['payment_date'].isoformat(): float(p['total_amount']) for p in payments}
+        # Group documents by payment date
+        grouped_docs = {}
+        for p in payments:
+            d_str = p.payment_date.isoformat()
+            if d_str not in grouped_docs:
+                grouped_docs[d_str] = []
+            
+            supplier_name = "Proveedor"
+            if p.invoice and p.invoice.supplier:
+                supplier_name = p.invoice.supplier.company_name or "Proveedor"
+                
+            grouped_docs[d_str].append({
+                'id': p.id,
+                'supplier_name': supplier_name,
+                'document_type': p.document_type,
+                'document_number': p.document_number,
+                'amount': float(p.amount)
+            })
         
-        # Complete full array of dates
+        # Build results list for only dates containing active payments
         result = []
         curr = today
         while curr <= end_date:
             curr_str = curr.isoformat()
-            result.append({
-                'date': curr_str,
-                'total_amount': data_dict.get(curr_str, 0.0),
-                'day_of_week': curr.strftime('%A')
-            })
+            docs_list = grouped_docs.get(curr_str, [])
+            if docs_list:
+                total_amt = sum(d['amount'] for d in docs_list)
+                result.append({
+                    'payment_date': curr_str,
+                    'total_amount': total_amt,
+                    'day_of_week': curr.strftime('%A'),
+                    'documents': docs_list
+                })
             curr += timedelta(days=1)
             
         return Response(result, status=status.HTTP_200_OK)
