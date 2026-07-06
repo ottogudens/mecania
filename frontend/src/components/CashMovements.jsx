@@ -21,12 +21,14 @@ export default function CashMovements() {
       setLoading(true);
       // Get current active session
       const sessRes = await axios.get('/api/finance/cash-register/');
-      const openSession = sessRes.data.find(s => s.status === 'OPEN');
+      const sessList = Array.isArray(sessRes.data) ? sessRes.data : (sessRes.data?.results || []);
+      const openSession = sessList.find(s => s.status === 'OPEN');
       setActiveSession(openSession || null);
 
       // Get movements list
       const movRes = await axios.get('/api/finance/cash-movements/');
-      setMovements(movRes.data);
+      const movList = Array.isArray(movRes.data) ? movRes.data : (movRes.data?.results || []);
+      setMovements(movList);
     } catch (err) {
       console.error(err);
       showToast('Error al cargar datos de movimientos de caja.', 'error');
