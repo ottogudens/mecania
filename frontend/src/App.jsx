@@ -20,6 +20,9 @@ import MechanicPortal from './components/MechanicPortal';
 import MobileScanner from './components/MobileScanner';
 import { ToastProvider } from './components/Toast';
 import WhatsAppChat from './components/WhatsAppChat';
+import CashMovements from './components/CashMovements';
+import SuppliersManager from './components/SuppliersManager';
+import SupplierInvoicesList from './components/SupplierInvoicesList';
 
 /* ── Icons (inline SVG, no extra dep) ── */
 const Icon = ({ path, size = 18, ...props }) => (
@@ -65,9 +68,15 @@ const NAV_ITEMS = [
   { id: 'clients',    label: 'Clientes',            icon: 'clients' },
   { id: 'vehicles',   label: 'Vehículos',           icon: 'car' },
   { id: 'whatsapp_chat', label: 'Chat de WhatsApp', icon: 'chat' },
-  { id: 'finance',    label: 'Finanzas',            icon: 'finance' },
+  
+  // Finance Submodule IDs
+  { id: 'finance_billing', label: 'Clientes y Facturación', icon: 'finance' },
+  { id: 'finance_cash_register', label: 'Control de Caja', icon: 'history' },
+  { id: 'finance_cash_movements', label: 'Movimientos de Caja', icon: 'pos' },
+  { id: 'finance_suppliers', label: 'Proveedores del Taller', icon: 'users' },
+  { id: 'finance_supplier_invoices', label: 'Facturas y Programador de Pagos', icon: 'orders' },
+
   { id: 'pos',        label: 'Punto de Venta',      icon: 'pos' },
-  { id: 'history',    label: 'Caja / Historial',    icon: 'history' },
   { id: 'estimates',  label: 'Presupuestos',        icon: 'orders' },
   { id: 'settings',   label: 'Configuración',     icon: 'settings' },
   { id: 'users',      label: 'Usuarios',          icon: 'users' },
@@ -82,9 +91,12 @@ const PAGE_TITLES = {
   clients:    { title: 'Clientes',            subtitle: 'Directorio y contacto de clientes' },
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
   whatsapp_chat: { title: 'Chat de WhatsApp', subtitle: 'Atención al cliente y control del asistente de IA' },
-  finance:    { title: 'Finanzas',            subtitle: 'Boletas, facturas y pagos del taller' },
+  finance_billing: { title: 'Clientes y Facturación', subtitle: 'Boletas, facturas y pagos del taller' },
+  finance_cash_register: { title: 'Control de Caja (Turnos)', subtitle: 'Aperturas, cierres y reportes X/Z de caja' },
+  finance_cash_movements: { title: 'Movimientos de Caja', subtitle: 'Registro manual de ingresos y egresos de caja' },
+  finance_suppliers: { title: 'Proveedores', subtitle: 'Catálogo de proveedores y datos de contacto' },
+  finance_supplier_invoices: { title: 'Facturas de Compra y Programador', subtitle: 'Carga inteligente DTE/PDF e historial de pagos' },
   pos:        { title: 'Punto de Venta',      subtitle: 'Caja rápida y venta directa de repuestos' },
-  history:    { title: 'Control de Caja y Ventas',    subtitle: 'Arqueo de caja, reporte X e historial de pagos' },
   estimates:  { title: 'Presupuestos',        subtitle: 'Cotizaciones y pre-aprobaciones' },
   settings:   { title: 'Configuración',       subtitle: 'Ajustes del taller e integraciones' },
   users:      { title: 'Usuarios del Sistema', subtitle: 'Administración de accesos y roles' },
@@ -103,6 +115,7 @@ function GearLogo() {
 /* ── Sidebar ── */
 function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, closeSidebar, logoUrl }) {
   const initials = username ? username.slice(0, 2).toUpperCase() : 'U';
+  const [financeOpen, setFinanceOpen] = useState(true);
 
   return (
     <>
@@ -138,23 +151,43 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
             </button>
           ))}
 
-          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas</div>
-          {NAV_ITEMS.slice(8, 12).map(item => (
-            <button
-              key={item.id}
-              data-key={item.id}
-              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => { setActiveTab(item.id); closeSidebar(); }}
-            >
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Finanzas</div>
+          <button
+            type="button"
+            className={`nav-item ${activeTab.startsWith('finance_') ? 'active' : ''}`}
+            onClick={() => setFinanceOpen(prev => !prev)}
+            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', textAlign: 'left' }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span className="nav-icon">
-                <Icon path={ICONS[item.icon]} />
+                <Icon path={ICONS.finance} />
               </span>
-              <span className="nav-label">{item.label}</span>
-            </button>
-          ))}
+              <span className="nav-label" style={{ fontWeight: 600 }}>Finanzas</span>
+            </span>
+            <span style={{ fontSize: '0.75rem', paddingRight: '4px' }}>{financeOpen ? '▼' : '►'}</span>
+          </button>
 
-          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Sistema</div>
-          {NAV_ITEMS.slice(12).map(item => (
+          {financeOpen && (
+            <div className="sidebar-submenu" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)', marginLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
+              {NAV_ITEMS.slice(8, 13).map(item => (
+                <button
+                  key={item.id}
+                  data-key={item.id}
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => { setActiveTab(item.id); closeSidebar(); }}
+                  style={{ height: '36px', fontSize: '0.85rem' }}
+                >
+                  <span className="nav-icon" style={{ transform: 'scale(0.8)' }}>
+                    <Icon path={ICONS[item.icon]} />
+                  </span>
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas y Sistema</div>
+          {NAV_ITEMS.slice(13).map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -206,6 +239,44 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
   );
 }
 
+          <div style={{ height: '1rem' }} />
+          <Link
+            to="/client"
+            className="nav-item"
+            style={{ textDecoration: 'none' }}
+            onClick={closeSidebar}
+          >
+            <span className="nav-icon">
+              <Icon path={ICONS.car} />
+            </span>
+            <span className="nav-label">Portal Cliente ↗</span>
+          </Link>
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">{initials}</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{username || 'Administrador'}</div>
+              <div className="sidebar-user-role">MecanIA Admin</div>
+            </div>
+          </div>
+          <button
+            className="nav-item"
+            onClick={onLogout}
+            style={{ color: 'var(--status-red)', borderColor: 'transparent' }}
+          >
+            <span className="nav-icon" style={{ color: 'var(--status-red)' }}>
+              <Icon path={ICONS.logout} />
+            </span>
+            <span className="nav-label">Cerrar Sesión</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 /* ── Admin Layout ── */
 function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -215,14 +286,12 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
   const pageInfo = PAGE_TITLES[activeTab] || { title: '', subtitle: '' };
 
   const PANELS = {
-    dashboard:  <DashboardHome />,
-    orders:     <WorkOrderList />,
-    inspection: <VisualInspection />,
-    inventory:  <InventoryDashboard />,
-    scan:       <MobileScanner />,
-    clients:    <ClientList />,
-    vehicles:   <VehicleList />,
-    whatsapp_chat: <WhatsAppChat />,
+    finance_billing: <FinanceDashboard />,
+    finance_cash_register: <CashRegister />,
+    finance_cash_movements: <CashMovements />,
+    finance_suppliers: <SuppliersManager />,
+    finance_supplier_invoices: <SupplierInvoicesList />,
+
     finance:    <FinanceDashboard />,
     pos:        <POSDashboard onNavigate={setActiveTab} />,
     history:    <CashRegister />,

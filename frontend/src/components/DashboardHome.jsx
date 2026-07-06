@@ -10,10 +10,12 @@ const DashboardHome = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState([]);
+  const [paymentAlerts, setPaymentAlerts] = useState([]);
 
   useEffect(() => {
     fetchStats();
     fetchMaintenanceAlerts();
+    fetchPaymentAlerts();
   }, []);
 
   const fetchStats = async () => {
@@ -40,6 +42,18 @@ const DashboardHome = () => {
       setMaintenanceAlerts(response.data || []);
     } catch (err) {
       console.error('Error fetching maintenance alerts:', err);
+    }
+  };
+
+  const fetchPaymentAlerts = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/finance/supplier-payments/alerts/', {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setPaymentAlerts(response.data || []);
+    } catch (err) {
+      console.error('Error fetching payment alerts:', err);
     }
   };
 
@@ -105,6 +119,46 @@ const DashboardHome = () => {
           <span style={{ fontSize: '0.75rem', color: '#a3a3a3' }}>Mes en curso</span>
         </div>
       </div>
+
+      {/* Supplier Payment Alerts Widget */}
+      {paymentAlerts.length > 0 && (
+        <div className="glass-card" style={{ borderLeft: '4px solid #ef4444', backgroundColor: 'rgba(239, 68, 68, 0.03)' }}>
+          <h4 style={{ marginBottom: '1rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            ⚠️ Vencimientos de Cheques / Proveedores (Próximos 2 días)
+            <span className="badge red" style={{ fontSize: '0.75rem' }}>{paymentAlerts.length}</span>
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {paymentAlerts.map(alert => (
+              <div key={alert.id} style={{
+                padding: '0.8rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                borderRadius: '8px',
+                borderLeft: '3px solid #ef4444',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+              }}>
+                <div>
+                  <strong style={{ fontSize: '0.9rem' }}>
+                    💸 {alert.supplier_name} — Factura N° {alert.invoice_number}
+                  </strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                    — {alert.document_type} N° {alert.document_number || 'S/N'}
+                  </span>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Monto Documentado: <strong>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(alert.amount)}</strong>
+                    <span style={{ marginLeft: '1rem', color: '#ef4444', fontWeight: 'bold' }}>
+                      Cobro: {alert.payment_date} ({alert.days_remaining === 0 ? 'HOY' : alert.days_remaining === 1 ? 'Mañana' : `en ${alert.days_remaining} días`})
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Maintenance Alerts Widget */}
       {maintenanceAlerts.length > 0 && (

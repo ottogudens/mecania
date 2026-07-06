@@ -218,3 +218,89 @@ class CashRegisterSession(models.Model):
     def __str__(self):
         return f"Caja {self.id} ({self.get_status_display()}) - Abierta el {self.opened_at.strftime('%d/%m/%Y %H:%M')}"
 
+
+class Supplier(models.Model):
+    rut = models.CharField(max_length=20, unique=True, help_text="RUT de la empresa proveedora")
+    company_name = models.CharField(max_length=255, help_text="Razón Social / Nombre")
+    email = models.EmailField(blank=True, null=True)
+    contact_name = models.CharField(max_length=255, blank=True, help_text="Nombre del vendedor / contacto")
+    contact_phone = models.CharField(max_length=50, blank=True, help_text="Teléfono del vendedor")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.company_name} ({self.rut})"
+
+
+class SupplierInvoice(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pendiente'),
+        ('PARTIALLY_PAID', 'Pago Parcial'),
+        ('PAID', 'Pagada'),
+        ('CANCELLED', 'Anulada'),
+    ]
+    supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name='invoices')
+    invoice_number = models.CharField(max_length=50, help_text="Número / Folio de la Factura")
+    description = models.TextField(blank=True)
+    emission_date = models.DateField()
+    due_date = models.DateField()
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    xml_or_pdf_data = models.TextField(blank=True, help_text="Datos crudos JSON extraídos del DTE o PDF")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"FACT-PROV-{self.invoice_number} - {self.supplier.company_name}"
+
+
+class SupplierPaymentDocument(models.Model):
+    TYPE_CHOICES = [
+        ('CHECK', 'Cheque'),
+        ('TRANSFER', 'Transferencia'),
+        ('CASH', 'Efectivo'),
+        ('OTHER', 'Otro'),
+    ]
+    STATUS_CHOICES = [
+        ('PENDING', 'Pendiente de Cobro'),
+        ('PAID', 'Cobrado/Pagado'),
+        ('BOUNCED', 'Rebotado'),
+        ('CANCELLED', 'Anulado'),
+    ]
+    invoice = models.ForeignKey(SupplierInvoice, on_delete=models.CASCADE, related_name='payment_documents')
+    document_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='CHECK')
+    document_number = models.CharField(max_length=100, blank=True, help_text="Número de cheque o código de operación")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_date = models.DateField(help_text="Fecha programada de cobro/pago")
+    bank = models.CharField(max_length=100, blank=True, help_text="Banco emisor (para cheques)")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.get_document_type_display()} {self.document_number or ''} - {self.amount} ({self.status})"
+
+
+class CashMovement(models.Model):
+    TYPE_CHOICES = [
+        ('IN', 'Ingreso'),
+        ('OUT', 'Egreso'),
+    ]
+    session = models.ForeignKey(
+        CashRegisterSession, on_delete=models.CASCADE, related_name='movements',
+        null=True, blank=True, help_text="Sesión de caja activa en el turno de trabajo"
+    )
+    movement_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.CharField(max_length=255)
+    date = models.DateTimeField(auto_now_add=True)
+    registered_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='registered_movements'
+    )
+
+    def __str__(self):
+        return f"{self.get_movement_type_display()} - {self.description} ({self.amount})"
+

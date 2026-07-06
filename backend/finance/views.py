@@ -7,8 +7,24 @@ from rest_framework.permissions import IsAuthenticated
 
 from django.utils import timezone
 from operations.models import WorkOrder
-from .models import Invoice, InvoiceLineItem, Payment, CashRegisterSession
-from .serializers import InvoiceSerializer, PaymentSerializer, CashRegisterSessionSerializer
+from .models import (
+    Invoice, InvoiceLineItem, Payment, CashRegisterSession,
+    Supplier, SupplierInvoice, SupplierPaymentDocument, CashMovement
+)
+from .serializers import (
+    InvoiceSerializer, PaymentSerializer, CashRegisterSessionSerializer,
+    SupplierSerializer, SupplierInvoiceSerializer, SupplierPaymentDocumentSerializer, CashMovementSerializer
+)
+import io
+import xml.etree.ElementTree as ET
+import base64
+import json
+from pypdf import PdfReader
+from openai import OpenAI
+import os
+from django.db import transaction
+from django.db.models import Sum
+from datetime import date, timedelta
 from .services import (
     POSError,
     get_or_create_invoice_for_work_order,
@@ -52,7 +68,7 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
         return Response(CashRegisterSessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
     def get_session_stats(self, session):
-        """Calcula los totales esperados en base a los pagos de la sesión."""
+        """Calcula los totales esperados en base a los pagos de la sesión y movimientos manuales."""
         payments = Payment.objects.filter(date__gte=session.opened_at)
         if session.closed_at:
             payments = payments.filter(date__lte=session.closed_at)
@@ -70,12 +86,20 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
             elif p.payment_method == 'TRANSFER':
                 transfer_total += p.amount
 
+        # Movimientos de caja manuales
+        movements = CashMovement.objects.filter(session=session)
+        inflow = sum((m.amount for m in movements if m.movement_type == 'IN'), Decimal('0.00'))
+        outflow = sum((m.amount for m in movements if m.movement_type == 'OUT'), Decimal('0.00'))
+
         return {
             'opening_amount': float(session.opening_amount),
             'expected_cash': float(cash_total),
             'expected_card': float(card_total),
             'expected_transfer': float(transfer_total),
-            'expected_total': float(session.opening_amount + cash_total + card_total + transfer_total)
+            'inbound_movements': float(inflow),
+            'outbound_movements': float(outflow),
+            'expected_total': float(session.opening_amount + cash_total + card_total + transfer_total + inflow - outflow),
+            'expected_cash_drawer': float(session.opening_amount + cash_total + inflow - outflow)
         }
 
     @action(detail=False, methods=['get'])
@@ -703,3 +727,296 @@ class EstimateViewSet(viewsets.ModelViewSet):
         resp = HttpResponse(buffer, content_type='application/pdf')
         resp['Content-Disposition'] = f'inline; filename="Presupuesto_{estimate.id}.pdf"'
         return resp
+
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = Supplier.objects.all().order_by('company_name')
+    serializer_class = SupplierSerializer
+
+
+class SupplierInvoiceViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = SupplierInvoice.objects.all().order_by('-emission_date')
+    serializer_class = SupplierInvoiceSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        # We handle creation including possible payment documents
+        data = request.data
+        supplier_id = data.get('supplier')
+        if not supplier_id:
+            # Maybe we received supplier RUT? We find or create supplier!
+            supplier_rut = data.get('supplier_rut')
+            supplier_name = data.get('supplier_name', 'Nuevo Proveedor')
+            if supplier_rut:
+                supplier, _ = Supplier.objects.get_or_create(
+                    rut=supplier_rut,
+                    defaults={'company_name': supplier_name}
+                )
+                data['supplier'] = supplier.id
+            else:
+                return Response({'error': 'Proveedor requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        invoice = serializer.save()
+
+        # Handle split payments / documents
+        payment_docs_data = data.get('payment_documents', [])
+        for doc_data in payment_docs_data:
+            SupplierPaymentDocument.objects.create(
+                invoice=invoice,
+                document_type=doc_data.get('document_type', 'CHECK'),
+                document_number=doc_data.get('document_number', ''),
+                amount=Decimal(str(doc_data.get('amount'))),
+                payment_date=doc_data.get('payment_date'),
+                bank=doc_data.get('bank', ''),
+                status=doc_data.get('status', 'PENDING')
+            )
+        
+        # update status if paid
+        invoice_status = data.get('status')
+        if invoice_status:
+            invoice.status = invoice_status
+            invoice.save(update_fields=['status'])
+
+        return Response(SupplierInvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+
+
+class SupplierPaymentDocumentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = SupplierPaymentDocument.objects.all().order_by('payment_date')
+    serializer_class = SupplierPaymentDocumentSerializer
+
+
+class CashMovementViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = CashMovement.objects.all().order_by('-date')
+    serializer_class = CashMovementSerializer
+
+    def perform_create(self, serializer):
+        # Auto-associate current active session if not explicitly provided
+        current_session = CashRegisterSession.objects.filter(status='OPEN').first()
+        serializer.save(
+            registered_by=self.request.user,
+            session=serializer.validated_data.get('session') or current_session
+        )
+
+
+class SupplierInvoiceParseUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'No se cargó ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        filename = file_obj.name.lower()
+        
+        # Initialize default values
+        parsed_data = {
+            'supplier_rut': '',
+            'supplier_company_name': '',
+            'invoice_number': '',
+            'emission_date': '',
+            'due_date': '',
+            'subtotal': 0,
+            'tax_amount': 0,
+            'total_amount': 0,
+        }
+
+        try:
+            if filename.endswith('.xml'):
+                # Handle XML DTE (Chile)
+                try:
+                    tree = ET.parse(file_obj)
+                    root = tree.getroot()
+                except Exception:
+                    file_obj.seek(0)
+                    xml_str = file_obj.read().decode('utf-8', errors='ignore')
+                    root = ET.fromstring(xml_str)
+
+                # Strip namespaces helper
+                def get_tag(elem):
+                    return elem.tag.split('}')[-1] if '}' in elem.tag else elem.tag
+
+                for elem in root.iter():
+                    tag = get_tag(elem)
+                    if tag == 'RUTEmit':
+                        parsed_data['supplier_rut'] = elem.text.strip()
+                    elif tag == 'RznSoc':
+                        parsed_data['supplier_company_name'] = elem.text.strip()
+                    elif tag == 'Folio':
+                        parsed_data['invoice_number'] = elem.text.strip()
+                    elif tag == 'FchEmis':
+                        parsed_data['emission_date'] = elem.text.strip()
+                    elif tag == 'FchVenc':
+                        parsed_data['due_date'] = elem.text.strip()
+                    elif tag == 'MntNeto':
+                        parsed_data['subtotal'] = int(float(elem.text.strip()))
+                    elif tag == 'IVA':
+                        parsed_data['tax_amount'] = int(float(elem.text.strip()))
+                    elif tag == 'MntTotal':
+                        parsed_data['total_amount'] = int(float(elem.text.strip()))
+                
+                # Default due_date to emission_date if missing
+                if not parsed_data['due_date']:
+                    parsed_data['due_date'] = parsed_data['emission_date']
+
+                return Response(parsed_data, status=status.HTTP_200_OK)
+
+            elif filename.endswith('.pdf') or 'image' in file_obj.content_type:
+                # Handle PDF or image using OpenAI and pypdf
+                openai_key = os.environ.get('OPENAI_API_KEY')
+                if not openai_key:
+                    return Response({
+                        'error': 'API de OpenAI no configurada en las variables de entorno.',
+                        'manual_fallback': True
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Prompt definition
+                system_prompt = (
+                    "Extrae los datos de esta factura de proveedor chilena. "
+                    "Devuelve tu respuesta únicamente como un objeto JSON plano estructurado con "
+                    "los siguientes campos exactos y ningún otro texto de adorno:\n"
+                    "{\n"
+                    "  \"supplier_rut\": \"RUT del proveedor\",\n"
+                    "  \"supplier_company_name\": \"Nombre/Razón social del proveedor\",\n"
+                    "  \"invoice_number\": \"Número o Folio de la factura\",\n"
+                    "  \"emission_date\": \"YYYY-MM-DD\",\n"
+                    "  \"due_date\": \"YYYY-MM-DD\",\n"
+                    "  \"subtotal\": número neto,\n"
+                    "  \"tax_amount\": número IVA,\n"
+                    "  \"total_amount\": número total\n"
+                    "}"
+                )
+
+                client = OpenAI(api_key=openai_key)
+
+                if filename.endswith('.pdf'):
+                    # Read using pypdf
+                    reader = PdfReader(file_obj)
+                    text = ""
+                    for page in reader.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+                    
+                    if len(text.strip()) < 30:
+                        return Response({
+                            'error': 'El contenido del PDF está vacío o es un escaneo sin texto. Ingrésala manualmente.',
+                            'manual_fallback': True
+                        }, status=status.HTTP_400_BAD_REQUEST)
+
+                    # Query OpenAI
+                    completion = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        response_format={"type": "json_object"},
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Contenido del PDF:\n\n{text}"}
+                        ]
+                    )
+                else:
+                    # It's an image
+                    file_obj.seek(0)
+                    encoded_image = base64.b64encode(file_obj.read()).decode('utf-8')
+                    completion = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        response_format={"type": "json_object"},
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": "Extrae los datos de esta imagen de factura de compra:"},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {"url": f"data:{file_obj.content_type};base64,{encoded_image}"}
+                                    }
+                                ]
+                            }
+                        ]
+                    )
+
+                extracted_data = json.loads(completion.choices[0].message.content)
+                parsed_data.update(extracted_data)
+                return Response(parsed_data, status=status.HTTP_200_OK)
+
+            else:
+                return Response({'error': 'Formato no soportado. Cargue un archivo XML (DTE) o PDF digital.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return Response({
+                'error': f'Error al procesar el archivo: {str(e)}',
+                'manual_fallback': True
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SupplierPaymentForecastView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Devuelve el pronóstico de egresos agrupados por día de pago
+        para las próximos 45 días, permitiendo encontrar días con baja carga de cobro.
+        """
+        today = date.today()
+        end_date = today + timedelta(days=45)
+        
+        # Query planned payments in the range
+        payments = SupplierPaymentDocument.objects.filter(
+            payment_date__gte=today,
+            payment_date__lte=end_date,
+            status='PENDING'
+        ).values('payment_date').annotate(total_amount=Sum('amount')).order_by('payment_date')
+        
+        # Build dictionary from query
+        data_dict = {p['payment_date'].isoformat(): float(p['total_amount']) for p in payments}
+        
+        # Complete full array of dates
+        result = []
+        curr = today
+        while curr <= end_date:
+            curr_str = curr.isoformat()
+            result.append({
+                'date': curr_str,
+                'total_amount': data_dict.get(curr_str, 0.0),
+                'day_of_week': curr.strftime('%A')
+            })
+            curr += timedelta(days=1)
+            
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class SupplierPaymentAlertsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Retorna los documentos de pago pendientes que vencen en exactamente
+        o menos de 2 días.
+        """
+        today = timezone.localdate()
+        warning_limit = today + timedelta(days=2)
+        
+        alerts = SupplierPaymentDocument.objects.filter(
+            payment_date__gte=today,
+            payment_date__lte=warning_limit,
+            status='PENDING'
+        ).order_by('payment_date')
+        
+        results = []
+        for doc in alerts:
+            results.append({
+                'id': doc.id,
+                'supplier_name': doc.invoice.supplier.company_name,
+                'invoice_number': doc.invoice.invoice_number,
+                'amount': float(doc.amount),
+                'document_type': doc.document_type,
+                'payment_date': doc.payment_date.isoformat(),
+                'days_remaining': (doc.payment_date - today).days
+            })
+            
+        return Response(results, status=status.HTTP_200_OK)
