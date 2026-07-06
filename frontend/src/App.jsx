@@ -239,44 +239,6 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
   );
 }
 
-          <div style={{ height: '1rem' }} />
-          <Link
-            to="/client"
-            className="nav-item"
-            style={{ textDecoration: 'none' }}
-            onClick={closeSidebar}
-          >
-            <span className="nav-icon">
-              <Icon path={ICONS.car} />
-            </span>
-            <span className="nav-label">Portal Cliente ↗</span>
-          </Link>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{initials}</div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{username || 'Administrador'}</div>
-              <div className="sidebar-user-role">MecanIA Admin</div>
-            </div>
-          </div>
-          <button
-            className="nav-item"
-            onClick={onLogout}
-            style={{ color: 'var(--status-red)', borderColor: 'transparent' }}
-          >
-            <span className="nav-icon" style={{ color: 'var(--status-red)' }}>
-              <Icon path={ICONS.logout} />
-            </span>
-            <span className="nav-label">Cerrar Sesión</span>
-          </button>
-        </div>
-      </aside>
-    </>
-  );
-}
-
 /* ── Admin Layout ── */
 function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
   const [activeTab, setActiveTab] = useState('dashboard');
