@@ -19,7 +19,7 @@ if (!tempBackendUrl) {
         tempBackendUrl = 'http://localhost:8080';
     }
 }
-const BACKEND_URL = tempBackendUrl;
+const BACKEND_URL = tempBackendUrl.replace(/\/+$/, '');
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'mecania-default-internal-secret-token-key-2026';
 const AUTH_DIR = 'auth_info_baileys';
 
