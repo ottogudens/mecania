@@ -138,3 +138,45 @@ def cancel_work_order(*, work_order: WorkOrder, reason: str = ''):
     work_order.status = 'CANCELLED'
     work_order.save(update_fields=['status', 'updated_at'])
     return work_order
+
+
+def send_whatsapp_message(*, number: str, text: str, document_url: str = None, file_name: str = None) -> bool:
+    """
+    Envía un mensaje de WhatsApp a través del microservicio de Node.js inyectando
+    correctamente la clave de seguridad interna (API Key) en los encabezados.
+    """
+    import os
+    import requests
+    import logging
+    from django.conf import settings
+
+    logger = logging.getLogger(__name__)
+
+    base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+    whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+
+    expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+    headers = {}
+    if expected_key:
+        headers['X-Mecania-Secret-Key'] = expected_key
+
+    payload = {
+        "number": number,
+        "text": text
+    }
+    if document_url:
+        payload["documentUrl"] = document_url
+    if file_name:
+        payload["fileName"] = file_name
+
+    try:
+        resp = requests.post(whatsapp_service_url, json=payload, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            return True
+        else:
+            logger.error(f"El microservicio de WhatsApp retornó código {resp.status_code}: {resp.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Fallo al conectar con el microservicio de WhatsApp: {str(e)}")
+        return False
+

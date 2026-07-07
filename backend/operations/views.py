@@ -139,32 +139,18 @@ class ClientViewSet(viewsets.ModelViewSet):
             f"¡Gracias por confiar en nosotros!"
         )
 
-        try:
-            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-
-            resp = requests.post(whatsapp_service_url, json={
-                "number": client.phone,
-                "text": message,
-            }, timeout=10)
-
-            if resp.status_code == 200:
-                return Response({
-                    'success': True,
-                    'message': f'Credenciales enviadas a {client.phone}.',
-                    'pin': raw_pin,  # Mostrar solo en la respuesta admin
-                })
-            else:
-                return Response({
-                    'success': True,
-                    'message': f'Portal activado pero WhatsApp no disponible. PIN generado: {raw_pin}',
-                    'pin': raw_pin,
-                    'whatsapp_error': True,
-                })
-        except Exception as e:
+        from .services import send_whatsapp_message
+        success = send_whatsapp_message(number=client.phone, text=message)
+        if success:
             return Response({
                 'success': True,
-                'message': f'Portal activado pero WhatsApp falló ({str(e)}). PIN generado: {raw_pin}',
+                'message': f'Credenciales enviadas a {client.phone}.',
+                'pin': raw_pin,  # Mostrar solo en la respuesta admin
+            })
+        else:
+            return Response({
+                'success': True,
+                'message': f'Portal activado pero WhatsApp no disponible o falló. PIN generado: {raw_pin}',
                 'pin': raw_pin,
                 'whatsapp_error': True,
             })
@@ -199,32 +185,18 @@ class ClientViewSet(viewsets.ModelViewSet):
             f"Si no solicitaste este cambio, contáctanos."
         )
 
-        try:
-            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-
-            resp = requests.post(whatsapp_service_url, json={
-                "number": client.phone,
-                "text": message,
-            }, timeout=10)
-
-            if resp.status_code == 200:
-                return Response({
-                    'success': True,
-                    'message': f'Nuevo PIN enviado a {client.phone}.',
-                    'pin': raw_pin,
-                })
-            else:
-                return Response({
-                    'success': True,
-                    'message': f'PIN regenerado pero WhatsApp no disponible. PIN: {raw_pin}',
-                    'pin': raw_pin,
-                    'whatsapp_error': True,
-                })
-        except Exception:
+        from .services import send_whatsapp_message
+        success = send_whatsapp_message(number=client.phone, text=message)
+        if success:
             return Response({
                 'success': True,
-                'message': f'PIN regenerado pero WhatsApp falló. PIN: {raw_pin}',
+                'message': f'Nuevo PIN enviado a {client.phone}.',
+                'pin': raw_pin,
+            })
+        else:
+            return Response({
+                'success': True,
+                'message': f'PIN regenerado pero WhatsApp no disponible o falló. PIN: {raw_pin}',
                 'pin': raw_pin,
                 'whatsapp_error': True,
             })
@@ -327,22 +299,12 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
         
         message = request.data.get('message', f"Hola {client.first_name}, tu vehículo {work_order.vehicle.license_plate} tiene una actualización. Estado: {work_order.get_status_display()}")
         
-        try:
-            # En producción, configurar la variable de entorno WHATSAPP_SERVICE_URL (ej: https://whatsapp-production.up.railway.app)
-            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-            
-            response = requests.post(whatsapp_service_url, json={
-                "number": client.phone,
-                "text": message
-            })
-            
-            if response.status_code == 200:
-                return Response({'success': True, 'message': 'Notificación enviada vía WhatsApp.'})
-            else:
-                return Response({'error': 'Fallo al enviar notificación al microservicio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            return Response({'error': f'Error de conexión con microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        from .services import send_whatsapp_message
+        success = send_whatsapp_message(number=client.phone, text=message)
+        if success:
+            return Response({'success': True, 'message': 'Notificación enviada vía WhatsApp.'})
+        else:
+            return Response({'error': 'Fallo al enviar notificación al microservicio o WhatsApp no disponible.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def send_findings_whatsapp(self, request, pk=None):
@@ -363,21 +325,12 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
             f"Por favor, indícanos si apruebas realizar este servicio adicional respondiendo a este mensaje."
         )
         
-        try:
-            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-            
-            response = requests.post(whatsapp_service_url, json={
-                "number": client.phone,
-                "text": message
-            })
-            
-            if response.status_code == 200:
-                return Response({'success': True, 'message': 'Mensaje de hallazgos enviado vía WhatsApp.'})
-            else:
-                return Response({'error': 'Fallo al enviar notificación al microservicio.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            return Response({'error': f'Error de conexión con microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        from .services import send_whatsapp_message
+        success = send_whatsapp_message(number=client.phone, text=message)
+        if success:
+            return Response({'success': True, 'message': 'Mensaje de hallazgos enviado vía WhatsApp.'})
+        else:
+            return Response({'error': 'Fallo al enviar notificación al microservicio o WhatsApp no disponible.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
     def generate_pdf(self, request, pk=None):
@@ -1335,28 +1288,16 @@ class ScheduledMaintenanceViewSet(viewsets.ModelViewSet):
             f"Te esperamos en el taller. ¡Agenda tu hora!"
         )
 
-        try:
-            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-            whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-
-            response = requests.post(whatsapp_service_url, json={
-                "number": client.phone,
-                "text": message
-            })
-
-            if response.status_code == 200:
-                scheduled.status = 'NOTIFIED'
-                scheduled.notified_at = timezone.now()
-                scheduled.save()
-                return Response({'success': True, 'message': 'Recordatorio enviado vía WhatsApp.'})
-            else:
-                return Response(
-                    {'error': 'Fallo al enviar notificación al microservicio.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        except Exception as e:
+        from .services import send_whatsapp_message
+        success = send_whatsapp_message(number=client.phone, text=message)
+        if success:
+            scheduled.status = 'NOTIFIED'
+            scheduled.notified_at = timezone.now()
+            scheduled.save()
+            return Response({'success': True, 'message': 'Recordatorio enviado vía WhatsApp.'})
+        else:
             return Response(
-                {'error': f'Error de conexión con microservicio: {str(e)}'},
+                {'error': 'Fallo al enviar notificación al microservicio o WhatsApp no disponible.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

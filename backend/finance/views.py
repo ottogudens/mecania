@@ -256,19 +256,8 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
                     f"📝 *Notas de Cierre:* {session.closing_notes or 'Sin comentarios.'}"
                 )
 
-                base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-                send_msg_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-                
-                from django.conf import settings as django_settings
-                expected_key = getattr(django_settings, 'INTERNAL_API_KEY', None)
-                headers = {}
-                if expected_key:
-                    headers['X-Mecania-Secret-Key'] = expected_key
-
-                requests.post(send_msg_url, json={
-                    "number": phone,
-                    "text": message
-                }, headers=headers, timeout=5)
+                from operations.services import send_whatsapp_message
+                send_whatsapp_message(number=phone, text=message)
         except Exception as e:
             # Capturar errores de red/configuración sin romper la respuesta del cierre de caja
             import logging
@@ -747,25 +736,19 @@ class EstimateViewSet(viewsets.ModelViewSet):
         # Build absolute URL for the PDF
         document_url = request.build_absolute_uri(f'/api/finance/estimates/{estimate.id}/pdf/')
         
-        import os
-        base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
-        whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
-        
-        try:
-            resp = requests.post(whatsapp_service_url, json={
-                "number": estimate.client.phone,
-                "text": text,
-                "documentUrl": document_url,
-                "fileName": f"Presupuesto_{estimate.id}.pdf"
-            }, timeout=10)
-            if resp.status_code == 200:
-                estimate.status = 'SENT'
-                estimate.save(update_fields=['status'])
-                return Response({'success': True})
-            else:
-                return Response({'error': 'Failed to send via WhatsApp'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        from operations.services import send_whatsapp_message
+        success = send_whatsapp_message(
+            number=estimate.client.phone,
+            text=text,
+            document_url=document_url,
+            file_name=f"Presupuesto_{estimate.id}.pdf"
+        )
+        if success:
+            estimate.status = 'SENT'
+            estimate.save(update_fields=['status'])
+            return Response({'success': True})
+        else:
+            return Response({'error': 'Failed to send via WhatsApp or microservice not available'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['get'])
     def pdf(self, request, pk=None):
