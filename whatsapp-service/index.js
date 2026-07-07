@@ -191,6 +191,24 @@ function getMessageText(message) {
            '';
 }
 
+async function syncMessageToDjango(phone, text, sender, timestamp) {
+    try {
+        await axios.post(`${BACKEND_URL}/api/operations/whatsapp-messages/sync/`, {
+            messages: [{
+                phone: phone,
+                text: text,
+                sender: sender,
+                timestamp: timestamp
+            }]
+        }, {
+            headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
+            timeout: 5000
+        });
+    } catch (err) {
+        console.error('Error al sincronizar mensaje individual con backend:', err.message);
+    }
+}
+
 async function connectToWhatsApp() {
     // 1. Descargar credenciales persistentes antes de conectar
     await syncSessionFromDB();
@@ -262,12 +280,11 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', wrappedSaveCreds);
 
-    // Escuchar mensajes entrantes de clientes para automatizar el agente de ventas con IA
+    // Escuchar mensajes de WhatsApp (entrantes y salientes) y sincronizarlos con Django
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
             if (!msg || !msg.message) return;
-            if (msg.key.fromMe) return; // Ignorar mensajes propios
             
             const senderJid = msg.key.remoteJid;
             if (!senderJid || !senderJid.endsWith('@s.whatsapp.net')) return;
@@ -276,9 +293,21 @@ async function connectToWhatsApp() {
             const text = getMessageText(msg.message);
             if (!text || text.trim() === '') return;
 
-            console.log(`Mensaje entrante de ${senderJid}: "${text}"`);
+            const timestamp = msg.messageTimestamp ? Number(msg.messageTimestamp) : Math.floor(Date.now() / 1000);
 
-            // Consultar a Django AI Assistant
+            if (msg.key.fromMe) {
+                // Mensaje saliente enviado desde nuestro propio número (ya sea manual o por el asistente)
+                console.log(`Mensaje saliente propio para ${senderJid}: "${text}"`);
+                await syncMessageToDjango(senderJid, text, 'assistant', timestamp);
+                return;
+            }
+
+            console.log(`Mensaje entrante de ${senderJid}: "${text}"`);
+            
+            // Sincronizar mensaje entrante del cliente al backend
+            await syncMessageToDjango(senderJid, text, 'client', timestamp);
+
+            // Consultar a Django AI Assistant para responder de manera automatizada
             const response = await axios.post(`${BACKEND_URL}/api/ai/whatsapp-agent/`, {
                 number: senderJid,
                 text: text

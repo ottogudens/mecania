@@ -110,22 +110,29 @@ class WhatsAppAgentView(APIView):
         client_obj = Client.objects.filter(phone__icontains=clean_num[-8:]).first()
 
         # Si el bot está silenciado para este cliente por intervención humana reciente, no responder
+        import datetime
+        dt_now = timezone.now()
+        start_dt = dt_now - datetime.timedelta(seconds=15)
+        end_dt = dt_now + datetime.timedelta(seconds=15)
+
         if client_obj and client_obj.bot_silenced_until and client_obj.bot_silenced_until > timezone.now():
+            if not WhatsAppMessage.objects.filter(phone=clean_num, text=text, sender='client', timestamp__range=(start_dt, end_dt)).exists():
+                WhatsAppMessage.objects.create(
+                    phone=clean_num,
+                    client=client_obj,
+                    sender='client',
+                    text=text
+                )
+            return Response({"reply": None}, status=status.HTTP_200_OK)
+
+        # Guardar el mensaje entrante del cliente si no fue registrado recientemente
+        if not WhatsAppMessage.objects.filter(phone=clean_num, text=text, sender='client', timestamp__range=(start_dt, end_dt)).exists():
             WhatsAppMessage.objects.create(
                 phone=clean_num,
                 client=client_obj,
                 sender='client',
                 text=text
             )
-            return Response({"reply": None}, status=status.HTTP_200_OK)
-
-        # Guardar el mensaje entrante del cliente
-        WhatsAppMessage.objects.create(
-            phone=clean_num,
-            client=client_obj,
-            sender='client',
-            text=text
-        )
 
         def save_and_response(reply_text, extra_props=None):
             WhatsAppMessage.objects.create(
