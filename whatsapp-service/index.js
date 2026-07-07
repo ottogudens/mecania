@@ -392,6 +392,24 @@ app.get('/api/status', requireInternalKey, (req, res) => {
     });
 });
 
+app.post('/api/resolve-number', requireInternalKey, async (req, res) => {
+    try {
+        const { number } = req.body;
+        if (!number) {
+            return res.status(400).json({ error: 'Number is required' });
+        }
+        if (!sock) {
+            return res.status(503).json({ error: 'WhatsApp service not ready' });
+        }
+        const cleanNumber = String(number).replace(/\D/g, '');
+        const result = await sock.onWhatsApp(cleanNumber);
+        return res.status(200).json({ number, cleanNumber, result });
+    } catch (err) {
+        console.error('Error in /api/resolve-number:', err);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/send-message', requireInternalKey, async (req, res) => {
     try {
         const { number, text, documentUrl, documentBase64, fileName } = req.body;
@@ -406,7 +424,19 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
 
         // Format number to JID
         const cleanNumber = String(number).replace(/\D/g, '');
-        const jid = `${cleanNumber}@s.whatsapp.net`;
+        let jid = `${cleanNumber}@s.whatsapp.net`;
+        
+        try {
+            const result = await sock.onWhatsApp(cleanNumber);
+            if (result && result.length > 0 && result[0].exists) {
+                jid = result[0].jid;
+                console.log(`Resolved JID for number ${number} using onWhatsApp -> ${jid}`);
+            } else {
+                console.warn(`Number ${number} / ${cleanNumber} not found on WhatsApp, using fallback JID: ${jid}`);
+            }
+        } catch (err) {
+            console.error('Error resolving JID using onWhatsApp, reusing fallback:', err.message);
+        }
         
         if (documentBase64) {
             await sock.sendMessage(jid, { 
@@ -426,7 +456,7 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
             await sock.sendMessage(jid, { text: text });
         }
         
-        return res.status(200).json({ success: true, message: 'Message sent successfully' });
+        return res.status(200).json({ success: true, message: 'Message sent successfully', resolvedJid: jid });
     } catch (error) {
         console.error('Error sending message:', error);
         return res.status(500).json({ error: 'Failed to send message', details: error.message });
