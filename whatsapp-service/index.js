@@ -364,10 +364,10 @@ app.get('/api/status', requireInternalKey, (req, res) => {
 
 app.post('/api/send-message', requireInternalKey, async (req, res) => {
     try {
-        const { number, text, documentUrl, fileName } = req.body;
+        const { number, text, documentUrl, documentBase64, fileName } = req.body;
         
-        if (!number || (!text && !documentUrl)) {
-            return res.status(400).json({ error: 'Number and either text or documentUrl are required' });
+        if (!number || (!text && !documentUrl && !documentBase64)) {
+            return res.status(400).json({ error: 'Number and either text, documentUrl or documentBase64 are required' });
         }
         
         if (!sock) {
@@ -378,7 +378,14 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
         const cleanNumber = String(number).replace(/\D/g, '');
         const jid = `${cleanNumber}@s.whatsapp.net`;
         
-        if (documentUrl) {
+        if (documentBase64) {
+            await sock.sendMessage(jid, { 
+                document: Buffer.from(documentBase64, 'base64'), 
+                mimetype: 'application/pdf', 
+                fileName: fileName || 'Documento.pdf',
+                caption: text || ''
+            });
+        } else if (documentUrl) {
             await sock.sendMessage(jid, { 
                 document: { url: documentUrl }, 
                 mimetype: 'application/pdf', 

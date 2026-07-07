@@ -725,35 +725,7 @@ class EstimateViewSet(viewsets.ModelViewSet):
         
         return Response({'success': True, 'work_order_id': work_order.id})
 
-    @action(detail=True, methods=['post'])
-    def share_whatsapp(self, request, pk=None):
-        estimate = self.get_object()
-        if not estimate.client.phone:
-            return Response({'error': 'Client has no phone number'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        text = f"¡Hola {estimate.client.first_name}! Te compartimos el presupuesto PRE-{estimate.id} por un total de ${estimate.total_amount}. Puedes revisarlo en el documento adjunto."
-        
-        # Build absolute URL for the PDF
-        document_url = request.build_absolute_uri(f'/api/finance/estimates/{estimate.id}/pdf/')
-        
-        from operations.services import send_whatsapp_message
-        success = send_whatsapp_message(
-            number=estimate.client.phone,
-            text=text,
-            document_url=document_url,
-            file_name=f"Presupuesto_{estimate.id}.pdf"
-        )
-        if success:
-            estimate.status = 'SENT'
-            estimate.save(update_fields=['status'])
-            return Response({'success': True})
-        else:
-            return Response({'error': 'Failed to send via WhatsApp or microservice not available'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    @action(detail=True, methods=['get'])
-    def pdf(self, request, pk=None):
-        estimate = self.get_object()
-        
+    def _generate_pdf_content(self, estimate):
         from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import letter
         from reportlab.lib import colors
@@ -855,9 +827,42 @@ class EstimateViewSet(viewsets.ModelViewSet):
         p.showPage()
         p.save()
         buffer.seek(0)
+        return buffer.getvalue()
+
+    @action(detail=True, methods=['post'])
+    def share_whatsapp(self, request, pk=None):
+        estimate = self.get_object()
+        if not estimate.client.phone:
+            return Response({'error': 'Client has no phone number'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        text = f"¡Hola {estimate.client.first_name}! Te compartimos el presupuesto PRE-{estimate.id} por un total de ${estimate.total_amount}. Puedes revisarlo en el documento adjunto."
+        
+        # Generar contenido binario del PDF y codificarlo en Base64
+        import base64
+        pdf_data = self._generate_pdf_content(estimate)
+        pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
+        
+        from operations.services import send_whatsapp_message
+        success = send_whatsapp_message(
+            number=estimate.client.phone,
+            text=text,
+            document_base64=pdf_base64,
+            file_name=f"Presupuesto_{estimate.id}.pdf"
+        )
+        if success:
+            estimate.status = 'SENT'
+            estimate.save(update_fields=['status'])
+            return Response({'success': True})
+        else:
+            return Response({'error': 'Failed to send via WhatsApp or microservice not available'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        estimate = self.get_object()
+        pdf_data = self._generate_pdf_content(estimate)
         
         from django.http import HttpResponse
-        resp = HttpResponse(buffer, content_type='application/pdf')
+        resp = HttpResponse(pdf_data, content_type='application/pdf')
         resp['Content-Disposition'] = f'inline; filename="Presupuesto_{estimate.id}.pdf"'
         return resp
 

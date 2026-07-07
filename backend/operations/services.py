@@ -140,7 +140,7 @@ def cancel_work_order(*, work_order: WorkOrder, reason: str = ''):
     return work_order
 
 
-def send_whatsapp_message(*, number: str, text: str, document_url: str = None, file_name: str = None) -> bool:
+def send_whatsapp_message(*, number: str, text: str, document_url: str = None, document_base64: str = None, file_name: str = None) -> bool:
     """
     Envía un mensaje de WhatsApp a través del microservicio de Node.js inyectando
     correctamente la clave de seguridad interna (API Key) en los encabezados.
@@ -166,6 +166,8 @@ def send_whatsapp_message(*, number: str, text: str, document_url: str = None, f
     }
     if document_url:
         payload["documentUrl"] = document_url
+    if document_base64:
+        payload["documentBase64"] = document_base64
     if file_name:
         payload["fileName"] = file_name
 
