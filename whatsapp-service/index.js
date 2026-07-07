@@ -344,7 +344,7 @@ connectToWhatsApp();
 
 // REST API for Django to call
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', requireInternalKey, (req, res) => {
     res.json({
         status: connectionStatus,
         qr: currentQr,

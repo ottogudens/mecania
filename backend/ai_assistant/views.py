@@ -184,6 +184,11 @@ class WhatsAppAgentView(APIView):
                 reply_msg = "He pausado la automatización y he notificado a nuestro equipo. Un asesor técnico se comunicará contigo en breves minutos."
                 if matched_flow.response_text.strip():
                     reply_msg = matched_flow.response_text
+                if client_obj:
+                    from django.utils import timezone
+                    from datetime import timedelta
+                    client_obj.bot_silenced_until = timezone.now() + timedelta(hours=6)
+                    client_obj.save(update_fields=['bot_silenced_until'])
                 return save_and_response(reply_msg, {"action": "human_transfer"})
 
         # 2. Recolectar contexto del cliente y vehículos

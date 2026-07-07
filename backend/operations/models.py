@@ -13,6 +13,11 @@ class WorkshopSettings(models.Model):
     name = models.CharField(max_length=100, default="MecanIA")
     logo = models.TextField(blank=True, null=True, help_text="Logo del taller en formato Base64")
     phone = models.CharField(max_length=20, blank=True)
+    admin_whatsapp = models.CharField(
+        max_length=20, 
+        blank=True, 
+        help_text="Número de WhatsApp del Administrador para notificaciones de cierre de caja (ej: +56912345678)"
+    )
     address = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True)
     website = models.URLField(blank=True)

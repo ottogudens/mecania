@@ -1743,4 +1743,28 @@ class WhatsAppLogoutView(APIView):
             return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class WhatsAppStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+            whatsapp_status_url = f"{base_whatsapp_url.rstrip('/')}/api/status"
+
+            from django.conf import settings
+            expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+            headers = {}
+            if expected_key:
+                headers['X-Mecania-Secret-Key'] = expected_key
+
+            resp = requests.get(whatsapp_status_url, headers=headers, timeout=10)
+
+            if resp.status_code == 200:
+                return Response(resp.json(), status=status.HTTP_200_OK)
+            else:
+                return Response({'error': f'El microservicio respondió con status: {resp.status_code}'}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception as e:
+            return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 

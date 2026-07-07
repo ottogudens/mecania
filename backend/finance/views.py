@@ -216,6 +216,64 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
         session.status = 'CLOSED'
         session.save()
 
+        # Generar notificación de Reporte Z a WhatsApp del Administrador
+        try:
+            from operations.models import WorkshopSettings
+            import os
+            import requests
+
+            ws_settings = WorkshopSettings.objects.first()
+            if ws_settings and ws_settings.admin_whatsapp:
+                phone = ws_settings.admin_whatsapp
+                stats = self.get_session_stats(session)
+                
+                # Calcular diferencias
+                diff_cash = session.closing_cash - Decimal(str(stats['expected_cash_drawer']))
+                diff_card = session.closing_card - Decimal(str(stats['expected_card']))
+                diff_transfer = session.closing_transfer - Decimal(str(stats['expected_transfer']))
+                
+                def fmt(val):
+                    # Formato chileno simple: separador de miles con coma o punto, sin decimales
+                    return f"${val:,.0f}".replace(",", ".") if val >= 0 else f"-${abs(val):,.0f}".replace(",", ".")
+
+                message = (
+                    f"⭐ *REPORTE Z - CIERRE DE CAJA* ⭐\n\n"
+                    f"📅 *Fecha cierre:* {session.closed_at.strftime('%d-%m-%Y %H:%M')}\n"
+                    f"👤 *Cerrado por:* {request.user.first_name or request.user.username}\n\n"
+                    f"💵 *Monto Inicial:* {fmt(session.opening_amount)}\n\n"
+                    f"📊 *Resumen Efectivo (Caja):*\n"
+                    f"  - Esperado en caja: {fmt(Decimal(str(stats['expected_cash_drawer'])))}\n"
+                    f"  - Físico declarado: {fmt(session.closing_cash)}\n"
+                    f"  - Diferencia: {fmt(diff_cash)}\n\n"
+                    f"💳 *Resumen Transbank (Tarjeta):*\n"
+                    f"  - Esperado tarjeta: {fmt(Decimal(str(stats['expected_card'])))}\n"
+                    f"  - Físico declarado: {fmt(session.closing_card)}\n"
+                    f"  - Diferencia: {fmt(diff_card)}\n\n"
+                    f"🏦 *Resumen Transferencias:*\n"
+                    f"  - Esperado transf: {fmt(Decimal(str(stats['expected_transfer'])))}\n"
+                    f"  - Físico declarado: {fmt(session.closing_transfer)}\n"
+                    f"  - Diferencia: {fmt(diff_transfer)}\n\n"
+                    f"📝 *Notas de Cierre:* {session.closing_notes or 'Sin comentarios.'}"
+                )
+
+                base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+                send_msg_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+                
+                from django.conf import settings as django_settings
+                expected_key = getattr(django_settings, 'INTERNAL_API_KEY', None)
+                headers = {}
+                if expected_key:
+                    headers['X-Mecania-Secret-Key'] = expected_key
+
+                requests.post(send_msg_url, json={
+                    "number": phone,
+                    "text": message
+                }, headers=headers, timeout=5)
+        except Exception as e:
+            # Capturar errores de red/configuración sin romper la respuesta del cierre de caja
+            import logging
+            logging.getLogger(__name__).error(f"Error al enviar Reporte Z por WhatsApp: {str(e)}")
+
         return Response(CashRegisterSessionSerializer(session).data)
 
     @action(detail=True, methods=['get'])

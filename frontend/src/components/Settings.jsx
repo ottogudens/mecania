@@ -88,7 +88,7 @@ const Settings = ({ onSettingsUpdate }) => {
   const [qrCode, setQrCode] = useState(null);
   
   const [workshopSettings, setWorkshopSettings] = useState({
-    name: '', phone: '', address: '', email: '', website: '', logo_url: '', google_maps_link: '', assistant_prompt: ''
+    name: '', phone: '', address: '', email: '', website: '', logo_url: '', google_maps_link: '', assistant_prompt: '', admin_whatsapp: ''
   });
   const [logoFile, setLogoFile] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -132,12 +132,11 @@ const Settings = ({ onSettingsUpdate }) => {
 
   const fetchWhatsAppStatus = async () => {
     try {
-      const baseUrl = import.meta.env.VITE_WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-      const response = await axios.get(`${baseUrl}/api/status`);
+      const response = await axios.get('/api/operations/whatsapp/status/');
       setWaStatus(response.data.status);
       setQrCode(response.data.qr);
     } catch (err) {
-      console.error("Error connecting to WhatsApp microservice:", err);
+      console.error("Error connecting to WhatsApp status proxy:", err);
       setWaStatus('error');
     }
   };
@@ -183,7 +182,8 @@ const Settings = ({ onSettingsUpdate }) => {
         website: workshopSettings.website || '',
         google_maps_link: workshopSettings.google_maps_link || '',
         logo: workshopSettings.logo || null,
-        assistant_prompt: workshopSettings.assistant_prompt || ''
+        assistant_prompt: workshopSettings.assistant_prompt || '',
+        admin_whatsapp: workshopSettings.admin_whatsapp || ''
       });
       setWorkshopSettings(res.data);
       if (onSettingsUpdate) {
@@ -209,7 +209,8 @@ const Settings = ({ onSettingsUpdate }) => {
         website: workshopSettings.website || '',
         google_maps_link: workshopSettings.google_maps_link || '',
         logo: workshopSettings.logo || null,
-        assistant_prompt: workshopSettings.assistant_prompt || ''
+        assistant_prompt: workshopSettings.assistant_prompt || '',
+        admin_whatsapp: workshopSettings.admin_whatsapp || ''
       });
       setWorkshopSettings(res.data);
       if (onSettingsUpdate) {
@@ -377,8 +378,14 @@ const Settings = ({ onSettingsUpdate }) => {
               </div>
 
               <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Teléfono</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Teléfono de Contacto</label>
                 <input className="input-field" type="text" value={workshopSettings.phone} onChange={e => setWorkshopSettings({...workshopSettings, phone: e.target.value})} />
+              </div>
+
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>WhatsApp del Administrador (Reportes Z)</label>
+                <input className="input-field" type="text" placeholder="Ej: 56912345678" value={workshopSettings.admin_whatsapp || ''} onChange={e => setWorkshopSettings({...workshopSettings, admin_whatsapp: e.target.value})} />
+                <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Número en formato internacional sin el signo '+' ni espaciados (Ej: 56912345678) para recibir los Reportes Z automáticos al cerrar cajas.</small>
               </div>
 
               <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
