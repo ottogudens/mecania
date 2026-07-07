@@ -76,10 +76,18 @@ async function syncSessionFromDB() {
 
 let pendingSync = {};
 let syncTimeout = null;
+let isSyncing = false;
 
 async function flushSync() {
+    if (isSyncing) {
+        // Si hay una sincronización en curso, posponerla para cuando termine
+        scheduleSync();
+        return;
+    }
+    
     if (Object.keys(pendingSync).length === 0) return;
     
+    isSyncing = true;
     const batch = { ...pendingSync };
     pendingSync = {};
     syncTimeout = null;
@@ -96,6 +104,8 @@ async function flushSync() {
         // Volver a encolar para reintento en el siguiente ciclo
         pendingSync = { ...batch, ...pendingSync };
         scheduleSync();
+    } finally {
+        isSyncing = false;
     }
 }
 
