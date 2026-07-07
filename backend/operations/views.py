@@ -1639,14 +1639,24 @@ class WhatsAppMessageSyncView(APIView):
             client_obj = get_client(clean_num)
 
             dt_utc = datetime.datetime.fromtimestamp(timestamp_unix, tz=datetime.timezone.utc)
-            start_dt = dt_utc - datetime.timedelta(seconds=5)
-            end_dt = dt_utc + datetime.timedelta(seconds=5)
+            # Ventana de tolerancia más amplia para mensajes salientes (30s) ya que el timestamp
+            # de Django (auto_now_add) y el de Baileys (messageTimestamp) pueden diferir por latencia/clock drift.
+            tolerance = 30 if sender in ('assistant', 'operator') else 5
+            start_dt = dt_utc - datetime.timedelta(seconds=tolerance)
+            end_dt = dt_utc + datetime.timedelta(seconds=tolerance)
+
+            # Para mensajes salientes (assistant/operator), buscar duplicados contra ambos roles
+            # porque Django guarda como 'operator' pero Baileys lo reporta como 'assistant' (fromMe)
+            if sender in ('assistant', 'operator'):
+                sender_filter = {'sender__in': ['assistant', 'operator']}
+            else:
+                sender_filter = {'sender': sender}
 
             exists = WhatsAppMessage.objects.filter(
                 phone=clean_num,
                 text=text,
-                sender=sender,
-                timestamp__range=(start_dt, end_dt)
+                timestamp__range=(start_dt, end_dt),
+                **sender_filter
             ).exists()
 
             if not exists:

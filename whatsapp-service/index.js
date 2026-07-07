@@ -264,8 +264,15 @@ async function connectToWhatsApp() {
                 clearSession().then(() => {
                     connectToWhatsApp();
                 });
+            } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
+                // Conflicto de sesión: otra instancia o dispositivo tomó el control del socket.
+                // Usar un delay largo (60s) para evitar bucle infinito de reconexión competitiva.
+                console.warn('⚠️  Conflicto de sesión detectado (connectionReplaced / 440). Esperando 60 segundos antes de reintentar...');
+                setTimeout(() => {
+                    connectToWhatsApp();
+                }, 60000);
             } else if (shouldReconnect) {
-                // Para cualquier otro error (timeout, conflicto transitorio por reinicio rápido), reintentamos conectar conservando la sesión
+                // Para cualquier otro error transitorio (timeout, red), reintentamos rápido conservando la sesión
                 console.log('Desconexión temporal. Intentando reconectar en 3 segundos...');
                 setTimeout(() => {
                     connectToWhatsApp();
