@@ -1562,17 +1562,24 @@ class WhatsAppChatListView(APIView):
                     except Exception:
                         pass
 
+                from django.utils import timezone
+                now = timezone.now()
+                is_silenced = client_obj.bot_silenced_until and client_obj.bot_silenced_until > now
                 client_info = {
                     "id": client_obj.id,
                     "name": f"{client_obj.first_name} {client_obj.last_name}",
                     "email": client_obj.email,
                     "phone": client_obj.phone,
-                    "vehicles": vehicles_list
+                    "vehicles": vehicles_list,
+                    "bot_silenced_until": client_obj.bot_silenced_until.isoformat() if client_obj.bot_silenced_until else None,
+                    "is_bot_silenced": bool(is_silenced)
                 }
 
             client_name = client_info["name"] if client_info else "Desconocido"
             client_id = client_info["id"] if client_info else None
             vehicles_list = client_info["vehicles"] if client_info else []
+            is_bot_silenced = client_info["is_bot_silenced"] if client_info else False
+            bot_silenced_until = client_info["bot_silenced_until"] if client_info else None
 
             chats.append({
                 "phone": phone,
@@ -1583,7 +1590,9 @@ class WhatsAppChatListView(APIView):
                 "client_name": client_name,
                 "client_id": client_id,
                 "vehicles": vehicles_list,
-                "client": client_info
+                "client": client_info,
+                "is_bot_silenced": is_bot_silenced,
+                "bot_silenced_until": bot_silenced_until
             })
 
         return Response(chats, status=status.HTTP_200_OK)
@@ -1793,6 +1802,55 @@ class WhatsAppStatusView(APIView):
                 return Response({'error': f'El microservicio respondió con status: {resp.status_code}'}, status=status.HTTP_502_BAD_GATEWAY)
         except Exception as e:
             return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class WhatsAppToggleSilenceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import Client
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        phone = request.data.get('phone')
+        silenced = request.data.get('silenced') # true, false, o toggle si es omitido
+
+        if not phone:
+            return Response({'error': 'phone es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        clean_num = ''.join(filter(str.isdigit, phone))
+        client_obj = None
+        if len(clean_num) >= 8:
+            suffix = clean_num[-8:]
+            client_obj = Client.objects.filter(phone__icontains=suffix).first()
+
+        if not client_obj:
+            return Response({'error': 'Cliente no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        if silenced is not None:
+            if silenced:
+                client_obj.bot_silenced_until = timezone.now() + timedelta(hours=2)
+            else:
+                client_obj.bot_silenced_until = None
+        else:
+            # Toggle
+            now = timezone.now()
+            is_currently_silenced = client_obj.bot_silenced_until and client_obj.bot_silenced_until > now
+            if is_currently_silenced:
+                client_obj.bot_silenced_until = None
+            else:
+                client_obj.bot_silenced_until = now + timedelta(hours=2)
+
+        client_obj.save(update_fields=['bot_silenced_until'])
+
+        now = timezone.now()
+        is_silenced = client_obj.bot_silenced_until and client_obj.bot_silenced_until > now
+
+        return Response({
+            'success': True,
+            'is_bot_silenced': bool(is_silenced),
+            'bot_silenced_until': client_obj.bot_silenced_until.isoformat() if client_obj.bot_silenced_until else None
+        }, status=status.HTTP_200_OK)
 
 
 

@@ -12,6 +12,7 @@ const WhatsAppChat = () => {
   const [sending, setSending] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedChatInfo, setSelectedChatInfo] = useState(null);
+  const [silencing, setSilencing] = useState(false);
   
   const toast = useToast();
   const messagesEndRef = useRef(null);
@@ -88,6 +89,51 @@ const WhatsAppChat = () => {
     }
   };
 
+  // Cambiar/Desactivar el silencio del bot
+  const handleToggleSilence = async () => {
+    if (!selectedPhone) return;
+    setSilencing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/operations/whatsapp-messages/toggle-silence/', {
+        phone: selectedPhone
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      
+      const { is_bot_silenced, bot_silenced_until } = response.data;
+      toast({ 
+        title: is_bot_silenced ? 'Bot Silenciado' : 'Bot Activado', 
+        message: is_bot_silenced 
+          ? 'El asistente automático ha sido silenciado por 2 horas.' 
+          : 'El asistente automático está activo para responder a este cliente.', 
+        type: 'success' 
+      });
+      
+      // Actualizar localmente en el listado de chats
+      setChats(prevChats => prevChats.map(c => {
+        if (c.phone === selectedPhone) {
+          return {
+            ...c,
+            is_bot_silenced,
+            bot_silenced_until,
+            client: c.client ? { ...c.client, is_bot_silenced, bot_silenced_until } : null
+          };
+        }
+        return c;
+      }));
+    } catch (err) {
+      console.error("Error al cambiar silencio del bot:", err);
+      toast({ 
+        title: 'Error', 
+        message: 'No se pudo cambiar el estado del bot inteligente.', 
+        type: 'error' 
+      });
+    } finally {
+      setSilencing(false);
+    }
+  };
+
   // Initial load
   useEffect(() => {
     fetchChats();
@@ -110,6 +156,16 @@ const WhatsAppChat = () => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Sincronizar selectedChatInfo cuando cambie el item correspondiente en la lista (polling o acciones)
+  useEffect(() => {
+    if (selectedPhone && chats.length > 0) {
+      const updatedChat = chats.find(c => c.phone === selectedPhone);
+      if (updatedChat) {
+        setSelectedChatInfo(updatedChat);
+      }
+    }
+  }, [chats, selectedPhone]);
 
   // Manejar selección de chat
   const handleSelectChat = (chat) => {
@@ -391,6 +447,41 @@ const WhatsAppChat = () => {
                       )}
                     </div>
                   </div>
+
+                  {selectedChatInfo.client_id && (
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>BOT DE AUTO-RESPUESTA</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                        {selectedChatInfo.is_bot_silenced ? (
+                          <>
+                            <span className="badge badge-pending" style={{ fontSize: '0.65rem', background: '#D97706', color: 'white' }}>Silenciado (2h)</span>
+                            <button
+                              onClick={handleToggleSilence}
+                              disabled={silencing}
+                              className="btn btn-ghost btn-sm"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '4px', cursor: 'pointer' }}
+                              title="Re-activar bot inteligente de inmediato"
+                            >
+                              ⚡ Activar BOT
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="badge badge-delivered" style={{ fontSize: '0.65rem', background: '#059669', color: 'white' }}>Activo</span>
+                            <button
+                              onClick={handleToggleSilence}
+                              disabled={silencing}
+                              className="btn btn-ghost btn-sm"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer' }}
+                              title="Silenciar bot inteligente por 2 horas"
+                            >
+                              🔕 Silenciar
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {selectedChatInfo.vehicles && selectedChatInfo.vehicles.length > 0 ? (
                     <div>
