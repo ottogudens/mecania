@@ -83,6 +83,118 @@ const ChargeWorkOrder = () => {
   const [activeInvoices, setActiveInvoices] = useState([]);
   const [loadingActive, setLoadingActive] = useState(false);
 
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editItemData, setEditItemData] = useState({ description: '', quantity: 1, unit_price: 0 });
+  const [catalogServices, setCatalogServices] = useState([]);
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [itemSource, setItemSource] = useState('manual');
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState(null);
+  const [newItem, setNewItem] = useState({ description: '', quantity: 1, unit_price: 0 });
+  const [barcodeInput, setBarcodeInput] = useState('');
+
+  useEffect(() => {
+    const h = authHeader();
+    Promise.all([
+      axios.get('/api/inventory/services/?is_active=true', h),
+      axios.get('/api/inventory/products/', h),
+    ]).then(([s, p]) => {
+      setCatalogServices(s.data.results || s.data);
+      setCatalogProducts(p.data.results || p.data);
+    }).catch(console.error);
+  }, []);
+
+  const reloadInvoice = async (invoiceId) => {
+    try {
+      const { data } = await axios.get(`/api/finance/invoices/${invoiceId}/`, { headers: authHeader() });
+      setInvoice(data);
+      setAmount(String(parseFloat(data.total_amount) - parseFloat(data.amount_paid)));
+      fetchActiveInvoices();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleUpdateItem = async (itemId) => {
+    try {
+      await axios.patch(`/api/operations/work-order-items/${itemId}/`, editItemData, {
+        headers: authHeader()
+      });
+      setEditingItemId(null);
+      setEditItemData({ description: '', quantity: 1, unit_price: 0 });
+      reloadInvoice(invoice.id);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo actualizar el ítem.');
+    }
+  };
+
+  const handleDeleteItem = async (itemId) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar este ítem?')) return;
+    try {
+      await axios.delete(`/api/operations/work-order-items/${itemId}/`, {
+        headers: authHeader()
+      });
+      reloadInvoice(invoice.id);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo eliminar el ítem.');
+    }
+  };
+
+  const handleAddItem = async (e) => {
+    e.preventDefault();
+    if (!invoice || !invoice.work_order) return;
+    try {
+      let payload = { ...newItem, work_order: invoice.work_order };
+      if (itemSource === 'service' && selectedCatalogItem) {
+        payload.service = selectedCatalogItem.id;
+        payload.description = selectedCatalogItem.name;
+        payload.unit_price = selectedCatalogItem.price;
+      } else if (itemSource === 'product' && selectedCatalogItem) {
+        payload.product = selectedCatalogItem.id;
+        payload.description = selectedCatalogItem.name;
+        payload.unit_price = selectedCatalogItem.price;
+      }
+      await axios.post('/api/operations/work-order-items/', payload, {
+        headers: authHeader()
+      });
+      setNewItem({ description: '', quantity: 1, unit_price: 0 });
+      setSelectedCatalogItem(null);
+      setItemSource('manual');
+      reloadInvoice(invoice.id);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo agregar el ítem.');
+    }
+  };
+
+  const handleScanBarcode = async (e) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    const p = catalogProducts.find(prod => prod.sku === barcodeInput.trim() || prod.id.toString() === barcodeInput.trim());
+    if (p) {
+      try {
+        const payload = {
+          work_order: invoice.work_order,
+          product: p.id,
+          description: p.name,
+          unit_price: p.price,
+          quantity: 1,
+          is_labor: false
+        };
+        await axios.post('/api/operations/work-order-items/', payload, {
+          headers: authHeader()
+        });
+        setBarcodeInput('');
+        reloadInvoice(invoice.id);
+      } catch (err) {
+        alert('Error al agregar producto escaneado.');
+      }
+    } else {
+      alert(`No existe ningún producto con SKU: ${barcodeInput}`);
+    }
+  };
+
   const fetchActiveInvoices = async () => {
     setLoadingActive(true);
     try {
@@ -154,6 +266,7 @@ const ChargeWorkOrder = () => {
   const selectInvoice = (inv) => {
     setInvoice(inv);
     setMsg(null);
+    setEditingItemId(null);
     setAmount(String(parseFloat(inv.total_amount) - parseFloat(inv.amount_paid)));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -312,6 +425,228 @@ const ChargeWorkOrder = () => {
             </div>
             
             <InvoiceSummary invoice={invoice} />
+
+            {/* Gestión de Ítems de la OT (solo si source es de una OT) */}
+            {invoice.work_order && (
+              <div className="glass-card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
+                <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary-color)' }}>🔧 Gestión de Ítems de la OT #{invoice.work_order}</h4>
+                
+                {(!invoice.items || invoice.items.length === 0) ? (
+                  <p style={{ color: 'var(--text-muted)' }}>Esta orden no tiene repuestos ni servicios agregados.</p>
+                ) : (
+                  <div style={{ overflowX: 'auto', marginBottom: '1rem' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                          <th style={{ padding: '0.5rem', textAlign: 'left' }}>Descripción</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', width: '50px' }}>Cant</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'left', width: '80px' }}>Precio</th>
+                          <th style={{ padding: '0.5rem', textAlign: 'right' }}>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoice.items.map(item => {
+                          const isEditing = editingItemId === item.id;
+                          const isReadOnly = ['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(invoice.status);
+                          
+                          if (isEditing) {
+                            return (
+                              <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                <td style={{ padding: '0.5rem' }}>
+                                  <input 
+                                    type="text" 
+                                    className="input-field" 
+                                    style={{ width: '100%', padding: '0.2rem 0.5rem', fontSize: '0.88rem' }} 
+                                    value={editItemData.description} 
+                                    onChange={e => setEditItemData({ ...editItemData, description: e.target.value })} 
+                                  />
+                                </td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    min="0.01"
+                                    className="input-field" 
+                                    style={{ width: '100%', padding: '0.2rem 0.5rem', fontSize: '0.88rem' }} 
+                                    value={editItemData.quantity} 
+                                    onChange={e => setEditItemData({ ...editItemData, quantity: e.target.value })} 
+                                  />
+                                </td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    className="input-field" 
+                                    style={{ width: '100%', padding: '0.2rem 0.5rem', fontSize: '0.88rem' }} 
+                                    value={editItemData.unit_price} 
+                                    onChange={e => setEditItemData({ ...editItemData, unit_price: e.target.value })} 
+                                  />
+                                </td>
+                                <td style={{ padding: '0.5rem' }}>
+                                  <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'flex-end' }}>
+                                    <button 
+                                      type="button"
+                                      className="btn btn-outline" 
+                                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', borderColor: 'var(--status-green)', color: 'var(--status-green)' }}
+                                      onClick={() => handleUpdateItem(item.id)}
+                                    >
+                                      ✓
+                                    </button>
+                                    <button 
+                                      type="button"
+                                      className="btn btn-outline" 
+                                      style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
+                                      onClick={() => { setEditingItemId(null); setEditItemData({ description: '', quantity: 1, unit_price: 0 }); }}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+                          
+                          return (
+                            <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '0.5rem' }}>{item.description}</td>
+                              <td style={{ padding: '0.5rem' }}>{item.quantity}</td>
+                              <td style={{ padding: '0.5rem' }}>{fmt(item.unit_price)}</td>
+                              <td style={{ padding: '0.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span>{fmt(item.quantity * item.unit_price)}</span>
+                                  {!isReadOnly && (
+                                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                      <button 
+                                        type="button"
+                                        title="Editar"
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: '#3b82f6' }}
+                                        onClick={() => {
+                                          setEditingItemId(item.id);
+                                          setEditItemData({ description: item.description, quantity: item.quantity, unit_price: item.unit_price });
+                                        }}
+                                      >
+                                        ✏️
+                                      </button>
+                                      <button 
+                                        type="button"
+                                        title="Eliminar"
+                                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--status-red)' }}
+                                        onClick={() => handleDeleteItem(item.id)}
+                                      >
+                                        🗑️
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                {/* Formulario de añadir item en Checkout POS */}
+                {!['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(invoice.status) && (
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                    <h5 style={{ margin: '0 0 0.5rem 0' }}>Añadir Repuesto / Servicio rápido:</h5>
+                    
+                    {/* selector de fuente */}
+                    <div style={{ display: 'flex', gap: '0.3rem', margin: '0.5rem 0', background: 'rgba(0,0,0,0.3)', padding: '0.2rem', borderRadius: 6, width: 'fit-content' }}>
+                      {[['manual','✏️ Man'], ['service','🔧 Cat'], ['product','📦 Inv']].map(([val, lbl]) => (
+                        <button key={val} type="button"
+                          onClick={() => { setItemSource(val); setSelectedCatalogItem(null); setNewItem({ description: '', quantity: 1, unit_price: 0 }); }}
+                          style={{
+                            padding: '0.3rem 0.6rem', borderRadius: 4, border: 'none', cursor: 'pointer',
+                            background: itemSource === val ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                            color: itemSource === val ? '#000' : 'var(--text-muted)',
+                            fontWeight: itemSource === val ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.75rem',
+                          }}>{lbl}</button>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleScanBarcode} style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.3rem' }}>
+                      <input 
+                        type="text" 
+                        className="glass-input" 
+                        placeholder="Escanear SKU..." 
+                        value={barcodeInput} 
+                        onChange={e => setBarcodeInput(e.target.value)} 
+                        style={{ flex: 1, padding: '0.4rem', borderRadius: '6px', fontSize: '0.8rem' }} 
+                      />
+                      <button type="submit" className="btn btn-outline" style={{ padding: '0 0.6rem', fontSize: '0.8rem' }}>Escanear</button>
+                    </form>
+
+                    <form onSubmit={handleAddItem} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {itemSource === 'service' && (
+                        <div>
+                          <select
+                            style={{ width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '0.5rem', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '0.8rem' }}
+                            value={selectedCatalogItem?.id || ''}
+                            onChange={e => {
+                              const s = catalogServices.find(x => String(x.id) === e.target.value);
+                              setSelectedCatalogItem(s || null);
+                              if (s) setNewItem(n => ({ ...n, description: s.name, unit_price: s.price }));
+                            }}
+                            required
+                          >
+                            <option value="">Seleccionar servicio...</option>
+                            {catalogServices.map(s => (
+                              <option key={s.id} value={s.id}>{s.name} — {fmt(s.price)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {itemSource === 'product' && (
+                        <div>
+                          <select
+                            style={{ width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: 6, padding: '0.5rem', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '0.8rem' }}
+                            value={selectedCatalogItem?.id || ''}
+                            onChange={e => {
+                              const p = catalogProducts.find(x => String(x.id) === e.target.value);
+                              setSelectedCatalogItem(p || null);
+                              if (p) setNewItem(n => ({ ...n, description: p.name, unit_price: p.price }));
+                            }}
+                            required
+                          >
+                            <option value="">Seleccionar producto...</option>
+                            {catalogProducts.map(p => (
+                              <option key={p.id} value={p.id} disabled={p.stock_quantity <= 0}>
+                                {p.name} ({p.sku}) — Stock: {p.stock_quantity} — {fmt(p.price)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {itemSource === 'manual' && (
+                        <div>
+                          <input type="text" placeholder="Descripción" className="glass-input" style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem' }} required
+                            value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})}
+                          />
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ flex: 1 }}>
+                          <input type="number" step="0.01" min="0.01" placeholder="Cant" className="glass-input" style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem' }} required
+                            value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})}
+                          />
+                        </div>
+                        <div style={{ flex: 1.5 }}>
+                          <input type="number" step="0.01" placeholder="Precio" className="glass-input" style={{ width: '100%', padding: '0.4rem', fontSize: '0.8rem' }} required
+                            value={newItem.unit_price} onChange={e => setNewItem({...newItem, unit_price: e.target.value})}
+                          />
+                        </div>
+                        <button type="submit" className="btn" style={{ padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Añadir</button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
 
             {!isPaid && !isCancelled && balance > 0 && (
               <div className="glass-card" style={{ padding: '1.25rem' }}>

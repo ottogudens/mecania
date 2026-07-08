@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
     WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
-    WhatsAppFlow, WhatsAppMessage
+    WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment
 )
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -81,6 +81,12 @@ class WorkOrderItemSerializer(serializers.ModelSerializer):
         model = WorkOrderItem
         fields = '__all__'
 
+class WorkOrderAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkOrderAttachment
+        fields = ['id', 'work_order', 'file', 'file_name', 'uploaded_at']
+        read_only_fields = ['file_name', 'uploaded_at']
+
 class WorkOrderSerializer(serializers.ModelSerializer):
     vehicle = VehicleSerializer(read_only=True)
     vehicle_id = serializers.PrimaryKeyRelatedField(
@@ -88,6 +94,7 @@ class WorkOrderSerializer(serializers.ModelSerializer):
     )
     inspections = VisualInspectionSerializer(many=True, read_only=True)
     items = WorkOrderItemSerializer(many=True, read_only=True)
+    attachments = WorkOrderAttachmentSerializer(many=True, read_only=True)
     
     # Exponer nombre del mecánico si está asignado
     mechanic_name = serializers.CharField(source='mechanic.username', read_only=True)

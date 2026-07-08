@@ -60,6 +60,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 class InvoiceSerializer(serializers.ModelSerializer):
     payments = PaymentSerializer(many=True, read_only=True)
     line_items = InvoiceLineItemSerializer(many=True, read_only=True)
+    items = serializers.SerializerMethodField()
     balance_due = serializers.ReadOnlyField()
     client_name = serializers.SerializerMethodField()
     vehicle_license_plate = serializers.CharField(
@@ -72,7 +73,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'id', 'work_order', 'client', 'client_name', 'vehicle_license_plate', 'source',
             'subtotal', 'tax_amount', 'total_amount', 'amount_paid', 'balance_due',
             'status', 'cancelled_reason', 'created_at', 'updated_at',
-            'payments', 'line_items',
+            'payments', 'line_items', 'items',
         ]
         read_only_fields = [
             'subtotal', 'tax_amount', 'total_amount', 'amount_paid',
@@ -88,6 +89,13 @@ class InvoiceSerializer(serializers.ModelSerializer):
             c = obj.work_order.vehicle.client
             return f"{c.first_name} {c.last_name}"
         return None
+
+    def get_items(self, obj):
+        from operations.serializers import WorkOrderItemSerializer
+        if obj.work_order_id:
+            return WorkOrderItemSerializer(obj.work_order.items.all(), many=True).data
+        else:
+            return InvoiceLineItemSerializer(obj.line_items.all(), many=True).data
 
 
 class CashMovementSerializer(serializers.ModelSerializer):

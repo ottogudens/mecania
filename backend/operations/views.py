@@ -14,12 +14,12 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
     WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer,
     VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer,
-    WhatsAppFlowSerializer, WhatsAppMessageSerializer
+    WhatsAppFlowSerializer, WhatsAppMessageSerializer, WorkOrderAttachmentSerializer
 )
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
@@ -437,6 +437,12 @@ class WorkOrderItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = WorkOrderItem.objects.all().order_by('id')
     serializer_class = WorkOrderItemSerializer
+
+class WorkOrderAttachmentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+    queryset = WorkOrderAttachment.objects.all().order_by('-uploaded_at')
+    serializer_class = WorkOrderAttachmentSerializer
 
 class VisualInspectionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -1000,11 +1006,17 @@ class AIDiagnosticsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, *args, **kwargs):
+        import base64
+        import mimetypes
+        import pypdf
+
         work_order_id = request.data.get('work_order_id')
+        extracted_texts = []
+        base64_images = []
         
         if work_order_id:
             try:
-                work_order = WorkOrder.objects.select_related('vehicle').get(id=work_order_id)
+                work_order = WorkOrder.objects.select_related('vehicle').prefetch_related('attachments').get(id=work_order_id)
                 vehicle = work_order.vehicle
                 symptoms = work_order.symptoms or "No especificado"
                 visit_reason = work_order.visit_reason or "No especificado"
@@ -1017,6 +1029,44 @@ class AIDiagnosticsView(APIView):
                     f"Cilindrada: {vehicle.engine_displacement or 'No especificado'}\n"
                     f"Kilometraje OT: {work_order.mileage} km"
                 )
+
+                # Process attachments
+                for attachment in work_order.attachments.all():
+                    if not attachment.file:
+                        continue
+                    filename = attachment.file.name.lower()
+                    mime_type, _ = mimetypes.guess_type(filename)
+                    if filename.endswith('.pdf'):
+                        try:
+                            attachment.file.seek(0)
+                            reader = pypdf.PdfReader(attachment.file)
+                            pdf_text = ""
+                            for page in reader.pages:
+                                pdf_text += page.extract_text() or ""
+                            if pdf_text.strip():
+                                extracted_texts.append(f"--- Contenido extraído del PDF: {attachment.file_name} ---\n{pdf_text}\n")
+                        except Exception as pdf_err:
+                            print(f"Error parseando PDF {attachment.file_name}: {pdf_err}")
+                    elif filename.endswith('.txt') or (mime_type and mime_type.startswith('text/')):
+                        try:
+                            attachment.file.seek(0)
+                            txt_content = attachment.file.read().decode('utf-8', errors='ignore')
+                            if txt_content.strip():
+                                extracted_texts.append(f"--- Contenido extraído del archivo: {attachment.file_name} ---\n{txt_content}\n")
+                        except Exception as txt_err:
+                            print(f"Error leyendo archivo de texto {attachment.file_name}: {txt_err}")
+                    elif mime_type and mime_type.startswith('image/'):
+                        try:
+                            attachment.file.seek(0)
+                            file_bytes = attachment.file.read()
+                            b64_str = base64.b64encode(file_bytes).decode('utf-8')
+                            base64_images.append({
+                                "url": f"data:{mime_type};base64,{b64_str}",
+                                "name": attachment.file_name
+                            })
+                        except Exception as img_err:
+                            print(f"Error procesando imagen {attachment.file_name}: {img_err}")
+
             except WorkOrder.DoesNotExist:
                 return Response({'error': 'Orden de trabajo no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
         else:
@@ -1041,18 +1091,38 @@ class AIDiagnosticsView(APIView):
             - Motivo de la visita: {visit_reason}
             - Servicio solicitado: {desired_service}
             - Síntomas reportados: {symptoms}
+            """
             
-            Proporciona un pre-diagnóstico técnico estructurado (máximo 4 párrafos), indicando las posibles causas,
-            los componentes específicos a revisar, y sugerencias de mantenimiento basadas en los datos técnicos del vehículo.
+            if extracted_texts:
+                prompt += "\nInformación técnica y reportes escaneados extraídos de los archivos adjuntos:\n"
+                prompt += "\n".join(extracted_texts)
+                
+            if base64_images:
+                prompt += f"\nSe han adjuntado {len(base64_images)} imagen(es) de diagnóstico. Analiza visualmente cualquier anomalía, códigos de error o problemas físicos visibles en estas imágenes."
+                
+            prompt += """
+            Proporciona un pre-diagnóstico técnico estructurado (máximo 4 párrafos), indicando las posibles causas técnicas del problema,
+            los componentes específicos a revisar, y sugerencias de mantenimiento basadas en los datos técnicos del vehículo y los archivos adjuntos.
             Usa un tono profesional, claro y amable.
             """
+
+            user_content = [{"type": "text", "text": prompt}]
+            for img in base64_images:
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": img["url"]
+                    }
+                })
+
+            messages = [
+                {"role": "system", "content": "Eres un asistente mecánico experto."},
+                {"role": "user", "content": user_content}
+            ]
             
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "Eres un asistente mecánico experto."},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages,
                 max_tokens=600,
                 temperature=0.7
             )

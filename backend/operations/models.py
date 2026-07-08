@@ -180,15 +180,49 @@ class WorkOrderItem(models.Model):
         return self.quantity * self.unit_price
 
     def save(self, *args, **kwargs):
+        if self.work_order.status in ['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED']:
+            raise ValidationError("No se pueden modificar ítems de una Orden de Trabajo cerrada o finalizada.")
         if not self.description:
             if self.product_id:
                 self.description = self.product.name
             elif self.service_id:
                 self.description = self.service.name
         super().save(*args, **kwargs)
+        try:
+            if hasattr(self.work_order, 'invoice') and self.work_order.invoice:
+                self.work_order.invoice.recalculate_totals()
+        except Exception:
+            pass
+
+    def delete(self, *args, **kwargs):
+        if self.work_order.status in ['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED']:
+            raise ValidationError("No se pueden eliminar ítems de una Orden de Trabajo cerrada o finalizada.")
+        work_order = self.work_order
+        super().delete(*args, **kwargs)
+        try:
+            if hasattr(work_order, 'invoice') and work_order.invoice:
+                work_order.invoice.recalculate_totals()
+        except Exception:
+            pass
 
     def __str__(self):
         return f"{self.quantity}x {self.description} (OT-{self.work_order.id})"
+
+class WorkOrderAttachment(models.Model):
+    work_order = models.ForeignKey(WorkOrder, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='work_orders/attachments/', help_text="Archivo adjunto")
+    file_name = models.CharField(max_length=255, blank=True, help_text="Nombre original del archivo")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.file_name and self.file:
+            import os
+            self.file_name = os.path.basename(self.file.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Adjunto a OT-{self.work_order_id}: {self.file_name}"
+
 
 class VisualInspection(models.Model):
     STATUS_CHOICES = [

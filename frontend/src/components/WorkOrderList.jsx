@@ -64,6 +64,11 @@ const WorkOrderList = () => {
     unit_price: 0
   });
 
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [editItemData, setEditItemData] = useState({ description: '', quantity: 1, unit_price: 0 });
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [detailFiles, setDetailFiles] = useState([]);
+
   useEffect(() => {
     fetchData();
 
@@ -137,10 +142,28 @@ const WorkOrderList = () => {
     e.preventDefault();
     try {
       const token = localStorage.getItem('token');
-      await axios.post('/api/operations/work-orders/', newOrder, {
+      const response = await axios.post('/api/operations/work-orders/', newOrder, {
         headers: { Authorization: `Token ${token}` }
       });
+      const workOrderId = response.data.id;
+      
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          const formData = new FormData();
+          formData.append('work_order', workOrderId);
+          formData.append('file', file);
+          formData.append('file_name', file.name);
+          await axios.post('/api/operations/work-order-attachments/', formData, {
+            headers: { 
+              Authorization: `Token ${token}`,
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+        }
+      }
+
       setShowNewModal(false);
+      setSelectedFiles([]);
       setNewOrder({ vehicle_id: '', mileage: '', fuel_level: 50, status: 'PENDING', visit_reason: '', desired_service: '', symptoms: '' });
       fetchData();
       toast({ title: 'OT Creada', message: 'La orden de trabajo fue creada exitosamente.', type: 'success' });
@@ -148,6 +171,93 @@ const WorkOrderList = () => {
       console.error(err);
       const msg = err.response?.data?.detail || 'No se pudo crear la OT. Revisa los datos.';
       toast({ title: 'Error', message: msg, type: 'error' });
+    }
+  };
+
+  const handleUpdateItem = async (itemId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`/api/operations/work-order-items/${itemId}/`, editItemData, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setEditingItemId(null);
+      setEditItemData({ description: '', quantity: 1, unit_price: 0 });
+      fetchData();
+      
+      const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setSelectedOrder(response.data);
+      toast({ title: 'Ítem actualizado', message: 'El ítem fue modificado correctamente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo actualizar el ítem.', type: 'error' });
+    }
+  };
+
+  const handleDeleteItem = async (itemId) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar este ítem?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/operations/work-order-items/${itemId}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      fetchData();
+      
+      const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setSelectedOrder(response.data);
+      toast({ title: 'Ítem eliminado', message: 'El ítem fue removido de la orden.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo eliminar el ítem.', type: 'error' });
+    }
+  };
+
+  const handleUploadDetailFiles = async () => {
+    if (detailFiles.length === 0) return;
+    try {
+      const token = localStorage.getItem('token');
+      for (const file of detailFiles) {
+        const formData = new FormData();
+        formData.append('work_order', selectedOrder.id);
+        formData.append('file', file);
+        formData.append('file_name', file.name);
+        await axios.post('/api/operations/work-order-attachments/', formData, {
+          headers: { 
+            Authorization: `Token ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+      }
+      setDetailFiles([]);
+      const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setSelectedOrder(response.data);
+      toast({ title: 'Archivos subidos', message: 'Los archivos adjuntos fueron cargados correctamente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudieron subir los archivos adjuntos.', type: 'error' });
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId) => {
+    if (!window.confirm('¿Está seguro de que desea eliminar este archivo adjunto?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/operations/work-order-attachments/${attachmentId}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      const response = await axios.get(`/api/operations/work-orders/${selectedOrder.id}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setSelectedOrder(response.data);
+      toast({ title: 'Archivo eliminado', message: 'El archivo adjunto fue removido correctamente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo eliminar el archivo adjunto.', type: 'error' });
     }
   };
 
@@ -345,6 +455,8 @@ const WorkOrderList = () => {
   const openDetails = (order) => {
     setSelectedOrder(order);
     setMechanicFinding(order.additional_findings || '');
+    setEditingItemId(null);
+    setDetailFiles([]);
     setShowDetailsModal(true);
     // Cargar catálogo al abrir el modal
     const token = localStorage.getItem('token');
@@ -657,8 +769,27 @@ const WorkOrderList = () => {
                   />
                 </div>
 
+                <div style={{ marginTop: '1rem' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Archivos Adjuntos (Scanner, Reportes, Manuales de taller)</label>
+                  <input 
+                    type="file" 
+                    multiple 
+                    onChange={e => setSelectedFiles(Array.from(e.target.files))}
+                    style={{ display: 'none' }}
+                    id="new-file-upload"
+                  />
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <label htmlFor="new-file-upload" className="btn btn-outline" style={{ cursor: 'pointer', padding: '0.5rem 1rem' }}>
+                      📎 Seleccionar Archivos
+                    </label>
+                    {selectedFiles.length > 0 && (
+                      <span style={{ fontSize: '0.85rem' }}>{selectedFiles.length} archivo(s) seleccionado(s)</span>
+                    )}
+                  </div>
+                </div>
+
                 <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button type="button" className="btn btn-outline" onClick={() => setShowNewModal(false)}>Cancelar</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowNewModal(false); setSelectedFiles([]); }}>Cancelar</button>
                   <button type="submit" className="btn">Crear OT</button>
                 </div>
               </form>
@@ -777,16 +908,191 @@ const WorkOrderList = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedOrder.items.map(item => (
-                       <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '0.5rem' }}>{item.description}</td>
-                        <td style={{ padding: '0.5rem' }}>{item.quantity}</td>
-                        <td style={{ padding: '0.5rem' }}>${item.unit_price}</td>
-                        <td style={{ padding: '0.5rem' }}>${(item.quantity * item.unit_price).toFixed(2)}</td>
-                      </tr>
-                    ))}
+                    {selectedOrder.items.map(item => {
+                      const isEditing = editingItemId === item.id;
+                      const isReadOnly = ['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(selectedOrder.status);
+                      
+                      if (isEditing) {
+                        return (
+                          <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '0.5rem' }}>
+                              <input 
+                                type="text" 
+                                className="input-field" 
+                                style={{ width: '100%', padding: '0.2rem 0.5rem' }} 
+                                value={editItemData.description} 
+                                onChange={e => setEditItemData({ ...editItemData, description: e.target.value })} 
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem', width: '90px' }}>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                min="0.01"
+                                className="input-field" 
+                                style={{ width: '100%', padding: '0.2rem 0.5rem' }} 
+                                value={editItemData.quantity} 
+                                onChange={e => setEditItemData({ ...editItemData, quantity: e.target.value })} 
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem', width: '120px' }}>
+                              <input 
+                                type="number" 
+                                step="0.01" 
+                                className="input-field" 
+                                style={{ width: '100%', padding: '0.2rem 0.5rem' }} 
+                                value={editItemData.unit_price} 
+                                onChange={e => setEditItemData({ ...editItemData, unit_price: e.target.value })} 
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem' }}>
+                              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                <button 
+                                  type="button"
+                                  className="btn btn-outline" 
+                                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderColor: 'var(--status-green)', color: 'var(--status-green)' }}
+                                  onClick={() => handleUpdateItem(item.id)}
+                                >
+                                  Guardar
+                                </button>
+                                <button 
+                                  type="button"
+                                  className="btn btn-outline" 
+                                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}
+                                  onClick={() => { setEditingItemId(null); setEditItemData({ description: '', quantity: 1, unit_price: 0 }); }}
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      
+                      return (
+                        <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '0.5rem' }}>{item.description}</td>
+                          <td style={{ padding: '0.5rem' }}>{item.quantity}</td>
+                          <td style={{ padding: '0.5rem' }}>${item.unit_price}</td>
+                          <td style={{ padding: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>${(item.quantity * item.unit_price).toFixed(2)}</span>
+                              {!isReadOnly && (
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button 
+                                    type="button"
+                                    title="Editar"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: '#3b82f6' }}
+                                    onClick={() => {
+                                      setEditingItemId(item.id);
+                                      setEditItemData({ description: item.description, quantity: item.quantity, unit_price: item.unit_price });
+                                    }}
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    title="Eliminar"
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'var(--status-red)' }}
+                                    onClick={() => handleDeleteItem(item.id)}
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+                </div>
+              )}
+            </div>
+
+            {/* Gestión de Archivos Adjuntos */}
+            <div style={{ marginBottom: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <h4>Archivos Adjuntos para Diagnóstico IA</h4>
+              {(!selectedOrder.attachments || selectedOrder.attachments.length === 0) ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay archivos adjuntos cargados en esta orden.</p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+                  {selectedOrder.attachments.map(att => {
+                    const isPdf = att.file.toLowerCase().endsWith('.pdf');
+                    const isImg = att.file.toLowerCase().match(/\.(jpg|jpeg|png|webp|gif)$/);
+                    let icon = '📁';
+                    if (isPdf) icon = '📄';
+                    else if (isImg) icon = '🖼️';
+                    return (
+                      <div key={att.id} style={{ 
+                        background: 'rgba(255,255,255,0.05)', 
+                        borderRadius: '8px', 
+                        padding: '0.8rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        justifyContent: 'space-between',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        minHeight: '100px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <span style={{ fontSize: '1.5rem' }}>{icon}</span>
+                          <a href={att.file} target="_blank" rel="noopener noreferrer" style={{ 
+                            color: '#3b82f6', 
+                            fontSize: '0.85rem', 
+                            textDecoration: 'underline',
+                            wordBreak: 'break-all',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}>
+                            {att.file_name}
+                          </a>
+                        </div>
+                        
+                        {!['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(selectedOrder.status) && (
+                          <button 
+                            type="button"
+                            className="btn btn-outline" 
+                            style={{ 
+                              padding: '0.2rem 0.5rem', 
+                              fontSize: '0.75rem', 
+                              borderColor: 'var(--status-red)', 
+                              color: 'var(--status-red)', 
+                              alignSelf: 'flex-end',
+                              marginTop: 'auto'
+                            }}
+                            onClick={() => handleDeleteAttachment(att.id)}
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {!['COMPLETED', 'DELIVERED', 'PAID', 'CANCELLED'].includes(selectedOrder.status) && (
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
+                  <input 
+                    type="file" 
+                    multiple 
+                    onChange={e => setDetailFiles(Array.from(e.target.files))}
+                    style={{ display: 'none' }}
+                    id="detail-file-upload"
+                  />
+                  <label htmlFor="detail-file-upload" className="btn btn-outline" style={{ cursor: 'pointer', padding: '0.5rem 1rem' }}>
+                    📎 Seleccionar Archivos
+                  </label>
+                  {detailFiles.length > 0 && (
+                    <>
+                      <span style={{ fontSize: '0.85rem' }}>{detailFiles.length} archivo(s) seleccionado(s)</span>
+                      <button type="button" className="btn" onClick={handleUploadDetailFiles}>Subir Archivos</button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -920,6 +1226,19 @@ const WorkOrderList = () => {
               <button onClick={() => setShowAiModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
             </div>
             
+            {selectedOrder.attachments && selectedOrder.attachments.length > 0 && (
+              <div style={{ padding: '0.8rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#60a5fa', marginBottom: '0.4rem', fontWeight: 600 }}>
+                  📎 Archivos adjuntos para análisis:
+                </label>
+                <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  {selectedOrder.attachments.map(att => (
+                    <li key={att.id}>{att.file_name}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <form onSubmit={handleAiSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Detalles de la OT para Analizar</label>

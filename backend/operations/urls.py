@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     ClientViewSet, VehicleViewSet, WorkOrderViewSet, 
-    WorkOrderItemViewSet, VisualInspectionViewSet, 
+    WorkOrderItemViewSet, WorkOrderAttachmentViewSet, VisualInspectionViewSet, 
     CustomAuthToken, ClientAuthToken, ClientDataView, ClientVehicleDetailView, ClientChangePinView,
     AIDiagnosticsView, AITranscribeView, WorkshopSettingsView,
     DashboardStatsView, UserViewSet,
@@ -17,6 +17,7 @@ router.register(r'clients', ClientViewSet)
 router.register(r'vehicles', VehicleViewSet)
 router.register(r'work-orders', WorkOrderViewSet)
 router.register(r'work-order-items', WorkOrderItemViewSet)
+router.register(r'work-order-attachments', WorkOrderAttachmentViewSet)
 router.register(r'inspections', VisualInspectionViewSet)
 router.register(r'users', UserViewSet)
 router.register(r'vehicle-parts', VehiclePartViewSet, basename='vehiclepart')
