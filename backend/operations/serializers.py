@@ -55,6 +55,24 @@ class VehicleSerializer(serializers.ModelSerializer):
     def get_pending_maintenance_count(self, obj):
         return obj.scheduled_maintenance.filter(status__in=['PENDING', 'NOTIFIED', 'OVERDUE']).count()
 
+class VisualInspectionListSerializer(serializers.ModelSerializer):
+    vehicle_plate = serializers.CharField(source='vehicle.license_plate', read_only=True)
+    vehicle_make = serializers.CharField(source='vehicle.make', read_only=True)
+    vehicle_model = serializers.CharField(source='vehicle.model', read_only=True)
+    mechanic_username = serializers.CharField(source='mechanic.username', read_only=True)
+    vehicle_id = serializers.PrimaryKeyRelatedField(queryset=Vehicle.objects.all(), source='vehicle', required=False, allow_null=True)
+
+    vehicle_client_id = serializers.IntegerField(source='vehicle.client.id', read_only=True, default=None)
+
+    class Meta:
+        model = VisualInspection
+        fields = [
+            'id', 'vehicle_id', 'vehicle_plate', 'vehicle_make', 'vehicle_model', 
+            'mechanic', 'mechanic_username', 'status', 'notes', 
+            'created_at', 'updated_at', 'work_order', 'category', 'evidence_file', 'observations',
+            'vehicle_client_id'
+        ]
+
 class VisualInspectionSerializer(serializers.ModelSerializer):
     vehicle_plate = serializers.CharField(source='vehicle.license_plate', read_only=True)
     vehicle_make = serializers.CharField(source='vehicle.make', read_only=True)

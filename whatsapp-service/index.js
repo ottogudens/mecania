@@ -202,7 +202,7 @@ async function syncMessageToDjango(phone, text, sender, timestamp) {
             }]
         }, {
             headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
-            timeout: 5000
+            timeout: 10000
         });
     } catch (err) {
         console.error('Error al sincronizar mensaje individual con backend:', err.message);

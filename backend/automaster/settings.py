@@ -95,7 +95,15 @@ if redis_url:
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
-                "hosts": [redis_url],
+                "hosts": [
+                    {
+                        "address": redis_url,
+                        "socket_timeout": 5.0,
+                        "socket_connect_timeout": 5.0,
+                        "health_check_interval": 30,
+                        "retry_on_timeout": True,
+                    }
+                ],
             },
         },
     }

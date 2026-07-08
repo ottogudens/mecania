@@ -14,6 +14,39 @@ const VEHICLE_PARTS = [
   { id: 'exhaust', name: 'Escape', icon: '💨', desc: 'Fugas de humo, catalizador y silenciador.' }
 ];
 
+const resizeImage = (file, maxWidth, maxHeight, quality) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const image = new Image();
+      image.onload = () => {
+        let width = image.width;
+        let height = image.height;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      image.src = readerEvent.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 const MechanicPortal = ({ onLogout }) => {
   const [pendingOrders, setPendingOrders] = useState([]);
   const [assignedOrders, setAssignedOrders] = useState([]);
@@ -210,9 +243,23 @@ const MechanicPortal = ({ onLogout }) => {
     }
   };
 
-  const openInspectionAudit = (ins) => {
-    setSelectedInspection(ins);
-    setActiveItemsData(ins.items_json || {});
+  const openInspectionAudit = async (ins) => {
+    let fullInspection = ins;
+    if (!ins.items_json) {
+      try {
+        const currentToken = localStorage.getItem('token');
+        const res = await axios.get(`/api/operations/inspections/${ins.id}/`, {
+          headers: { Authorization: `Token ${currentToken}` }
+        });
+        fullInspection = res.data;
+      } catch (err) {
+        console.error("Error fetching inspection detail:", err);
+        toast({ title: 'Error', message: 'No se pudo cargar el detalle de la inspección.', type: 'error' });
+        return;
+      }
+    }
+    setSelectedInspection(fullInspection);
+    setActiveItemsData(fullInspection.items_json || {});
     setShowInspectionModal(true);
   };
 
@@ -245,15 +292,17 @@ const MechanicPortal = ({ onLogout }) => {
   };
 
   // Image upload
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleUpdatePart(selectedPartId, 'image', reader.result);
-      toast({ title: 'Foto Adjunta', message: 'Cargada con éxito.', type: 'success' });
-    };
-    reader.readAsDataURL(file);
+    try {
+      const resized = await resizeImage(file, 1024, 1024, 0.7);
+      handleUpdatePart(selectedPartId, 'image', resized);
+      toast({ title: 'Foto Adjunta', message: 'Evidencia optimizada y cargada.', type: 'success' });
+    } catch (err) {
+      console.error("Error resizing image:", err);
+      toast({ title: 'Error', message: 'No se pudo procesar la imagen.', type: 'error' });
+    }
   };
 
   // Voice recording

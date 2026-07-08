@@ -17,7 +17,7 @@ from openai import OpenAI
 from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
-    WorkOrderItemSerializer, VisualInspectionSerializer, WorkshopSettingsSerializer,
+    WorkOrderItemSerializer, VisualInspectionSerializer, VisualInspectionListSerializer, WorkshopSettingsSerializer,
     VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer,
     WhatsAppFlowSerializer, WhatsAppMessageSerializer, WorkOrderAttachmentSerializer
 )
@@ -448,6 +448,11 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = VisualInspection.objects.all().order_by('-created_at')
     serializer_class = VisualInspectionSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return VisualInspectionListSerializer
+        return VisualInspectionSerializer
 
     @action(detail=True, methods=['post'])
     def take_inspection(self, request, pk=None):

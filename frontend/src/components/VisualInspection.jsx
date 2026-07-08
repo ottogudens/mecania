@@ -13,6 +13,39 @@ const VEHICLE_PARTS = [
   { id: 'exhaust', name: 'Escape', icon: '💨', desc: 'Fugas de humo, catalizador y silenciador.' }
 ];
 
+const resizeImage = (file, maxWidth, maxHeight, quality) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (readerEvent) => {
+      const image = new Image();
+      image.onload = () => {
+        let width = image.width;
+        let height = image.height;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(image, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      image.src = readerEvent.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 const VisualInspection = () => {
   const toast = useToast();
   
@@ -223,15 +256,17 @@ const VisualInspection = () => {
   };
 
   // Image Upload handler
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleUpdatePart(selectedPartId, 'image', reader.result);
-      toast({ title: 'Foto Adjunta', message: 'Evidencia cargada.', type: 'success' });
-    };
-    reader.readAsDataURL(file);
+    try {
+      const resized = await resizeImage(file, 1024, 1024, 0.7);
+      handleUpdatePart(selectedPartId, 'image', resized);
+      toast({ title: 'Foto Adjunta', message: 'Evidencia optimizada y cargada.', type: 'success' });
+    } catch (err) {
+      console.error("Error resizing image:", err);
+      toast({ title: 'Error', message: 'No se pudo procesar la imagen.', type: 'error' });
+    }
   };
 
   // Voice recording handlers
@@ -320,19 +355,47 @@ const VisualInspection = () => {
   };
 
   // Open active view (either to audit or read)
-  const openAuditView = (inspection) => {
-    setSelectedInspection(inspection);
-    setActiveItemsData(inspection.items_json || {});
+  const openAuditView = async (inspection) => {
+    let fullInspection = inspection;
+    if (!inspection.items_json) {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`/api/operations/inspections/${inspection.id}/`, {
+          headers: { Authorization: `Token ${token}` }
+        });
+        fullInspection = res.data;
+      } catch (err) {
+        console.error("Error fetching inspection detail:", err);
+        toast({ title: 'Error', message: 'No se pudo cargar el detalle de la inspección.', type: 'error' });
+        return;
+      }
+    }
+    setSelectedInspection(fullInspection);
+    setActiveItemsData(fullInspection.items_json || {});
     setShowActiveInspection(true);
   };
 
   // Create Quick Estimate Modal Pre-filled
-  const openEstimateDraft = (inspection) => {
-    setSelectedInspection(inspection);
+  const openEstimateDraft = async (inspection) => {
+    let fullInspection = inspection;
+    if (!inspection.items_json) {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get(`/api/operations/inspections/${inspection.id}/`, {
+          headers: { Authorization: `Token ${token}` }
+        });
+        fullInspection = res.data;
+      } catch (err) {
+        console.error("Error fetching inspection detail for estimate draft:", err);
+        toast({ title: 'Error', message: 'No se pudo cargar el detalle de la inspección para el presupuesto.', type: 'error' });
+        return;
+      }
+    }
+    setSelectedInspection(fullInspection);
     
     // Auto generate items from warning or critical parts
     const items = [];
-    const parts = inspection.items_json || {};
+    const parts = fullInspection.items_json || {};
     
     Object.keys(parts).forEach(key => {
       const part = parts[key];
