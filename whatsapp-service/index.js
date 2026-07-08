@@ -263,24 +263,34 @@ async function connectToWhatsApp() {
             connectionStatus = 'disconnected';
             currentQr = null;
             const statusCode = lastDisconnect.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            const errStr = lastDisconnect.error?.message || lastDisconnect.error?.output?.payload?.message || lastDisconnect.error?.toString() || '';
+            console.log(`Connection closed: statusCode=${statusCode}, error="${errStr}"`);
+            
+            // A session conflict can return 401. Let's make sure it's not a conflict, device removal, or restart.
+            const isConflict = errStr.toLowerCase().includes('conflict') || 
+                               errStr.toLowerCase().includes('device_removed') || 
+                               statusCode === DisconnectReason.connectionReplaced || 
+                               statusCode === 440;
+            
+            const isLoggedOut = statusCode === DisconnectReason.loggedOut && !isConflict;
+            const shouldReconnect = !isLoggedOut;
             console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting: ', shouldReconnect);
             
-            // Solo limpiar las credenciales locales y de DB de forma automática si es un logout explícito (desconexión manual)
-            if (statusCode === DisconnectReason.loggedOut) {
-                console.log('Logout manual detectado. Limpiando credenciales...');
+            // Solo limpiar las credenciales locales y de DB si es un logout explícito/real
+            if (isLoggedOut) {
+                console.log('Logout manual o desvinculación real detectada. Limpiando credenciales...');
                 clearSession().then(() => {
                     connectToWhatsApp();
                 });
-            } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
+            } else if (isConflict) {
                 // Conflicto de sesión: otra instancia o dispositivo tomó el control del socket.
-                // Usar un delay largo (60s) para evitar bucle infinito de reconexión competitiva.
-                console.warn('⚠️  Conflicto de sesión detectado (connectionReplaced / 440). Esperando 60 segundos antes de reintentar...');
+                // Usar un delay largo (60s) para evitar bucle de reconexión competitiva.
+                console.warn('⚠️  Conflicto de sesión detectado. Esperando 60 segundos antes de reintentar...');
                 setTimeout(() => {
                     connectToWhatsApp();
                 }, 60000);
             } else if (shouldReconnect) {
-                // Para cualquier otro error transitorio (timeout, red), reintentamos rápido conservando la sesión
+                // Para cualquier otro error transitorio (timeout, red, restart required), reintentamos rápido conservando la sesión
                 console.log('Desconexión temporal. Intentando reconectar en 3 segundos...');
                 setTimeout(() => {
                     connectToWhatsApp();
