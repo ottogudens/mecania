@@ -13,7 +13,8 @@ def create_user_profile(sender, instance, created, **kwargs):
     if created:
         UserProfile.objects.get_or_create(user=instance, defaults={'role': 'ADMIN' if instance.is_superuser else 'MECHANIC'})
 
-WHATSAPP_SERVICE_URL = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001/api/send-message')
+_whatsapp_base = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+WHATSAPP_SERVICE_URL = _whatsapp_base if _whatsapp_base.endswith('/api/send-message') else f"{_whatsapp_base.rstrip('/')}/api/send-message"
 
 @receiver(post_save, sender=WorkOrder)
 def notify_client_on_status_change(sender, instance, created, **kwargs):
