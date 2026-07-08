@@ -20,6 +20,14 @@ if (!tempBackendUrl) {
         tempBackendUrl = 'http://localhost:8080';
     }
 }
+// Normalize BACKEND_URL: prepend http:// or https:// if protocol is missing
+if (tempBackendUrl && !tempBackendUrl.startsWith('http://') && !tempBackendUrl.startsWith('https://')) {
+    if (tempBackendUrl.includes('railway.internal')) {
+        tempBackendUrl = `http://${tempBackendUrl}`;
+    } else {
+        tempBackendUrl = `https://${tempBackendUrl}`;
+    }
+}
 const BACKEND_URL = tempBackendUrl.replace(/\/+$/, '');
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'mecania-default-internal-secret-token-key-2026';
 const AUTH_DIR = 'auth_info_baileys';
