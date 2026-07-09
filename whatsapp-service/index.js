@@ -221,6 +221,16 @@ async function connectToWhatsApp() {
     // 1. Descargar credenciales persistentes antes de conectar
     await syncSessionFromDB();
 
+    // Cerrar conexión anterior si existía para evitar colisiones en memoria
+    if (sock) {
+        try {
+            sock.end();
+        } catch (e) {
+            console.log('Error cerrando socket anterior:', e.message);
+        }
+        sock = null;
+    }
+
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
     // Instalar ganchos (hooks) explícitos para sincronizar el estado Baileys en caliente
@@ -243,13 +253,15 @@ async function connectToWhatsApp() {
         await Promise.all(syncTasks);
     };
 
-    sock = makeWASocket({
+    const currentSock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' })
     });
+    sock = currentSock;
 
-    sock.ev.on('connection.update', (update) => {
+    currentSock.ev.on('connection.update', (update) => {
+        if (currentSock !== sock) return;
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
@@ -303,10 +315,14 @@ async function connectToWhatsApp() {
         }
     });
 
-    sock.ev.on('creds.update', wrappedSaveCreds);
+    currentSock.ev.on('creds.update', async () => {
+        if (currentSock !== sock) return;
+        await wrappedSaveCreds();
+    });
 
     // Escuchar mensajes de WhatsApp (entrantes y salientes) y sincronizarlos con Django
-    sock.ev.on('messages.upsert', async (m) => {
+    currentSock.ev.on('messages.upsert', async (m) => {
+        if (currentSock !== sock) return;
         try {
             const msg = m.messages[0];
             if (!msg || !msg.message) return;
@@ -352,7 +368,8 @@ async function connectToWhatsApp() {
     });
 
     // Sincronizar historial de conversaciones (messaging-history.set) al vincular/conectar
-    sock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
+    currentSock.ev.on('messaging-history.set', async ({ chats, contacts, messages, isLatest }) => {
+        if (currentSock !== sock) return;
         try {
             console.log(`Recibido evento messaging-history.set. Procesando ${messages ? messages.length : 0} mensajes del historial...`);
             if (!messages || messages.length === 0) return;
@@ -492,10 +509,12 @@ app.post('/api/logout', requireInternalKey, async (req, res) => {
     try {
         console.log('Solicitud manual de desconexión recibida...');
         if (sock) {
+            const oldSock = sock;
+            sock = null; // Desvincular inmediatamente para evitar ejecuciones duplicadas en listeners
             try {
-                await sock.logout();
+                await oldSock.logout();
             } catch (err) {
-                console.error('Error al ejecutar logout en socket, procediendo con limpieza manual:', err.message);
+                console.error('Error al ejecutar logout en socket:', err.message);
             }
         }
         await clearSession();
