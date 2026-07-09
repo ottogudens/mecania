@@ -1501,6 +1501,10 @@ class WhatsAppSessionView(APIView):
         if not self._validate_internal_key(request):
             return Response({'error': 'Unauthorized'}, status=403)
         from .models import WhatsAppSession
+        keep_creds = request.query_params.get('keep_creds') == 'true'
+        if keep_creds:
+            WhatsAppSession.objects.exclude(key='creds.json').delete()
+            return Response({'success': True, 'action': 'cleared_except_creds'})
         WhatsAppSession.objects.all().delete()
         return Response({'success': True, 'action': 'cleared'})
 
