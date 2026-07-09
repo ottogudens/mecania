@@ -44,7 +44,9 @@ class WorkshopSettings(models.Model):
 class Client(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True, null=True, blank=True)
+    # unique=True removido del campo para permitir múltiples NULL.
+    # La unicidad se garantiza con UniqueConstraint condicional en Meta.
+    email = models.EmailField(null=True, blank=True)
     phone = models.CharField(
         max_length=20,
         unique=True,
@@ -65,6 +67,15 @@ class Client(models.Model):
         help_text="Silencia el asistente de IA para este cliente hasta esta fecha/hora."
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=models.Q(email__isnull=False),
+                name='unique_client_email_when_not_null',
+            )
+        ]
 
     def set_pin(self, raw_pin):
         """Hashea y almacena un PIN en texto plano."""
