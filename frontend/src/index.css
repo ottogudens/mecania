@@ -1527,6 +1527,175 @@ canvas {
 }
 
 
+/* ===== MOBILE RESPONSIVENESS: GLOBAL OVERFLOW PREVENTION ===== */
+
+/* Prevent any element from causing horizontal overflow */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+#root {
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  /* Force ALL inline-style grids to single column on mobile.
+     React renders gridTemplateColumns as "grid-template-columns" in the DOM style attribute. */
+  .page-content [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* KPI values: reduce font size on mobile */
+  .kpi-value {
+    font-size: 1.5rem !important;
+  }
+
+  /* Large inline h2 headings */
+  .glass-card h2,
+  .page-content h2 {
+    font-size: 1.4rem !important;
+    word-break: break-word;
+  }
+
+  /* Ensure modal content doesn't overflow */
+  .modal-content {
+    max-width: calc(100vw - 2rem) !important;
+    margin: 0 auto;
+  }
+
+  /* Page header: stack title and actions vertically */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .page-title {
+    font-size: 1.15rem;
+  }
+
+  /* Force flex children of page-content to wrap */
+  .page-content > div[style*="display: flex"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* Supplier invoices & cash movements responsive grids (className-based) */
+  .responsive-invoices-grid,
+  .responsive-grid-movements {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* POS grid override */
+  .pos-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Ensure text doesn't create horizontal overflow */
+  .page-content strong,
+  .page-content span,
+  .page-content p {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Table on mobile: allow horizontal scroll within container only */
+  .table-responsive {
+    max-width: calc(100vw - 2rem);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Reduce spacing on mobile */
+  .glass-card {
+    padding: var(--space-3) !important;
+  }
+
+  /* Flex rows that could overflow */
+  .page-content div[style*="justify-content: space-between"] {
+    flex-wrap: wrap !important;
+    gap: 0.5rem;
+  }
+
+  /* WhatsApp chat panel: force vertical stacking */
+  .page-content div[style*="minmax(280px"] {
+    grid-template-columns: 1fr !important;
+  }
+  .page-content div[style*="1fr 280px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Finance / Dashboard chart grids with large minmax */
+  .page-content div[style*="minmax(300px"] {
+    grid-template-columns: 1fr !important;
+  }
+  .page-content div[style*="minmax(350px"] {
+    grid-template-columns: 1fr !important;
+  }
+  .page-content div[style*="minmax(320px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* POS multi-column grids */
+  .page-content div[style*="1.2fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  .page-content div[style*="1fr 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Even stricter: force ALL 2-column grids to single column too */
+  .page-content [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .page-title {
+    font-size: 1rem;
+  }
+
+  .page-subtitle {
+    font-size: 0.75rem;
+  }
+
+  /* Ensure buttons in row layouts wrap */
+  .ot-actions-row,
+  .section-header {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .ot-actions-row .btn,
+  .section-header .btn {
+    width: 100%;
+  }
+
+  /* Badge text slightly smaller */
+  .badge {
+    font-size: 0.65rem;
+    padding: 2px 7px;
+  }
+
+  /* Charts: reduce minimum height */  
+  .glass-card {
+    min-height: unset !important;
+  }
+
+  /* Inputs on mobile: full width guaranteed, prevent iOS auto-zoom */
+  .glass-input,
+  .input-field,
+  select.glass-input,
+  select.input-field {
+    font-size: 16px;
+  }
+
+  /* Reduce KPI even more */
+  .kpi-value {
+    font-size: 1.25rem !important;
+  }
+}
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
