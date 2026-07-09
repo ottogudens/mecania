@@ -1720,7 +1720,7 @@ class WhatsAppMessageSyncView(APIView):
             if not phone or not text or timestamp_unix is None:
                 continue
 
-            clean_num = phone.replace('@s.whatsapp.net', '')
+            clean_num = phone.replace('@s.whatsapp.net', '').replace('@lid', '')
             if not clean_num.startswith('+'):
                 clean_num = '+' + clean_num
 

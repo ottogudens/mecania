@@ -325,14 +325,25 @@ async function connectToWhatsApp() {
         if (currentSock !== sock) return;
         try {
             const msg = m.messages[0];
-            if (!msg || !msg.message) return;
+            if (!msg) return;
+
+            const senderJid = msg.key?.remoteJid;
+            console.log(`[DEBUG] Mensaje en upsert. JID: ${senderJid}, fromMe: ${msg.key?.fromMe}, hasMessage: ${!!msg.message}`);
+
+            if (!msg.message || !senderJid) return;
             
-            const senderJid = msg.key.remoteJid;
-            if (!senderJid || !senderJid.endsWith('@s.whatsapp.net')) return;
+            const isUser = senderJid.endsWith('@s.whatsapp.net') || senderJid.endsWith('@lid');
+            if (!isUser) {
+                console.log(`[DEBUG] Ignorando mensaje de JID no compatible: ${senderJid}`);
+                return;
+            }
 
             // Extraer texto
             const text = getMessageText(msg.message);
-            if (!text || text.trim() === '') return;
+            if (!text || text.trim() === '') {
+                console.log(`[DEBUG] Mensaje vacío o tipo no compatible ignorado para JID: ${senderJid}`);
+                return;
+            }
 
             const timestamp = msg.messageTimestamp ? Number(msg.messageTimestamp) : Math.floor(Date.now() / 1000);
 
