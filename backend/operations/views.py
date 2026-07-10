@@ -1897,3 +1897,11 @@ class DatabaseRestoreView(APIView):
                 destination.write(chunk)
                 
         return JsonResponse({'success': True, 'message': 'Base de datos restaurada correctamente.'})
+
+class WhatsAppClearChatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import WhatsAppMessage
+        WhatsAppMessage.objects.all().delete()
+        return Response({'success': True, 'message': 'Todos los historiales de chat sincronizados han sido eliminados.'})

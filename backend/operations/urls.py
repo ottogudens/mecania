@@ -10,7 +10,7 @@ from .views import (
     ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView,
     WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView,
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
-    DatabaseBackupView, DatabaseRestoreView
+    DatabaseBackupView, DatabaseRestoreView, WhatsAppClearChatsView
 )
 
 router = DefaultRouter()
@@ -48,6 +48,7 @@ urlpatterns = [
     path('whatsapp-messages/sync/', WhatsAppMessageSyncView.as_view(), name='whatsapp_messages_sync'),
     path('whatsapp-messages/send-manual/', WhatsAppManualSendView.as_view(), name='whatsapp_send_manual'),
     path('whatsapp-messages/toggle-silence/', WhatsAppToggleSilenceView.as_view(), name='whatsapp_toggle_silence'),
+    path('whatsapp-messages/clear/', WhatsAppClearChatsView.as_view(), name='whatsapp_clear_chats'),
     path('whatsapp/status/', WhatsAppStatusView.as_view(), name='whatsapp_status'),
     path('whatsapp/logout/', WhatsAppLogoutView.as_view(), name='whatsapp_logout'),
     path('system/backup/', DatabaseBackupView.as_view(), name='database_backup'),

@@ -18,7 +18,6 @@ const WhatsAppChat = () => {
   const messagesEndRef = useRef(null);
   const pollIntervalRef = useRef(null);
 
-  // Cargar lista de chats
   const fetchChats = async (silent = false) => {
     if (!silent) setLoadingChats(true);
     try {
@@ -32,6 +31,27 @@ const WhatsAppChat = () => {
       if (!silent) toast({ title: 'Error', message: 'No se pudieron cargar las conversaciones.', type: 'error' });
     } finally {
       if (!silent) setLoadingChats(false);
+    }
+  };
+
+  const handleClearAllChats = async () => {
+    if (!window.confirm("¿Estás completamente seguro de que deseas VACIAR todos los chats guardados en el sistema? Esto NO borrará los mensajes en tu teléfono, pero limpiará esta ventana. Esta acción NO se puede deshacer.")) {
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/operations/whatsapp-messages/clear/', {}, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Chats Eliminados', message: 'Todo el historial de chat sincronizado ha sido borrado.', type: 'success' });
+      setChats([]);
+      setMessages([]);
+      setSelectedPhone('');
+      setSelectedChatInfo(null);
+    } catch (err) {
+      console.error("Error al borrar chats:", err);
+      toast({ title: 'Error', message: 'No se pudieron limpiar las conversaciones.', type: 'error' });
     }
   };
 
@@ -214,13 +234,23 @@ const WhatsAppChat = () => {
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem', minHeight: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h3 style={{ margin: 0, fontSize: '1.1rem' }}>💬 Conversaciones</h3>
-            <button 
-              className="btn btn-ghost btn-sm" 
-              onClick={() => fetchChats()} 
-              style={{ padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-            >
-              🔄 Refrescar
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button 
+                className="btn btn-ghost btn-sm"
+                title="Vaciar todos los chats sincronizados"
+                onClick={handleClearAllChats} 
+                style={{ padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--status-red)' }}
+              >
+                <i className="fa-solid fa-trash"></i> Vaciar
+              </button>
+              <button 
+                className="btn btn-ghost btn-sm" 
+                onClick={() => fetchChats()} 
+                style={{ padding: '0.2rem 0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                🔄 Refrescar
+              </button>
+            </div>
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
