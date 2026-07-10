@@ -86,6 +86,9 @@ const Settings = ({ onSettingsUpdate }) => {
   const [activeTab, setActiveTab] = useState('taller');
   const [waStatus, setWaStatus] = useState('loading');
   const [qrCode, setQrCode] = useState(null);
+  const [pairingCode, setPairingCode] = useState(null);
+  const [pairingPhone, setPairingPhone] = useState('');
+  const [requestingPairing, setRequestingPairing] = useState(false);
   
   const [workshopSettings, setWorkshopSettings] = useState({
     name: '', phone: '', address: '', email: '', website: '', logo_url: '', google_maps_link: '', assistant_prompt: '', admin_whatsapp: ''
@@ -135,9 +138,27 @@ const Settings = ({ onSettingsUpdate }) => {
       const response = await axios.get('/api/operations/whatsapp/status/');
       setWaStatus(response.data.status);
       setQrCode(response.data.qr);
+      setPairingCode(response.data.pairingCode);
     } catch (err) {
       console.error("Error connecting to WhatsApp status proxy:", err);
       setWaStatus('error');
+    }
+  };
+
+  const handleRequestPairingCode = async () => {
+    if (!pairingPhone) {
+      alert("Por favor ingresa un número de teléfono con código país (ej. 56912345678)");
+      return;
+    }
+    setRequestingPairing(true);
+    try {
+      const resp = await axios.post('/api/operations/whatsapp/request-pairing-code/', { phone: pairingPhone });
+      setPairingCode(resp.data.code);
+    } catch (err) {
+      console.error('Error al pedir pairing code', err);
+      alert(err.response?.data?.error || "Error al solicitar código de vinculación");
+    } finally {
+      setRequestingPairing(false);
     }
   };
 
@@ -537,9 +558,43 @@ const Settings = ({ onSettingsUpdate }) => {
                     Desconectar WhatsApp
                   </button>
                 </div>
-              ) : waStatus === 'qr_ready' && qrCode ? (
-                <div style={{ padding: '1rem', background: 'white', borderRadius: '12px', display: 'inline-block' }}>
-                  <QRCodeSVG value={qrCode} size={200} />
+              ) : waStatus === 'qr_ready' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center' }}>
+                  {qrCode && (
+                    <div style={{ padding: '1rem', background: 'white', borderRadius: '12px', display: 'inline-block' }}>
+                      <QRCodeSVG value={qrCode} size={200} />
+                    </div>
+                  )}
+                  <div style={{ background: 'var(--surface-1)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', width: '100%', maxWidth: '300px' }}>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>O vincular con número de teléfono:</p>
+                    {pairingCode ? (
+                       <div style={{ textAlign: 'center' }}>
+                         <span style={{ fontSize: '1.5rem', letterSpacing: '4px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                           {pairingCode.match(/.{1,4}/g)?.join('-')}
+                         </span>
+                         <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '8px' }}>Ingresa este código en WhatsApp -{'>'} Dispositivos Vinculados -{'>'} Vincular con número.</p>
+                       </div>
+                    ) : (
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                         <input 
+                           type="text" 
+                           placeholder="Ej: 56912345678" 
+                           value={pairingPhone} 
+                           onChange={(e) => setPairingPhone(e.target.value)}
+                           className="glass-input" 
+                           style={{ fontSize: '0.9rem', padding: '0.5rem' }}
+                         />
+                         <button 
+                           onClick={handleRequestPairingCode}
+                           disabled={requestingPairing || !pairingPhone}
+                           className="btn btn-outline" 
+                           style={{ fontSize: '0.8rem', padding: '0.5rem' }}
+                         >
+                           {requestingPairing ? "Generando..." : "Generar Código"}
+                         </button>
+                       </div>
+                    )}
+                  </div>
                 </div>
               ) : waStatus === 'loading' ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>

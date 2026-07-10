@@ -43,6 +43,7 @@ function requireInternalKey(req, res, next) {
 
 let sock = null;
 let currentQr = null;
+let currentPairingCode = null;
 let connectionStatus = 'disconnected';
 
 // Descarga sesión guardada desde la base de datos de Django con reintentos robustos en caso de fallo de red/servidor
@@ -146,6 +147,7 @@ async function clearSession() {
     console.log('Limpiando sesión local y remota por cierre de conexión/logout...');
     connectionStatus = 'disconnected';
     currentQr = null;
+    currentPairingCode = null;
     
     // 1. Borrar archivos locales de sesión
     if (fs.existsSync(AUTH_DIR)) {
@@ -274,6 +276,7 @@ async function connectToWhatsApp() {
         if (connection === 'close') {
             connectionStatus = 'disconnected';
             currentQr = null;
+            currentPairingCode = null;
             const statusCode = lastDisconnect.error?.output?.statusCode;
             const errStr = lastDisconnect.error?.message || lastDisconnect.error?.output?.payload?.message || lastDisconnect.error?.toString() || '';
             console.log(`Connection closed: statusCode=${statusCode}, error="${errStr}"`);
@@ -311,6 +314,7 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             connectionStatus = 'connected';
             currentQr = null;
+            currentPairingCode = null;
             console.log('AutoMaster WhatsApp service connected successfully!');
         }
     });
@@ -458,8 +462,31 @@ app.get('/api/status', requireInternalKey, (req, res) => {
     res.json({
         status: connectionStatus,
         qr: currentQr,
+        pairingCode: currentPairingCode,
         user: sock ? sock.user : null
     });
+});
+
+app.post('/api/request-pairing-code', requireInternalKey, async (req, res) => {
+    try {
+        const { number } = req.body;
+        if (!number) return res.status(400).json({ error: 'Number is required' });
+        
+        if (!sock) return res.status(503).json({ error: 'WhatsApp service not ready' });
+        
+        if (sock.authState?.creds?.registered) {
+           return res.status(400).json({ error: 'Phone already registered on WhatsApp' });
+        }
+
+        const cleanNumber = String(number).replace(/\D/g, '');
+        const code = await sock.requestPairingCode(cleanNumber);
+        currentPairingCode = code;
+        
+        return res.status(200).json({ success: true, code: code });
+    } catch (err) {
+        console.error('Error requesting pairing code:', err);
+        return res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/resolve-number', requireInternalKey, async (req, res) => {

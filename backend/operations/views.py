@@ -1811,6 +1811,32 @@ class WhatsAppStatusView(APIView):
         except Exception as e:
             return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+class WhatsAppRequestPairingCodeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            phone = request.data.get('phone')
+            if not phone:
+                return Response({'error': 'Número de teléfono es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+            base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+            request_pairing_url = f"{base_whatsapp_url.rstrip('/')}/api/request-pairing-code"
+
+            from django.conf import settings
+            expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+            headers = {}
+            if expected_key:
+                headers['X-Mecania-Secret-Key'] = expected_key
+
+            resp = requests.post(request_pairing_url, json={'number': phone}, headers=headers, timeout=10)
+
+            if resp.status_code == 200:
+                return Response(resp.json(), status=status.HTTP_200_OK)
+            else:
+                return Response({'error': resp.json().get('error', 'Error al solicitar código')}, status=resp.status_code)
+        except Exception as e:
+            return Response({'error': f'No se pudo conectar con el microservicio: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class WhatsAppToggleSilenceView(APIView):
     permission_classes = [IsAuthenticated]
