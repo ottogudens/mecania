@@ -1862,3 +1862,38 @@ class WhatsAppToggleSilenceView(APIView):
 
 
 
+
+from django.http import HttpResponse, JsonResponse
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+import os
+import shutil
+
+class DatabaseBackupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        db_path = settings.DATABASES['default']['NAME']
+        if os.path.exists(db_path):
+            with open(db_path, 'rb') as f:
+                response = HttpResponse(f.read(), content_type='application/x-sqlite3')
+                response['Content-Disposition'] = 'attachment; filename="backup_db.sqlite3"'
+                return response
+        return JsonResponse({'error': 'No se encontró la base de datos'}, status=404)
+
+class DatabaseRestoreView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if 'file' not in request.FILES:
+            return JsonResponse({'error': 'No se proporcionó ningún archivo'}, status=400)
+        
+        file = request.FILES['file']
+        db_path = settings.DATABASES['default']['NAME']
+        
+        # Backup the current just in case, but just replacing it is fine since it's a restore requested
+        with open(db_path, 'wb+') as destination:
+            for chunk in file.chunks():
+                destination.write(chunk)
+                
+        return JsonResponse({'success': True, 'message': 'Base de datos restaurada correctamente.'})

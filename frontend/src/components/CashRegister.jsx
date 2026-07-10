@@ -4,7 +4,7 @@ import { useToast } from './Toast';
 import SaleHistory from './SaleHistory';
 
 const authHeader = () => ({ Authorization: `Token ${localStorage.getItem('token')}` });
-const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
+const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
 
 const METHOD_LABELS = { CASH: '💵 Efectivo', CARD: '💳 Tarjeta', TRANSFER: '🏦 Transferencia' };
 

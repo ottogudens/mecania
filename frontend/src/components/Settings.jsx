@@ -278,6 +278,52 @@ const Settings = ({ onSettingsUpdate }) => {
     }
   };
 
+  const handleDownloadBackup = () => {
+    window.open('/api/operations/system/backup/', '_blank');
+  };
+
+  const handleRestoreBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!window.confirm(`¿Estás seguro de que deseas restaurar la base de datos usando el archivo "${file.name}"? Esto sobrescribirá todos los datos actuales y la aplicación podría necesitar recargarse.`)) {
+      e.target.value = null;
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      await axios.post('/api/operations/system/restore/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert('Base de datos restaurada correctamente. Recarga la aplicación para ver los cambios.');
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert('Error al restaurar la base de datos.');
+    }
+    e.target.value = null;
+  };
+
+  const handleResetFinance = async () => {
+    if (!window.confirm('⚠️ ADVERTENCIA CRÍTICA: Estás a punto de borrar TODOS los movimientos financieros (facturas, pagos, cajas, cotizaciones). Esta acción es IRREVERSIBLE. Se mantendrán los clientes, vehículos, productos, servicios y órdenes de trabajo activas. ¿Estás absolutamente seguro de continuar?')) return;
+    
+    if (window.prompt('Escribe "CONFIRMAR" para borrar los datos financieros:') !== 'CONFIRMAR') {
+      alert('Operación cancelada.');
+      return;
+    }
+
+    try {
+      await axios.post('/api/finance/reset/');
+      alert('Los movimientos financieros han sido reiniciados exitosamente.');
+    } catch (err) {
+      console.error(err);
+      alert('Error al reiniciar los datos financieros.');
+    }
+  };
+
   const handleWhatsAppLogout = async () => {
     if (!window.confirm('¿Estás seguro de que deseas desconectar tu cuenta de WhatsApp? Se desactivarán las respuestas automáticas.')) return;
     try {
@@ -353,6 +399,24 @@ const Settings = ({ onSettingsUpdate }) => {
           }}
         >
           <i className="fa-solid fa-diagram-project"></i> Flujos de Automatización
+        </button>
+        <button 
+          onClick={() => setActiveTab('datos')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: activeTab === 'datos' ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+            color: activeTab === 'datos' ? 'white' : 'var(--text-muted)',
+            fontWeight: '600',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <i className="fa-solid fa-database"></i> Gestión de Datos
         </button>
       </div>
 
@@ -478,6 +542,52 @@ const Settings = ({ onSettingsUpdate }) => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Datos */}
+      {activeTab === 'datos' && (
+        <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+          <div className="glass-card" style={{ border: '1px solid var(--border-color)', maxWidth: '600px', margin: '0 auto', marginBottom: '2rem' }}>
+            <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>Copias de Seguridad (Backup)</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Descarga un archivo con toda la información actual del sistema. Puedes guardarlo en tu computador para tener un respaldo seguro.
+            </p>
+            <button 
+              onClick={handleDownloadBackup}
+              className="btn" 
+              style={{ width: '100%', backgroundColor: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <i className="fa-solid fa-download"></i> Descargar Respaldo (.sqlite3)
+            </button>
+          </div>
+
+          <div className="glass-card" style={{ border: '1px solid var(--border-color)', maxWidth: '600px', margin: '0 auto', marginBottom: '2rem' }}>
+            <h3 style={{ marginBottom: '1.5rem', color: 'var(--warning)' }}>Restaurar Respaldo</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Sube un archivo de respaldo (.sqlite3) generado anteriormente para restaurar la base de datos a ese estado. <b>Alerta: Esto reemplazará los datos actuales.</b>
+            </p>
+            <input 
+              type="file" 
+              accept=".sqlite3" 
+              onChange={handleRestoreBackup}
+              style={{ display: 'block', width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', border: '1px solid var(--border-color)', color: 'var(--text)' }}
+            />
+          </div>
+
+          <div className="glass-card" style={{ border: '1px solid var(--status-red)', maxWidth: '600px', margin: '0 auto' }}>
+            <h3 style={{ marginBottom: '1.5rem', color: 'var(--status-red)' }}>Reiniciar Movimientos Financieros</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Esta acción eliminará todos los registros de cajas, pagos, ingresos/egresos, cotizaciones y facturas. Los clientes, vehículos, productos, servicios se mantendrán intactos. Útil para empezar un nuevo ciclo de registro (por ejemplo, año nuevo).
+            </p>
+            <button 
+              onClick={handleResetFinance}
+              className="btn" 
+              style={{ width: '100%', backgroundColor: 'var(--status-red)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <i className="fa-solid fa-triangle-exclamation"></i> Reiniciar Datos Financieros
+            </button>
           </div>
         </div>
       )}

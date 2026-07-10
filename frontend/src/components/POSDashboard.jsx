@@ -4,7 +4,7 @@ import axios from 'axios';
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const token = () => localStorage.getItem('token');
 const authHeader = () => ({ Authorization: `Token ${token()}` });
-const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
+const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
 
 const PAYMENT_METHODS = [
   { value: 'CASH',     label: '💵 Efectivo' },

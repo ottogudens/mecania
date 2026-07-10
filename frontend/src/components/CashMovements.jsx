@@ -74,7 +74,7 @@ export default function CashMovements() {
     }
   };
 
-  const fmt = (num) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(num);
+  const fmt = (num) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(num);
 
   return (
     <div className="cash-movements-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '12px' }}>

@@ -387,7 +387,7 @@ const InventoryDashboard = () => {
 
   if (loading) return <div style={{ textAlign: 'center', padding: '2rem' }}>Cargando inventario...</div>;
 
-  const formatCLP = (val) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(val);
+  const formatCLP = (val) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(val);
 
   return (
     <div className="work-orders">

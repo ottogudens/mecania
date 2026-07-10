@@ -11,11 +11,15 @@ const DashboardHome = () => {
   const [error, setError] = useState(null);
   const [maintenanceAlerts, setMaintenanceAlerts] = useState([]);
   const [paymentAlerts, setPaymentAlerts] = useState([]);
+  const [waStatus, setWaStatus] = useState('loading');
+  const [recentChats, setRecentChats] = useState([]);
 
   useEffect(() => {
     fetchStats();
     fetchMaintenanceAlerts();
     fetchPaymentAlerts();
+    fetchWhatsAppStatus();
+    fetchRecentChats();
   }, []);
 
   const fetchStats = async () => {
@@ -54,6 +58,28 @@ const DashboardHome = () => {
       setPaymentAlerts(response.data || []);
     } catch (err) {
       console.error('Error fetching payment alerts:', err);
+    }
+  };
+
+  const fetchWhatsAppStatus = async () => {
+    try {
+      const response = await axios.get('/api/operations/whatsapp/status/');
+      setWaStatus(response.data.status);
+    } catch (err) {
+      console.error("Error connecting to WhatsApp status proxy:", err);
+      setWaStatus('error');
+    }
+  };
+
+  const fetchRecentChats = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/operations/whatsapp-messages/chats/', {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setRecentChats(response.data.slice(0, 5));
+    } catch (err) {
+      console.error('Error fetching recent chats:', err);
     }
   };
 
@@ -98,7 +124,7 @@ const DashboardHome = () => {
         <div className="glass-card" style={{ borderLeft: '4px solid #ef4444', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ventas del Día</span>
           <h2 style={{ fontSize: '2.2rem', fontWeight: 800, margin: 0 }}>
-            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(stats.sales.day)}
+            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(stats.sales.day)}
           </h2>
           <span style={{ fontSize: '0.75rem', color: '#10b981' }}>Hoy</span>
         </div>
@@ -106,7 +132,7 @@ const DashboardHome = () => {
         <div className="glass-card" style={{ borderLeft: '4px solid #eab308', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ventas de la Semana</span>
           <h2 style={{ fontSize: '2.2rem', fontWeight: 800, margin: 0 }}>
-            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(stats.sales.week)}
+            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(stats.sales.week)}
           </h2>
           <span style={{ fontSize: '0.75rem', color: '#eab308' }}>Últimos 7 días</span>
         </div>
@@ -114,9 +140,25 @@ const DashboardHome = () => {
         <div className="glass-card" style={{ borderLeft: '4px solid #ffffff', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ventas del Mes</span>
           <h2 style={{ fontSize: '2.2rem', fontWeight: 800, margin: 0 }}>
-            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(stats.sales.month)}
+            {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(stats.sales.month)}
           </h2>
           <span style={{ fontSize: '0.75rem', color: '#a3a3a3' }}>Mes en curso</span>
+        </div>
+
+        {/* WhatsApp Status Widget */}
+        <div className="glass-card" style={{ borderLeft: `4px solid ${waStatus === 'connected' ? '#10b981' : '#ef4444'}`, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estado de WhatsApp</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+            <i className="fa-brands fa-whatsapp" style={{ fontSize: '2.5rem', color: waStatus === 'connected' ? '#10b981' : '#ef4444' }}></i>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: waStatus === 'connected' ? '#10b981' : '#ef4444' }}>
+                {waStatus === 'connected' ? 'Conectado' : waStatus === 'loading' ? 'Cargando...' : 'Desconectado'}
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {waStatus === 'connected' ? 'Servicio activo respondiendo clientes.' : 'Atención automática detenida.'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -148,7 +190,7 @@ const DashboardHome = () => {
                     — {alert.document_type} N° {alert.document_number || 'S/N'}
                   </span>
                   <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    Monto Documentado: <strong>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(alert.amount)}</strong>
+                    Monto Documentado: <strong>{new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(alert.amount)}</strong>
                     <span style={{ marginLeft: '1rem', color: '#ef4444', fontWeight: 'bold' }}>
                       Cobro: {alert.payment_date} ({alert.days_remaining === 0 ? 'HOY' : alert.days_remaining === 1 ? 'Mañana' : `en ${alert.days_remaining} días`})
                     </span>
@@ -206,6 +248,42 @@ const DashboardHome = () => {
                 +{maintenanceAlerts.length - 5} más. Ve a Vehículos para gestionar.
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Recent WhatsApp Chats Widget */}
+      {recentChats.length > 0 && (
+        <div className="glass-card" style={{ borderLeft: '4px solid #10b981' }}>
+          <h4 style={{ marginBottom: '1rem', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <i className="fa-brands fa-whatsapp"></i> Últimos Chats de WhatsApp
+            <span className="badge green" style={{ fontSize: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>{recentChats.length}</span>
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {recentChats.map((chat, idx) => (
+              <div key={idx} style={{
+                padding: '0.8rem',
+                backgroundColor: 'rgba(255,255,255,0.02)',
+                borderRadius: '8px',
+                borderLeft: '3px solid #10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.5rem',
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                  <strong style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    📱 {chat.client_name ? chat.client_name : chat.phone}
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      {new Date(chat.last_message_time).toLocaleString()}
+                    </span>
+                  </strong>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {chat.last_message_text}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

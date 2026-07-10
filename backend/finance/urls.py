@@ -17,7 +17,8 @@ from .views import (
     CashMovementViewSet,
     SupplierInvoiceParseUploadView,
     SupplierPaymentForecastView,
-    SupplierPaymentAlertsView
+    SupplierPaymentAlertsView,
+    FinanceResetView
 )
 
 router = DefaultRouter()
@@ -35,6 +36,7 @@ urlpatterns = [
     path('pos/charge/', POSChargeView.as_view(), name='pos-charge'),
     path('pos/cancel-invoice/', POSCancelInvoiceView.as_view(), name='pos-cancel-invoice'),
     path('pos/counter-sale/', POSCounterSaleView.as_view(), name='pos-counter-sale'),
+    path('reset/', FinanceResetView.as_view(), name='finance_reset'),
     path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
     path('supplier-invoices/parse-upload/', SupplierInvoiceParseUploadView.as_view(), name='supplier-invoice-parse-upload'),
     path('supplier-payments/forecast/', SupplierPaymentForecastView.as_view(), name='supplier-payment-forecast'),

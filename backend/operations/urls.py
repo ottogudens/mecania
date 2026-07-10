@@ -9,7 +9,8 @@ from .views import (
     VehiclePartViewSet, MaintenanceRecordViewSet,
     ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView,
     WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView,
-    WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView
+    WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
+    DatabaseBackupView, DatabaseRestoreView
 )
 
 router = DefaultRouter()
@@ -49,5 +50,7 @@ urlpatterns = [
     path('whatsapp-messages/toggle-silence/', WhatsAppToggleSilenceView.as_view(), name='whatsapp_toggle_silence'),
     path('whatsapp/status/', WhatsAppStatusView.as_view(), name='whatsapp_status'),
     path('whatsapp/logout/', WhatsAppLogoutView.as_view(), name='whatsapp_logout'),
+    path('system/backup/', DatabaseBackupView.as_view(), name='database_backup'),
+    path('system/restore/', DatabaseRestoreView.as_view(), name='database_restore'),
     path('', include(router.urls)),
 ]

@@ -1151,7 +1151,7 @@ const WorkOrderList = () => {
                     >
                       <option value="">Seleccionar servicio...</option>
                       {catalogServices.map(s => (
-                        <option key={s.id} value={s.id}>{s.name} — {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(s.price)}</option>
+                        <option key={s.id} value={s.id}>{s.name} — {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(s.price)}</option>
                       ))}
                     </select>
                   </div>
@@ -1173,7 +1173,7 @@ const WorkOrderList = () => {
                       <option value="">Seleccionar producto...</option>
                       {catalogProducts.map(p => (
                         <option key={p.id} value={p.id} disabled={p.stock_quantity <= 0}>
-                          {p.name} ({p.sku}) — Stock: {p.stock_quantity} — {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(p.price)}
+                          {p.name} ({p.sku}) — Stock: {p.stock_quantity} — {new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(p.price)}
                           {p.stock_quantity <= 0 ? ' ⚠️ Sin stock' : ''}
                         </option>
                       ))}

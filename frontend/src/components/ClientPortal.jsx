@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://local
 const clientToken = () => localStorage.getItem('clientToken');
 const clientAuth = () => ({ Authorization: `ClientToken ${clientToken()}` });
 const fmt = (n) =>
-  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP' }).format(n || 0);
+  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CL') : '—';
 
 const STATUS_COLORS = {

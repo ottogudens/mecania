@@ -1179,3 +1179,21 @@ class SupplierPaymentAlertsView(APIView):
             })
             
         return Response(results, status=status.HTTP_200_OK)
+
+class FinanceResetView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import Invoice, InvoiceLineItem, Payment, CashRegisterSession, SupplierInvoice, SupplierPaymentDocument, CashMovement, Estimate, EstimateLineItem
+        
+        InvoiceLineItem.objects.all().delete()
+        Payment.objects.all().delete()
+        CashMovement.objects.all().delete()
+        CashRegisterSession.objects.all().delete()
+        SupplierPaymentDocument.objects.all().delete()
+        SupplierInvoice.objects.all().delete()
+        EstimateLineItem.objects.all().delete()
+        Estimate.objects.all().delete()
+        Invoice.objects.all().delete()
+        
+        return Response({'success': True, 'message': 'Todos los movimientos financieros han sido reiniciados a cero.'})
