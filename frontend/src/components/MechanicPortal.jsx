@@ -439,7 +439,7 @@ const MechanicPortal = ({ onLogout }) => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+    <div style={{ padding: 'clamp(1rem, 4vw, 2rem)', maxWidth: '1200px', margin: '0 auto', width: '100%', boxSizing: 'border-box', overflowX: 'hidden' }}>
       {/* Header */}
       <div className="mechanic-header">
         <div>
@@ -474,7 +474,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>No hay nuevas OTs disponibles en este momento.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1rem' }}>
                     {pendingOrders.map(ot => (
                       <div key={ot.id} className="glass-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -499,7 +499,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>Aún no tienes órdenes de trabajo asignadas.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1.5rem' }}>
                     {assignedOrders.map(ot => (
                       <div key={ot.id} className="glass-card" style={{ borderLeft: ot.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -528,7 +528,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>No hay inspecciones visuales pendientes en este momento.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1rem' }}>
                     {pendingInspections.map(ins => (
                       <div key={ins.id} className="glass-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -553,7 +553,7 @@ const MechanicPortal = ({ onLogout }) => {
                     <p style={{ color: 'var(--text-muted)' }}>Aún no has tomado ninguna inspección visual.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1.5rem' }}>
                     {assignedInspections.map(ins => (
                       <div key={ins.id} className="glass-card" style={{ borderLeft: ins.status === 'IN_PROGRESS' ? '4px solid var(--secondary)' : '4px solid var(--status-green)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -584,7 +584,7 @@ const MechanicPortal = ({ onLogout }) => {
               <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
             </div>
             {/* OT content */}
-            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.95rem' }}>
+            <div style={{ marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(180px, 100%), 1fr))', gap: '1rem', fontSize: '0.95rem' }}>
               <div><strong>Auto:</strong> {selectedOrder.vehicle?.make} {selectedOrder.vehicle?.model}</div>
               <div><strong>Año:</strong> {selectedOrder.vehicle?.year}</div>
             </div>

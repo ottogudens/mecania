@@ -327,10 +327,18 @@ async function connectToWhatsApp() {
             const msg = m.messages[0];
             if (!msg) return;
 
-            const senderJid = msg.key?.remoteJid;
+            let senderJid = msg.key?.remoteJid;
             console.log(`[DEBUG] Mensaje en upsert. JID: ${senderJid}, fromMe: ${msg.key?.fromMe}, hasMessage: ${!!msg.message}`);
 
             if (!msg.message || !senderJid) return;
+            
+            if (senderJid.endsWith('@lid')) {
+                const alt = msg.key.remoteJidAlt || msg.key.participant;
+                if (alt && alt.endsWith('@s.whatsapp.net')) {
+                    console.log(`[DEBUG] Resolviendo LID ${senderJid} a ${alt}`);
+                    senderJid = alt;
+                }
+            }
             
             const isUser = senderJid.endsWith('@s.whatsapp.net') || senderJid.endsWith('@lid');
             if (!isUser) {
@@ -390,8 +398,17 @@ async function connectToWhatsApp() {
             for (const msg of messages) {
                 if (!msg.message || !msg.key) continue;
 
-                const remoteJid = msg.key.remoteJid;
-                if (!remoteJid || !remoteJid.endsWith('@s.whatsapp.net')) continue;
+                let remoteJid = msg.key.remoteJid;
+                if (!remoteJid) continue;
+                
+                if (remoteJid.endsWith('@lid')) {
+                    const alt = msg.key.remoteJidAlt || msg.key.participant;
+                    if (alt && alt.endsWith('@s.whatsapp.net')) {
+                        remoteJid = alt;
+                    }
+                }
+
+                if (!remoteJid.endsWith('@s.whatsapp.net') && !remoteJid.endsWith('@lid')) continue;
 
                 const text = getMessageText(msg.message);
                 if (!text || text.trim() === '') continue;

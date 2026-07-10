@@ -288,7 +288,7 @@ export default function SupplierInvoicesList() {
       </div>
 
       {activeTab === 'list' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 3fr) 2fr', gap: '24px' }} className="responsive-invoices-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(320px, 100%), 3fr) 2fr', gap: '24px' }} className="responsive-invoices-grid">
           {/* Main left column: parsing + list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             

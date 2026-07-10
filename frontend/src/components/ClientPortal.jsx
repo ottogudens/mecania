@@ -416,7 +416,7 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
           <h3 style={{ color: '#60a5fa', marginBottom: '1.25rem', fontSize: '1.1rem' }}>
             📋 Datos del Vehículo
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1rem' }}>
             {[
               ['Marca', vehicle.make],
               ['Modelo', vehicle.model],
@@ -943,7 +943,7 @@ const ClientDashboard = ({ clientName, onLogout }) => {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))',
           gap: '1.5rem',
         }}>
           {vehicles.map((item, idx) => (

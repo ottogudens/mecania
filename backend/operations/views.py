@@ -1725,6 +1725,10 @@ class WhatsAppMessageSyncView(APIView):
                 clean_num = '+' + clean_num
 
             client_obj = get_client(clean_num)
+            
+            # Normalizar el número al del cliente si existe, para evitar bifurcaciones por números @lid o con variaciones de código de país
+            if client_obj and client_obj.phone:
+                clean_num = client_obj.phone
 
             dt_utc = datetime.datetime.fromtimestamp(timestamp_unix, tz=datetime.timezone.utc)
             # Ventana de tolerancia más amplia para mensajes salientes (30s) ya que el timestamp

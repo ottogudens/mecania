@@ -132,7 +132,7 @@ export default function CashMovements() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1fr) 2fr', gap: '24px', flexWrap: 'wrap' }} className="responsive-grid-movements">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(320px, 100%), 1fr) 2fr', gap: '24px' }} className="responsive-grid-movements">
         {/* Registration Form Card */}
         <div className="glass-card" style={{
           display: 'flex',

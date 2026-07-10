@@ -208,7 +208,7 @@ const WhatsAppChat = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)', gap: '1rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 350px) 1fr', gap: '1rem', height: '100%', minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(min(280px, 100%), 350px) 1fr', gap: '1rem', height: '100%', minHeight: 0 }}>
         
         {/* PANEL IZQUIERDO: LISTA DE CHATS */}
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem', minHeight: 0 }}>
@@ -298,7 +298,7 @@ const WhatsAppChat = () => {
 
         {/* PANEL DERECHO: VISOR DE CHAT + INFORMACIÓN */}
         {selectedPhone ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '1rem', height: '100%', minHeight: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) min(280px, 30%)', gap: '1rem', height: '100%', minHeight: 0 }}>
             {/* COLL DE CHAT */}
             <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: '1rem', minHeight: 0 }}>
               {/* Header del Chat Activo */}
