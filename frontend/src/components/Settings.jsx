@@ -278,8 +278,22 @@ const Settings = ({ onSettingsUpdate }) => {
     }
   };
 
-  const handleDownloadBackup = () => {
-    window.open('/api/operations/system/backup/', '_blank');
+  const handleDownloadBackup = async () => {
+    try {
+      const response = await axios.get('/api/operations/system/backup/', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'backup_db.sqlite3');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error(err);
+      alert('Error al descargar el respaldo (posiblemente falta de permisos).');
+    }
   };
 
   const handleRestoreBackup = async (e) => {
