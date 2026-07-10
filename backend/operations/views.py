@@ -32,7 +32,7 @@ def draw_pdf_header_and_footer(canvas_obj, settings, title, doc_num, date_str, p
     W, H = 612, 792 # letter size
 
     # Top Teal colored band
-    canvas_obj.setFillColor(colors.HexColor('#0d9488'))
+    canvas_obj.setFillColor(colors.HexColor('#ef4444'))
     canvas_obj.rect(0, H - 8, W, 8, fill=1, stroke=0)
 
     # Render logo if available
@@ -622,14 +622,14 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
             p.setFont("Helvetica-Bold", 8)
             p.drawCentredString(506, y_pos - 12, st_text)
             
-            y_pos -= 28
+            y_pos -= 42
             p.setFont("Helvetica-Bold", 8)
             p.setFillColor(colors.HexColor('#475569'))
-            p.drawString(55, y_pos + 12, "Diagnóstico:")
+            p.drawString(55, y_pos + 14, "Diagnóstico:")
             
             p.setFont("Helvetica", 9)
             p.setFillColor(colors.HexColor('#334155'))
-            y_note = y_pos + 12
+            y_note = y_pos + 14
             for line in wrapped_note:
                 p.drawString(140, y_note, line)
                 y_note -= 13

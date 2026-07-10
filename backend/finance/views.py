@@ -17,7 +17,7 @@ def draw_pdf_header_and_footer(canvas_obj, settings, title, doc_num, date_str, p
     W, H = 612, 792 # letter size
 
     # Top Teal colored band
-    canvas_obj.setFillColor(colors.HexColor('#0d9488'))
+    canvas_obj.setFillColor(colors.HexColor('#ef4444'))
     canvas_obj.rect(0, H - 8, W, 8, fill=1, stroke=0)
 
     # Render logo if available
@@ -58,7 +58,7 @@ def draw_pdf_header_and_footer(canvas_obj, settings, title, doc_num, date_str, p
         canvas_obj.drawString(text_x, H - 70, settings.address)
 
     # Draw Document Title & Date (Right aligned)
-    canvas_obj.setFillColor(colors.HexColor('#0d9488')) # Accent Teal
+    canvas_obj.setFillColor(colors.HexColor('#ef4444')) # Accent Teal
     canvas_obj.setFont("Helvetica-Bold", 13)
     canvas_obj.drawRightString(W - 45, H - 35, title.upper())
 
@@ -585,7 +585,7 @@ class InvoicePDFView(APIView):
                 p.setFont("Helvetica-Bold", 12)
                 p.setFillColor(colors.HexColor('#0f172a'))
                 p.drawRightString(460, y, label)
-                p.setFillColor(colors.HexColor('#0d9488'))
+                p.setFillColor(colors.HexColor('#ef4444'))
                 p.drawRightString(550, y, f"${int(val):,}")
             else:
                 p.setFont("Helvetica", 10)
@@ -814,7 +814,7 @@ class EstimateViewSet(viewsets.ModelViewSet):
                 p.setFont("Helvetica-Bold", 12)
                 p.setFillColor(colors.HexColor('#0f172a'))
                 p.drawRightString(460, y, label)
-                p.setFillColor(colors.HexColor('#0d9488'))
+                p.setFillColor(colors.HexColor('#ef4444'))
                 p.drawRightString(550, y, f"${val:,.0f}")
             else:
                 p.setFont("Helvetica", 10)
