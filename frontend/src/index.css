@@ -767,6 +767,12 @@ select.input-field {
   background-color: rgba(0, 0, 0, 0.3);
 }
 
+select.glass-input option,
+select.input-field option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .input-label {
   display: block;
   font-size: 0.8rem;
