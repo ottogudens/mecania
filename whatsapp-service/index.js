@@ -394,7 +394,44 @@ async function connectToWhatsApp() {
             if (response.data && response.data.reply) {
                 const replyText = response.data.reply;
                 console.log(`Respuesta IA para ${senderJid}: "${replyText}"`);
-                await sock.sendMessage(senderJid, { text: replyText });
+
+                // Retry con limpieza de sesión si el primer intento falla
+                let sent = false;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        await sock.sendMessage(senderJid, { text: replyText });
+                        sent = true;
+                        break;
+                    } catch (sendErr) {
+                        console.error(`Error al enviar (intento ${attempt}/2):`, sendErr.message);
+                        if (attempt === 1) {
+                            // Limpiar sesión Signal corrupt para este contacto y reintentar
+                            try {
+                                const cleanJid = senderJid.split('@')[0];
+                                const authDir = AUTH_DIR;
+                                const fs2 = require('fs');
+                                const files = fs2.readdirSync(authDir);
+                                let cleared = 0;
+                                for (const f of files) {
+                                    if (f.startsWith('session-') && f.includes(cleanJid)) {
+                                        fs2.unlinkSync(`${authDir}/${f}`);
+                                        cleared++;
+                                        console.log(`Sesión limpiada: ${f}`);
+                                    }
+                                }
+                                if (cleared > 0) {
+                                    console.log(`Limpiadas ${cleared} sesión(es) corruptas para ${senderJid}. Reintentando envío...`);
+                                    await new Promise(r => setTimeout(r, 500));
+                                }
+                            } catch (cleanErr) {
+                                console.error('Error al limpiar sesión:', cleanErr.message);
+                            }
+                        }
+                    }
+                }
+                if (!sent) {
+                    console.error(`No se pudo enviar respuesta a ${senderJid} tras 2 intentos.`);
+                }
             }
         } catch (err) {
             console.error('Error al responder mensaje vía IA:', err.message, err.response?.data || err);
