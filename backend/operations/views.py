@@ -570,23 +570,7 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
         p.drawString(320, 606, f"Mecánico: {mechanic_name}")
         p.drawString(320, 592, f"Ficha ID: INS-{inspection.id}")
         
-        # General Observations Section
-        p.setFont("Helvetica-Bold", 10)
-        p.setFillColor(colors.HexColor('#0f172a'))
-        p.drawString(50, 548, "Observaciones Generales:")
-        p.setFont("Helvetica", 9)
-        p.setFillColor(colors.HexColor('#475569'))
-        obs_text = inspection.notes or "Sin notas generales."
-        wrapped_obs = textwrap.wrap(obs_text, width=100)
-        y_obs = 534
-        for line in wrapped_obs:
-            p.drawString(50, y_obs, line)
-            y_obs -= 13
-            
-        y_pos = y_obs - 10
-        # Line separating observations
-        p.setStrokeColor(colors.HexColor('#e2e8f0'))
-        p.line(50, y_pos+5, 562, y_pos+5)
+        y_pos = 550
         
         category_map = {
             'engine': 'Motor (🔧)',
@@ -726,32 +710,79 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
                 p.drawString(50, y_pos, title)
                 y_pos -= 14
                 
-                p.setFont("Helvetica", 9)
-                p.setFillColor(colors.HexColor('#334155'))
+                from reportlab.platypus import Paragraph
+                from reportlab.lib.styles import ParagraphStyle
+                from reportlab.lib.enums import TA_JUSTIFY
+                
+                justified_style = ParagraphStyle(
+                    'Justified',
+                    fontName='Helvetica',
+                    fontSize=9,
+                    textColor=colors.HexColor('#334155'),
+                    alignment=TA_JUSTIFY,
+                    leading=13
+                )
+                
                 for line in content:
-                    wrapped_line = textwrap.wrap(line, width=105)
-                    for wl in wrapped_line:
-                        if y_pos < 60:
-                            p.showPage()
-                            page_num += 1
-                            draw_header_footer(p, page_num)
-                            y_pos = 675
-                            p.setFont("Helvetica", 9)
-                            p.setFillColor(colors.HexColor('#334155'))
-                            
-                        # Quick split for bold labels
-                        if ':' in wl and wl.startswith(line.split(':')[0][:20]):
-                            parts = wl.split(':', 1)
-                            p.setFont("Helvetica-Bold", 9)
-                            p.drawString(50, y_pos, parts[0] + ":")
-                            p.setFont("Helvetica", 9)
-                            # string width approx
-                            w_len = p.stringWidth(parts[0] + ": ", "Helvetica-Bold", 9)
-                            p.drawString(50 + w_len, y_pos, parts[1])
-                        else:
-                            p.drawString(50, y_pos, wl)
-                        y_pos -= 12
+                    fmt_line = line
+                    if ':' in line:
+                        parts = line.split(":", 1)
+                        fmt_line = f"<b>{parts[0]}:</b>{parts[1]}"
+                        
+                    para = Paragraph(fmt_line, justified_style)
+                    w, h = para.wrapOn(p, 512, 800)
+                    
+                    if y_pos - h < 60:
+                        p.showPage()
+                        page_num += 1
+                        draw_header_footer(p, page_num)
+                        y_pos = 675
+                        
+                    y_pos -= h
+                    para.drawOn(p, 50, y_pos)
+                    y_pos -= 4
                 y_pos -= 8
+                
+        # Draw General Observations (Notas Generales / Especiales) at the very end
+        if y_pos - 40 < 60:
+            p.showPage()
+            page_num += 1
+            draw_header_footer(p, page_num)
+            y_pos = 675
+            
+        p.setFont("Helvetica-Bold", 10)
+        p.setFillColor(colors.HexColor('#0f172a'))
+        p.drawString(50, y_pos - 15, "NOTAS ESPECIALES Y DIAGNÓSTICO ADICIONAL")
+        y_pos -= 30
+        
+        from reportlab.platypus import Paragraph
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_JUSTIFY
+        
+        justified_style = ParagraphStyle(
+            'Justified_Notes',
+            fontName='Helvetica',
+            fontSize=9,
+            textColor=colors.HexColor('#475569'),
+            alignment=TA_JUSTIFY,
+            leading=13
+        )
+        
+        obs_text = inspection.notes or "Sin notas especiales registradas."
+        for line in obs_text.split('\n'):
+            if not line.strip(): continue
+            para = Paragraph(line, justified_style)
+            w, h = para.wrapOn(p, 512, 800)
+            
+            if y_pos - h < 60:
+                p.showPage()
+                page_num += 1
+                draw_header_footer(p, page_num)
+                y_pos = 675
+                
+            y_pos -= h
+            para.drawOn(p, 50, y_pos)
+            y_pos -= 4
 
         p.showPage()
         p.save()

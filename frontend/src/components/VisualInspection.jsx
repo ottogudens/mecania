@@ -575,16 +575,17 @@ const VisualInspection = () => {
               <button className="btn" style={{ backgroundColor: '#25D366', color: 'white', borderColor: 'transparent' }} onClick={() => handleSendWhatsApp(selectedInspection)}>
                 📲 Enviar por WhatsApp
               </button>
+              
+              <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', borderColor: 'transparent' }} onClick={() => saveProgress()}>
+                💾 Guardar Cambios
+              </button>
+              
               {selectedInspection.status === 'IN_PROGRESS' && (
-                <>
-                  <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', borderColor: 'transparent' }} onClick={() => saveProgress()}>
-                    💾 Guardar Cambios
-                  </button>
-                  <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
-                    ✓ Finalizar Lista para Entrega
-                  </button>
-                </>
+                <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
+                  ✓ Finalizar Lista para Entrega
+                </button>
               )}
+              
               <button className="btn btn-outline" onClick={() => { setShowActiveInspection(false); setSelectedInspection(null); fetchInspections(); }}>
                 Volver
               </button>
@@ -846,11 +847,9 @@ const VisualInspection = () => {
           )}
           
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
-            {selectedInspection.status === 'IN_PROGRESS' && (
-              <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', padding: '1rem 3rem', fontSize: '1.1rem' }} onClick={() => saveProgress()}>
-                💾 Guardar Progreso de Inspección
-              </button>
-            )}
+            <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', padding: '1rem 3rem', fontSize: '1.1rem' }} onClick={() => saveProgress()}>
+              💾 Guardar Progreso de Inspección
+            </button>
           </div>
 
         </div>
