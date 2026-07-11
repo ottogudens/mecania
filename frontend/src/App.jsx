@@ -23,6 +23,7 @@ import WhatsAppChat from './components/WhatsAppChat';
 import CashMovements from './components/CashMovements';
 import SuppliersManager from './components/SuppliersManager';
 import SupplierInvoicesList from './components/SupplierInvoicesList';
+import FinancialReports from './components/FinancialReports';
 
 /* ── Icons (inline SVG, no extra dep) ── */
 const Icon = ({ path, size = 18, ...props }) => (
@@ -75,6 +76,7 @@ const NAV_ITEMS = [
   { id: 'finance_cash_movements', label: 'Movimientos de Caja', icon: 'pos' },
   { id: 'finance_suppliers', label: 'Proveedores del Taller', icon: 'users' },
   { id: 'finance_supplier_invoices', label: 'Facturas y Programador de Pagos', icon: 'orders' },
+  { id: 'finance_reports', label: 'Reportes Financieros', icon: 'finance' },
 
   { id: 'pos',        label: 'Punto de Venta',      icon: 'pos' },
   { id: 'estimates',  label: 'Presupuestos',        icon: 'orders' },
@@ -96,6 +98,7 @@ const PAGE_TITLES = {
   finance_cash_movements: { title: 'Movimientos de Caja', subtitle: 'Registro manual de ingresos y egresos de caja' },
   finance_suppliers: { title: 'Proveedores', subtitle: 'Catálogo de proveedores y datos de contacto' },
   finance_supplier_invoices: { title: 'Facturas de Compra y Programador', subtitle: 'Carga inteligente DTE/PDF e historial de pagos' },
+  finance_reports: { title: 'Reportes Financieros', subtitle: 'Ingresos, egresos y flujo corporativo del taller' },
   pos:        { title: 'Punto de Venta',      subtitle: 'Caja rápida y venta directa de repuestos' },
   estimates:  { title: 'Presupuestos',        subtitle: 'Cotizaciones y pre-aprobaciones' },
   settings:   { title: 'Configuración',       subtitle: 'Ajustes del taller e integraciones' },
@@ -169,7 +172,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 
           {financeOpen && (
             <div className="sidebar-submenu" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)', marginLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
-              {NAV_ITEMS.slice(8, 13).map(item => (
+              {NAV_ITEMS.slice(8, 14).map(item => (
                 <button
                   key={item.id}
                   data-key={item.id}
@@ -187,7 +190,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
           )}
 
           <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas y Sistema</div>
-          {NAV_ITEMS.slice(13).map(item => (
+          {NAV_ITEMS.slice(14).map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -262,6 +265,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     finance_cash_movements:     <CashMovements />,
     finance_suppliers:          <SuppliersManager />,
     finance_supplier_invoices:  <SupplierInvoicesList />,
+    finance_reports:            <FinancialReports />,
 
     finance:                    <FinanceDashboard />,
     pos:                        <POSDashboard onNavigate={setActiveTab} />,
