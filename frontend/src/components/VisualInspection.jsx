@@ -478,6 +478,20 @@ const VisualInspection = () => {
     }
   };
 
+  const handleSendWhatsApp = async (inspection) => {
+    if (!inspection) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/operations/inspections/${inspection.id}/send_whatsapp/`, {}, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Enviado por WhatsApp', message: 'El informe se ha enviado al cliente exitosamente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error al enviar por WhatsApp', message: err.response?.data?.error || 'No se pudo enviar el informe por WhatsApp.', type: 'error' });
+    }
+  };
+
   // Filter list
   const filteredInspections = inspections.filter(ins => {
     if (activeTab === 'pending') return ins.status === 'PENDING';
@@ -520,6 +534,9 @@ const VisualInspection = () => {
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <button className="btn btn-outline" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => handleDownloadPDF(selectedInspection)}>
                 📄 Informe PDF
+              </button>
+              <button className="btn" style={{ backgroundColor: '#25D366', color: 'white', borderColor: 'transparent' }} onClick={() => handleSendWhatsApp(selectedInspection)}>
+                📲 Enviar por WhatsApp
               </button>
               {selectedInspection.status === 'IN_PROGRESS' && (
                 <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
@@ -754,6 +771,9 @@ const VisualInspection = () => {
                           </button>
                           <button className="btn btn-outline btn-sm" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => handleDownloadPDF(ins)}>
                             📄 PDF
+                          </button>
+                          <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: 'white', borderColor: 'transparent' }} onClick={() => handleSendWhatsApp(ins)}>
+                            📲 WSP
                           </button>
                           <button className="btn btn-sm" style={{ backgroundColor: 'var(--secondary)', color: 'black' }} onClick={() => openEstimateDraft(ins)}>
                             💰 Presupuesto
