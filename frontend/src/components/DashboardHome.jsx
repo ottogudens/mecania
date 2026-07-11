@@ -273,13 +273,13 @@ const DashboardHome = () => {
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                   <strong style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    📱 {chat.client_name ? chat.client_name : chat.phone}
+                    📱 {chat.client_name && chat.client_name !== "Desconocido" ? `${chat.client_name} (${chat.phone})` : chat.phone}
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {new Date(chat.last_message_time).toLocaleString()}
+                      {new Date(chat.last_time).toLocaleString()}
                     </span>
                   </strong>
                   <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {chat.last_message_text}
+                    {chat.last_message}
                   </p>
                 </div>
               </div>
