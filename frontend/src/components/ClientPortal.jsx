@@ -5,9 +5,7 @@ import axios from 'axios';
 const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '');
 const clientToken = () => localStorage.getItem('clientToken');
 const clientAuth = () => ({ Authorization: `ClientToken ${clientToken()}` });
-const fmt = (n) =>
-  new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CL') : '—';
 
 export const handleDownloadPDF = async (url, filename) => {
