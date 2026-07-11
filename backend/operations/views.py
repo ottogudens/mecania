@@ -696,6 +696,37 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
         resp['Content-Disposition'] = f'inline; filename="Inspeccion_{plate}_{inspection.id}.pdf"'
         return resp
 
+    @action(detail=True, methods=['post'])
+    def send_whatsapp(self, request, pk=None):
+        inspection = self.get_object()
+        vehicle = inspection.vehicle
+        client = vehicle.client if vehicle else None
+        
+        if not client or not client.phone:
+            return Response({'error': 'El vehículo asociado no tiene un cliente con número de teléfono registrado.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        pdf_response = self.generate_pdf(request, pk=pk)
+        pdf_content = pdf_response.content
+        
+        import base64
+        b64_pdf = base64.b64encode(pdf_content).decode('ascii')
+        
+        from .services import send_whatsapp_message
+        message = f"Hola {client.first_name},\n\nAdjuntamos el informe de inspección visual de tu vehículo {vehicle.license_plate}."
+        filename = f"Inspeccion_{vehicle.license_plate}.pdf"
+        
+        success = send_whatsapp_message(
+            number=client.phone,
+            text=message,
+            document_base64=b64_pdf,
+            file_name=filename
+        )
+        
+        if success:
+            return Response({'success': True, 'message': 'Informe enviado por WhatsApp correctamente.'})
+        else:
+            return Response({'error': 'No se pudo enviar el informe por WhatsApp.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class CustomAuthToken(APIView):
     """Login endpoint — public, no authentication required."""
     permission_classes = []
