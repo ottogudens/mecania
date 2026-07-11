@@ -236,8 +236,6 @@ const VisualInspection = () => {
           [key]: value
         }
       };
-      // Auto-save changes locally on change to keep database updated
-      saveProgress(updated);
       return updated;
     });
   };
@@ -247,12 +245,15 @@ const VisualInspection = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, {
-        items_json: items
+        items_json: items || activeItemsData,
+        notes: selectedInspection.notes
       }, {
         headers: { Authorization: `Token ${token}` }
       });
+      toast({ title: 'Cambios Guardados', message: 'La información se ha actualizado correctamente.', type: 'success' });
     } catch (err) {
-      console.error("Auto-save failed:", err);
+      console.error("Save failed:", err);
+      toast({ title: 'Error', message: 'No se pudieron guardar los cambios.', type: 'error' });
     }
   };
 
@@ -575,72 +576,20 @@ const VisualInspection = () => {
                 📲 Enviar por WhatsApp
               </button>
               {selectedInspection.status === 'IN_PROGRESS' && (
-                <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
-                  ✓ Finalizar y Marcar Lista para Entrega
-                </button>
+                <>
+                  <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', borderColor: 'transparent' }} onClick={() => saveProgress()}>
+                    💾 Guardar Cambios
+                  </button>
+                  <button className="btn" style={{ backgroundColor: '#10b981' }} onClick={handleCompleteInspection}>
+                    ✓ Finalizar Lista para Entrega
+                  </button>
+                </>
               )}
               <button className="btn btn-outline" onClick={() => { setShowActiveInspection(false); setSelectedInspection(null); fetchInspections(); }}>
                 Volver
               </button>
             </div>
           </div>
-
-          {/* Resumen IA Estructurado */}
-          {selectedInspection?.items_json?.ai_summary && (
-            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', backgroundColor: 'rgba(139, 92, 246, 0.05)', borderColor: 'rgba(139, 92, 246, 0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  ✨ Ficha Técnica e Informe de Vehículo (IA)
-                </h4>
-                <button 
-                  className="btn btn-sm" 
-                  style={{ backgroundColor: 'transparent', color: 'var(--status-red)', border: '1px solid var(--status-red)' }} 
-                  onClick={async () => {
-                    const confirmDel = window.confirm("¿Seguro que deseas eliminar este informe IA?");
-                    if (!confirmDel) return;
-                    const updatedItemsJson = { ...selectedInspection.items_json };
-                    delete updatedItemsJson.ai_summary;
-                    setSelectedInspection({ ...selectedInspection, items_json: updatedItemsJson });
-                    setActiveItemsData(updatedItemsJson);
-                    const token = localStorage.getItem('token');
-                    await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, { items_json: updatedItemsJson }, { headers: { Authorization: `Token ${token}` } });
-                  }}
-                >
-                  ✖ Eliminar
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
-                {selectedInspection.items_json.ai_summary.split(/\n{2,}/).map((block, bIdx) => {
-                  const lines = block.split('\n').filter(l => l.trim().length > 0);
-                  if (lines.length === 0) return null;
-                  const sectionTitle = lines[0];
-                  const sectionContent = lines.slice(1);
-                  return (
-                    <div key={bIdx} style={{ backgroundColor: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #8b5cf6' }}>
-                      <h5 style={{ margin: '0 0 0.8rem 0', color: '#c4b5fd', fontSize: '1.05rem' }}>{sectionTitle}</h5>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        {sectionContent.map((line, lIdx) => {
-                          const boldMatch = line.match(/^([^:]+):(.*)$/);
-                          if (boldMatch) {
-                            return (
-                              <p key={lIdx} style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textAlign: 'justify', lineHeight: '1.5' }}>
-                                <strong style={{ color: '#e0e7ff' }}>{boldMatch[1]}:</strong>{boldMatch[2]}
-                              </p>
-                            );
-                          }
-                          return (
-                            <p key={lIdx} style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textAlign: 'justify', lineHeight: '1.5' }}>
-                              {line}
-                            </p>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Notas Generales */}
           <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
@@ -662,14 +611,7 @@ const VisualInspection = () => {
               style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
               placeholder="Añade notas adicionales..."
               value={selectedInspection?.notes || ''}
-              onChange={async (e) => {
-                const newNotes = e.target.value;
-                setSelectedInspection({ ...selectedInspection, notes: newNotes });
-                try {
-                  const token = localStorage.getItem('token');
-                  await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, { notes: newNotes }, { headers: { Authorization: `Token ${token}` } });
-                } catch (err) { console.error('Error auto-saving notes:', err); }
-              }}
+              onChange={(e) => setSelectedInspection({ ...selectedInspection, notes: e.target.value })}
             />
           </div>
 
@@ -844,6 +786,71 @@ const VisualInspection = () => {
               </div>
             )}
 
+          </div>
+
+          {/* Resumen IA Estructurado */}
+          {selectedInspection?.items_json?.ai_summary && (
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', backgroundColor: 'rgba(139, 92, 246, 0.05)', borderColor: 'rgba(139, 92, 246, 0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  ✨ Ficha Técnica e Informe de Vehículo (IA)
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  style={{ backgroundColor: 'transparent', color: 'var(--status-red)', border: '1px solid var(--status-red)' }} 
+                  onClick={async () => {
+                    const confirmDel = window.confirm("¿Seguro que deseas eliminar este informe IA?");
+                    if (!confirmDel) return;
+                    const updatedItemsJson = { ...selectedInspection.items_json };
+                    delete updatedItemsJson.ai_summary;
+                    setSelectedInspection({ ...selectedInspection, items_json: updatedItemsJson });
+                    setActiveItemsData(updatedItemsJson);
+                    const token = localStorage.getItem('token');
+                    await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, { items_json: updatedItemsJson }, { headers: { Authorization: `Token ${token}` } });
+                  }}
+                >
+                  ✖ Eliminar
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                {selectedInspection.items_json.ai_summary.split(/\n{2,}/).map((block, bIdx) => {
+                  const lines = block.split('\n').filter(l => l.trim().length > 0);
+                  if (lines.length === 0) return null;
+                  const sectionTitle = lines[0];
+                  const sectionContent = lines.slice(1);
+                  return (
+                    <div key={bIdx} style={{ backgroundColor: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #8b5cf6' }}>
+                      <h5 style={{ margin: '0 0 0.8rem 0', color: '#c4b5fd', fontSize: '1.05rem' }}>{sectionTitle}</h5>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {sectionContent.map((line, lIdx) => {
+                          const boldMatch = line.match(/^([^:]+):(.*)$/);
+                          if (boldMatch) {
+                            return (
+                              <p key={lIdx} style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textAlign: 'justify', lineHeight: '1.5' }}>
+                                <strong style={{ color: '#e0e7ff' }}>{boldMatch[1]}:</strong>{boldMatch[2]}
+                              </p>
+                            );
+                          }
+                          return (
+                            <p key={lIdx} style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textAlign: 'justify', lineHeight: '1.5' }}>
+                              {line}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+            {selectedInspection.status === 'IN_PROGRESS' && (
+              <button className="btn" style={{ backgroundColor: '#3b82f6', color: 'white', padding: '1rem 3rem', fontSize: '1.1rem' }} onClick={() => saveProgress()}>
+                💾 Guardar Progreso de Inspección
+              </button>
+            )}
           </div>
 
         </div>

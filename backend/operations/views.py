@@ -688,6 +688,71 @@ class VisualInspectionViewSet(viewsets.ModelViewSet):
             p.line(50, y_pos+5, 562, y_pos+5)
             y_pos -= 8
             
+        # Draw AI Summary at the very end
+        ai_summary = items_data.get('ai_summary', '')
+        if ai_summary:
+            # Check overflow for title
+            if y_pos - 40 < 60:
+                p.showPage()
+                page_num += 1
+                draw_header_footer(p, page_num)
+                y_pos = 675
+            
+            p.setFillColor(colors.HexColor('#8b5cf6'))
+            p.rect(50, y_pos - 18, 512, 22, fill=True, stroke=False)
+            p.setFillColor(colors.white)
+            p.setFont("Helvetica-Bold", 10)
+            p.drawString(55, y_pos - 13, "FICHA TÉCNICA E INFORME DE VEHÍCULO (IA)")
+            y_pos -= 35
+            
+            # Split summary by logic
+            blocks = [b.strip() for b in ai_summary.split('\n\n') if b.strip()]
+            for block in blocks:
+                lines = [l.strip() for l in block.split('\n') if l.strip()]
+                if not lines: continue
+                
+                title = lines[0]
+                content = lines[1:]
+                
+                # Check page height constraint
+                if y_pos - 30 < 60:
+                    p.showPage()
+                    page_num += 1
+                    draw_header_footer(p, page_num)
+                    y_pos = 675
+                    
+                p.setFont("Helvetica-Bold", 9)
+                p.setFillColor(colors.HexColor('#6d28d9'))
+                p.drawString(50, y_pos, title)
+                y_pos -= 14
+                
+                p.setFont("Helvetica", 9)
+                p.setFillColor(colors.HexColor('#334155'))
+                for line in content:
+                    wrapped_line = textwrap.wrap(line, width=105)
+                    for wl in wrapped_line:
+                        if y_pos < 60:
+                            p.showPage()
+                            page_num += 1
+                            draw_header_footer(p, page_num)
+                            y_pos = 675
+                            p.setFont("Helvetica", 9)
+                            p.setFillColor(colors.HexColor('#334155'))
+                            
+                        # Quick split for bold labels
+                        if ':' in wl and wl.startswith(line.split(':')[0][:20]):
+                            parts = wl.split(':', 1)
+                            p.setFont("Helvetica-Bold", 9)
+                            p.drawString(50, y_pos, parts[0] + ":")
+                            p.setFont("Helvetica", 9)
+                            # string width approx
+                            w_len = p.stringWidth(parts[0] + ": ", "Helvetica-Bold", 9)
+                            p.drawString(50 + w_len, y_pos, parts[1])
+                        else:
+                            p.drawString(50, y_pos, wl)
+                        y_pos -= 12
+                y_pos -= 8
+
         p.showPage()
         p.save()
         
