@@ -1078,7 +1078,45 @@ class ClientVehicleDetailView(APIView):
             'work_orders': wo_data,
             'visual_inspections': inspections_data,
         })
-        
+
+class ClientWorkOrderPDFView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, pk=None):
+        client_id = _extract_client_id(request)
+        if not client_id:
+            return Response({'error': 'Token inválido o expirado.'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+        work_order = WorkOrder.objects.filter(id=pk, vehicle__client_id=client_id).first()
+        if not work_order:
+            return Response({'error': 'OT no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        # We can reuse the same PDF logic from WorkOrderViewSet
+        viewset = WorkOrderViewSet()
+        viewset.kwargs = {'pk': pk}
+        viewset.request = request
+        return viewset.generate_pdf(request, pk=pk)
+
+class ClientInspectionPDFView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request, pk=None):
+        client_id = _extract_client_id(request)
+        if not client_id:
+            return Response({'error': 'Token inválido o expirado.'}, status=status.HTTP_401_UNAUTHORIZED)
+            
+        from .models import VisualInspection
+        inspection = VisualInspection.objects.filter(id=pk, vehicle__client_id=client_id).first()
+        if not inspection:
+            return Response({'error': 'Inspección no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        viewset = VisualInspectionViewSet()
+        viewset.kwargs = {'pk': pk}
+        viewset.request = request
+        return viewset.generate_pdf(request, pk=pk)
+
 class AIVehicleSummaryView(APIView):
     permission_classes = [IsAuthenticated]
     

@@ -467,6 +467,16 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
                             borderRadius: 20, border: `1px solid ${st.color}40`,
                           }}>{wo.status}</span>
                         </div>
+                        
+                        <div style={{ marginBottom: '1rem' }}>
+                          <button
+                            onClick={() => handleDownloadPDF(`/api/operations/client/work-orders/${wo.id}/pdf/`, `Comprobante_OT_${wo.id}.pdf`)}
+                            className="btn btn-outline btn-sm"
+                            style={{ borderColor: 'var(--primary)', color: 'var(--primary)', width: '100%', display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}
+                          >
+                            📄 Descargar Comprobante PDF 
+                          </button>
+                        </div>
 
                         {!['DELIVERED', 'CANCELLED'].includes(wo.raw_status) && (
                           <div style={{
@@ -555,10 +565,19 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
                           <strong>Mecánico:</strong> {ins.mechanic}
                         </div>
                         {ins.notes && (
-                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic', marginBottom: '0.5rem' }}>
                             "{ins.notes}"
                           </div>
                         )}
+                        <div style={{ marginTop: '1rem' }}>
+                          <button
+                            onClick={() => handleDownloadPDF(`/api/operations/client/inspections/${ins.id}/pdf/`, `Informe_Inspeccion_${ins.id}.pdf`)}
+                            className="btn btn-outline btn-sm"
+                            style={{ borderColor: 'var(--primary)', color: 'var(--primary)', width: '100%', display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}
+                          >
+                            📄 Descargar Informe PDF 
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1015,7 +1034,28 @@ const ClientPortal = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('clientToken');
-    setAuthenticated(false);
+    window.location.href = '/portal-cliente';
+  };
+
+  const handleDownloadPDF = async (url, filename) => {
+    try {
+      const token = localStorage.getItem('clientToken');
+      const response = await axios.get(url, {
+        headers: { Authorization: `ClientToken ${token}` },
+        responseType: 'blob'
+      });
+      const objectUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast({ title: 'Descarga exitosa', message: 'El PDF ha sido descargado localmente.', type: 'success' });
+    } catch (error) {
+      console.error(error);
+      toast({ title: 'Error', message: 'No se pudo descargar el archivo PDF.', type: 'error' });
+    }
   };
 
   if (!authenticated) {

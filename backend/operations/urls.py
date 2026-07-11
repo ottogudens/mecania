@@ -11,8 +11,9 @@ from .views import (
     WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView,
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
+    WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
     DatabaseBackupView, DatabaseRestoreView, WhatsAppClearChatsView, WhatsAppRequestPairingCodeView,
-    AIVehicleSummaryView
+    AIVehicleSummaryView, ClientWorkOrderPDFView, ClientInspectionPDFView
 )
 
 router = DefaultRouter()
@@ -39,6 +40,8 @@ urlpatterns = [
     path('client/change-pin/', ClientChangePinView.as_view(), name='client_change_pin'),
     path('client/data/', ClientDataView.as_view(), name='client_data'),
     path('client/vehicles/<int:pk>/', ClientVehicleDetailView.as_view(), name='client_vehicle_detail'),
+    path('client/work-orders/<int:pk>/pdf/', ClientWorkOrderPDFView.as_view(), name='client_work_order_pdf'),
+    path('client/inspections/<int:pk>/pdf/', ClientInspectionPDFView.as_view(), name='client_inspection_pdf'),
     # AI endpoints
     path('ai-diagnostics/', AIDiagnosticsView.as_view(), name='ai_diagnostics'),
     path('ai-transcribe/', AITranscribeView.as_view(), name='ai_transcribe'),
