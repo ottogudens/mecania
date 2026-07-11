@@ -82,6 +82,7 @@ const VisualInspection = () => {
   // Audio recording states
   const [isRecording, setIsRecording] = useState(false);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [generatingSummary, setGeneratingSummary] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
@@ -336,6 +337,40 @@ const VisualInspection = () => {
     }
   };
 
+  const handleGenerateAISummary = async () => {
+    if (!selectedInspection || !selectedInspection.vehicle_id) return;
+    setGeneratingSummary(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post('/api/operations/vehicles/ai-summary/', {
+        vehicle_id: selectedInspection.vehicle_id
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      
+      const summary = res.data.summary;
+      const newNotes = (selectedInspection.notes || '') + '\n\n=== Resumen IA (Curiosidades y Mantenciones) ===\n' + summary;
+      
+      // Update local state and backend
+      const updatedInspection = { ...selectedInspection, notes: newNotes.trim() };
+      setSelectedInspection(updatedInspection);
+      
+      await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, {
+        notes: newNotes.trim()
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      
+      toast({ title: 'Resumen IA Generado', message: 'Se ha agregado el resumen al campo de notas de la inspección.', type: 'success' });
+      fetchInspections(true);
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error IA', message: 'No se pudo generar el resumen automotriz.', type: 'error' });
+    } finally {
+      setGeneratingSummary(false);
+    }
+  };
+
   // Complete visual inspection
   const handleCompleteInspection = async () => {
     if (!selectedInspection) return;
@@ -547,6 +582,35 @@ const VisualInspection = () => {
                 Volver
               </button>
             </div>
+          </div>
+
+          {/* Notas Generales y Resumen IA */}
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h4 style={{ margin: 0, color: 'var(--primary)' }}>Notas Generales de la Inspección</h4>
+              <button 
+                className="btn btn-sm" 
+                style={{ backgroundColor: '#8b5cf6', color: 'white', borderColor: 'transparent', display: 'flex', gap: '0.5rem', alignItems: 'center' }} 
+                onClick={handleGenerateAISummary}
+                disabled={generatingSummary}
+              >
+                {generatingSummary ? '⏳ Generando...' : '✨ Generar Resumen IA (Vehículo)'}
+              </button>
+            </div>
+            <textarea
+              className="input-field"
+              style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
+              placeholder="Añade notas generales adicionales a la inspección..."
+              value={selectedInspection?.notes || ''}
+              onChange={async (e) => {
+                const newNotes = e.target.value;
+                setSelectedInspection({ ...selectedInspection, notes: newNotes });
+                try {
+                  const token = localStorage.getItem('token');
+                  await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, { notes: newNotes }, { headers: { Authorization: `Token ${token}` } });
+                } catch (err) { console.error('Error auto-saving notes:', err); }
+              }}
+            />
           </div>
 
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap-reverse' }}>

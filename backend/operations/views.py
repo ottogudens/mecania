@@ -1078,7 +1078,54 @@ class ClientVehicleDetailView(APIView):
             'work_orders': wo_data,
             'visual_inspections': inspections_data,
         })
-
+        
+class AIVehicleSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, *args, **kwargs):
+        vehicle_id = request.data.get('vehicle_id')
+        if not vehicle_id:
+            return Response({'error': 'Se requiere el vehicle_id'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            vehicle = Vehicle.objects.get(id=vehicle_id)
+        except Vehicle.DoesNotExist:
+            return Response({'error': 'Vehículo no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+            
+        try:
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            
+            prompt = f"""
+            Eres un experto automotriz. Genera un breve resumen estructurado e interesante sobre el siguiente vehículo.
+            Incluye curiosidades breves del modelo (si existen) y las mantenciones preventivas más críticas que suele requerir este modelo.
+            
+            Datos del vehículo:
+            Marca: {vehicle.make}
+            Modelo: {vehicle.model}
+            Año: {vehicle.year}
+            VIN: {vehicle.vin or 'No especificado'}
+            Motor (Número): {vehicle.engine_number or 'No especificado'}
+            Transmisión: {vehicle.get_transmission_type_display() or 'No especificado'}
+            
+            El resumen debe ser directo, máximo 3 o 4 párrafos cortos, con tono profesional pero amigable, listo para ser leído por el mecánico o cliente.
+            """
+            
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un asistente mecánico experto y una enciclopedia automotriz."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=400,
+                temperature=0.7
+            )
+            
+            ai_message = response.choices[0].message.content
+            return Response({'summary': ai_message})
+            
+        except Exception as e:
+            print(f"Error calling OpenAI API for vehicle summary: {e}")
+            return Response({'error': 'Hubo un error al generar el resumen con IA. Por favor, intenta de nuevo.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class AIDiagnosticsView(APIView):
     permission_classes = [IsAuthenticated]

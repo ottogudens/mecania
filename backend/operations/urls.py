@@ -10,7 +10,9 @@ from .views import (
     ScheduledMaintenanceViewSet, MaintenanceAlertsView, WhatsAppSessionView,
     WhatsAppFlowViewSet, WhatsAppChatListView, WhatsAppMessageListView, WhatsAppManualSendView,
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
-    DatabaseBackupView, DatabaseRestoreView, WhatsAppClearChatsView, WhatsAppRequestPairingCodeView
+    WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
+    DatabaseBackupView, DatabaseRestoreView, WhatsAppClearChatsView, WhatsAppRequestPairingCodeView,
+    AIVehicleSummaryView
 )
 
 router = DefaultRouter()
@@ -40,6 +42,7 @@ urlpatterns = [
     # AI endpoints
     path('ai-diagnostics/', AIDiagnosticsView.as_view(), name='ai_diagnostics'),
     path('ai-transcribe/', AITranscribeView.as_view(), name='ai_transcribe'),
+    path('vehicles/ai-summary/', AIVehicleSummaryView.as_view(), name='ai_vehicle_summary'),
     # WhatsApp session persistence
     path('whatsapp-session/', WhatsAppSessionView.as_view(), name='whatsapp_session'),
     # WhatsApp Chat history and manual messaging
