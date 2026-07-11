@@ -732,8 +732,8 @@ const WorkOrderList = () => {
                     <input type="text" value={quickVehicle.engine_displacement} onChange={e => setQuickVehicle({...quickVehicle, engine_displacement: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="2.0L" />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Cliente *</label>
-                    <select required value={quickVehicle.client_id} onChange={e => setQuickVehicle({...quickVehicle, client_id: e.target.value})} className="input-field" style={{ width: '100%', backgroundColor: 'var(--bg-card)' }}>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', fontSize: '0.9rem' }}>Cliente</label>
+                    <select value={quickVehicle.client_id} onChange={e => setQuickVehicle({...quickVehicle, client_id: e.target.value})} className="input-field" style={{ width: '100%', backgroundColor: 'var(--bg-card)' }}>
                       <option value="">Seleccione Propietario...</option>
                       {clients.map(c => (
                         <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>

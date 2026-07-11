@@ -36,7 +36,7 @@ class ClientSerializer(serializers.ModelSerializer):
 class VehicleSerializer(serializers.ModelSerializer):
     client = ClientSerializer(read_only=True)
     client_id = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(), source='client', write_only=True, required=False
+        queryset=Client.objects.all(), source='client', write_only=True, required=False, allow_null=True
     )
     parts_count = serializers.SerializerMethodField()
     maintenance_count = serializers.SerializerMethodField()
