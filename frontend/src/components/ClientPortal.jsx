@@ -331,7 +331,8 @@ const VehicleCard = ({ vehicle, activeOrders, pastOrders, pendingMaintenance, on
 const VehicleDetail = ({ vehicleId, onBack }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info');
+  const [expandedTabs, setExpandedTabs] = useState({ info: true });
+  const toggleTab = (id) => setExpandedTabs(prev => ({ ...prev, [id]: !prev[id] }));
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -395,305 +396,299 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="client-tabs-container">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            padding: '0.55rem 1.1rem', borderRadius: 8, border: 'none', cursor: 'pointer',
-            background: activeTab === t.id ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : 'rgba(255,255,255,0.05)',
-            color: activeTab === t.id ? '#fff' : '#94a3b8',
-            fontWeight: activeTab === t.id ? 600 : 400,
-            fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem', transition: 'all 0.2s',
-            whiteSpace: 'nowrap',
-          }}>
-            {t.label}{t.count !== null ? ` (${t.count})` : ''}
+      {/* Accordions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
+        
+        {/* Datos */}
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button onClick={() => toggleTab('info')} style={{ width: '100%', padding: '1.25rem', background: expandedTabs['info'] ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: 'none', textAlign: 'left', color: expandedTabs['info'] ? '#60a5fa' : '#f8fafc', fontSize: '1.1rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif' }}>
+            <span>📋 Datos del Vehículo</span>
+            <span style={{ opacity: 0.6 }}>{expandedTabs['info'] ? '▲' : '▼'}</span>
           </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'info' && (
-        <div className="glass-card" style={{ padding: '1.75rem' }}>
-          <h3 style={{ color: '#60a5fa', marginBottom: '1.25rem', fontSize: '1.1rem' }}>
-            📋 Datos del Vehículo
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1rem' }}>
-            {[
-              ['Marca', vehicle.make],
-              ['Modelo', vehicle.model],
-              ['Año', vehicle.year],
-              ['Patente', vehicle.license_plate],
-              ['Color', vehicle.color || '—'],
-              ['Transmisión', vehicle.transmission_type],
-              ['Combustible', vehicle.fuel_type],
-              ['Cilindrada', vehicle.engine_displacement || '—'],
-              ['VIN / Chasis', vehicle.vin || '—'],
-              ['Nº Motor', vehicle.engine_number || '—'],
-              ['Kilometraje', vehicle.mileage ? `${vehicle.mileage.toLocaleString('es-CL')} km` : '—'],
-            ].map(([label, value]) => (
-              <div key={label} style={{
-                padding: '0.75rem 1rem', borderRadius: 8,
-                background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)',
-              }}>
-                <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-                  {label}
-                </div>
-                <div style={{ fontWeight: 500, fontSize: '0.95rem' }}>{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'orders' && (
-        <div>
-          {work_orders.length === 0 ? (
-            <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              Sin atenciones registradas.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {work_orders.map(wo => {
-                const st = STATUS_COLORS[wo.raw_status] || STATUS_COLORS.PENDING;
-                return (
-                  <div key={wo.id} className="glass-card" style={{ padding: '1.25rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <div>
-                        <span style={{ fontWeight: 600 }}>OT #{wo.id}</span>
-                        <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.8rem' }}>
-                          {fmtDate(wo.created_at)}
-                        </span>
-                      </div>
-                      <span style={{
-                        color: st.color, fontWeight: 600, fontSize: '0.8rem',
-                        padding: '0.25rem 0.8rem', background: `${st.color}18`,
-                        borderRadius: 20, border: `1px solid ${st.color}40`,
-                      }}>{wo.status}</span>
+          {expandedTabs['info'] && (
+            <div style={{ padding: '1.75rem', borderTop: '1px solid rgba(255,255,255,0.05)', animation: 'fadeIn 0.3s' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))', gap: '1rem' }}>
+                {[
+                  ['Marca', vehicle.make],
+                  ['Modelo', vehicle.model],
+                  ['Año', vehicle.year],
+                  ['Patente', vehicle.license_plate],
+                  ['Color', vehicle.color || '—'],
+                  ['Transmisión', vehicle.transmission_type],
+                  ['Combustible', vehicle.fuel_type],
+                  ['Cilindrada', vehicle.engine_displacement || '—'],
+                  ['VIN / Chasis', vehicle.vin || '—'],
+                  ['Nº Motor', vehicle.engine_number || '—'],
+                  ['Kilometraje', vehicle.mileage ? `${vehicle.mileage.toLocaleString('es-CL')} km` : '—'],
+                ].map(([label, value]) => (
+                  <div key={label} style={{
+                    padding: '0.75rem 1rem', borderRadius: 8,
+                    background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)',
+                  }}>
+                    <div style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
+                      {label}
                     </div>
+                    <div style={{ fontWeight: 500, fontSize: '0.95rem' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-                    {/* Progress bar for active orders */}
-                    {!['DELIVERED', 'CANCELLED'].includes(wo.raw_status) && (
-                      <div style={{
-                        width: '100%', height: 6, background: 'rgba(255,255,255,0.08)',
-                        borderRadius: 3, overflow: 'hidden', marginBottom: '0.75rem',
-                      }}>
-                        <div style={{
-                          width: `${st.progress}%`, height: '100%', background: st.color,
-                          transition: 'width 1s ease-in-out', borderRadius: 3,
-                        }} />
-                      </div>
-                    )}
-
-                    {wo.visit_reason && (
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                        <strong>Motivo:</strong> {wo.visit_reason}
-                      </div>
-                    )}
-
-                    {/* Items */}
-                    {wo.items && wo.items.length > 0 && (
-                      <div style={{
-                        marginTop: '0.5rem', padding: '0.75rem',
-                        background: 'rgba(0,0,0,0.2)', borderRadius: 8,
-                      }}>
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '0.5rem' }}>
-                          Detalle
-                        </div>
-                        {wo.items.map((item, idx) => (
-                          <div key={idx} style={{
-                            display: 'flex', justifyContent: 'space-between',
-                            padding: '0.3rem 0', fontSize: '0.85rem',
-                            borderBottom: idx < wo.items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                          }}>
-                            <span style={{ color: item.is_labor ? '#c084fc' : '#94a3b8' }}>
-                              {item.is_labor ? '🔧' : '📦'} {item.description}
-                            </span>
-                            <span style={{ color: 'var(--text-muted)' }}>
-                              {item.quantity}x {fmt(item.unit_price)}
+        {/* Órdenes */}
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button onClick={() => toggleTab('orders')} style={{ width: '100%', padding: '1.25rem', background: expandedTabs['orders'] ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: 'none', textAlign: 'left', color: expandedTabs['orders'] ? '#60a5fa' : '#f8fafc', fontSize: '1.1rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif' }}>
+            <span>🛠️ Atenciones ({work_orders.length})</span>
+            <span style={{ opacity: 0.6 }}>{expandedTabs['orders'] ? '▲' : '▼'}</span>
+          </button>
+          {expandedTabs['orders'] && (
+            <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', animation: 'fadeIn 0.3s' }}>
+              {work_orders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Sin atenciones registradas.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {work_orders.map(wo => {
+                    const st = STATUS_COLORS[wo.raw_status] || STATUS_COLORS.PENDING;
+                    return (
+                      <div key={wo.id} className="glass-card" style={{ padding: '1.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>OT #{wo.id}</span>
+                            <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.8rem' }}>
+                              {fmtDate(wo.created_at)}
                             </span>
                           </div>
-                        ))}
+                          <span style={{
+                            color: st.color, fontWeight: 600, fontSize: '0.8rem',
+                            padding: '0.25rem 0.8rem', background: `${st.color}18`,
+                            borderRadius: 20, border: `1px solid ${st.color}40`,
+                          }}>{wo.status}</span>
+                        </div>
+
+                        {!['DELIVERED', 'CANCELLED'].includes(wo.raw_status) && (
+                          <div style={{
+                            width: '100%', height: 6, background: 'rgba(255,255,255,0.08)',
+                            borderRadius: 3, overflow: 'hidden', marginBottom: '0.75rem',
+                          }}>
+                            <div style={{
+                              width: `${st.progress}%`, height: '100%', background: st.color,
+                              transition: 'width 1s ease-in-out', borderRadius: 3,
+                            }} />
+                          </div>
+                        )}
+
+                        {wo.visit_reason && (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                            <strong>Motivo:</strong> {wo.visit_reason}
+                          </div>
+                        )}
+
+                        {wo.items && wo.items.length > 0 && (
+                          <div style={{
+                            marginTop: '0.5rem', padding: '0.75rem',
+                            background: 'rgba(0,0,0,0.2)', borderRadius: 8,
+                          }}>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: '0.5rem' }}>
+                              Detalle
+                            </div>
+                            {wo.items.map((item, idx) => (
+                              <div key={idx} style={{
+                                display: 'flex', justifyContent: 'space-between',
+                                padding: '0.3rem 0', fontSize: '0.85rem',
+                                borderBottom: idx < wo.items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                              }}>
+                                <span style={{ color: item.is_labor ? '#c084fc' : '#94a3b8' }}>
+                                  {item.is_labor ? '🔧' : '📦'} {item.description}
+                                </span>
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                  {item.quantity}x {fmt(item.unit_price)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
 
-      {activeTab === 'inspections' && (
-        <div>
-          {visual_inspections.length === 0 ? (
-            <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              Sin inspecciones visuales registradas.
+        {/* Inspecciones Visuales */}
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button onClick={() => toggleTab('inspections')} style={{ width: '100%', padding: '1.25rem', background: expandedTabs['inspections'] ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: 'none', textAlign: 'left', color: expandedTabs['inspections'] ? '#60a5fa' : '#f8fafc', fontSize: '1.1rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif' }}>
+            <span>🔎 Inspecciones ({visual_inspections.length})</span>
+            <span style={{ opacity: 0.6 }}>{expandedTabs['inspections'] ? '▲' : '▼'}</span>
+          </button>
+          {expandedTabs['inspections'] && (
+            <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', animation: 'fadeIn 0.3s' }}>
+              {visual_inspections.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Sin inspecciones visuales registradas.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {visual_inspections.map(ins => {
+                    const isCompleted = ins.raw_status === 'COMPLETED';
+                    const color = isCompleted ? '#10b981' : (ins.raw_status === 'PENDING' ? '#f59e0b' : '#3b82f6');
+                    return (
+                      <div key={ins.id} className="glass-card" style={{ padding: '1.25rem', borderLeft: `4px solid ${color}` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                          <div>
+                            <span style={{ fontWeight: 600 }}>Inspección #{ins.id}</span>
+                            <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.8rem' }}>
+                              {fmtDate(ins.created_at)}
+                            </span>
+                          </div>
+                          <span style={{
+                            color: color, fontWeight: 600, fontSize: '0.8rem',
+                            padding: '0.25rem 0.8rem', background: `${color}18`,
+                            borderRadius: 20, border: `1px solid ${color}40`,
+                          }}>{ins.status}</span>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          <strong>Mecánico:</strong> {ins.mechanic}
+                        </div>
+                        {ins.notes && (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                            "{ins.notes}"
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {visual_inspections.map(ins => {
-                const isCompleted = ins.raw_status === 'COMPLETED';
-                const color = isCompleted ? '#10b981' : (ins.raw_status === 'PENDING' ? '#f59e0b' : '#3b82f6');
-                
-                return (
-                  <div key={ins.id} className="glass-card" style={{ padding: '1.25rem', borderLeft: `4px solid ${color}` }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <div>
-                        <span style={{ fontWeight: 600 }}>Inspección #{ins.id}</span>
-                        <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.8rem' }}>
-                          {fmtDate(ins.created_at)}
+          )}
+        </div>
+
+        {/* Repuestos */}
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button onClick={() => toggleTab('parts')} style={{ width: '100%', padding: '1.25rem', background: expandedTabs['parts'] ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: 'none', textAlign: 'left', color: expandedTabs['parts'] ? '#60a5fa' : '#f8fafc', fontSize: '1.1rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif' }}>
+            <span>🔩 Repuestos ({parts.length})</span>
+            <span style={{ opacity: 0.6 }}>{expandedTabs['parts'] ? '▲' : '▼'}</span>
+          </button>
+          {expandedTabs['parts'] && (
+            <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', animation: 'fadeIn 0.3s' }}>
+              {parts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Sin repuestos registrados.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {parts.map((p) => (
+                    <div key={p.id} className="glass-card" style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div style={{ fontWeight: 600, color: '#e2e8f0', fontSize: '1.05rem' }}>{p.name}</div>
+                        <div style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: 4, fontSize: '0.75rem', fontFamily: 'monospace' }}>{p.oem_number}</div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 1fr) minmax(100px, 1fr)', gap: '0.75rem', fontSize: '0.85rem' }}>
+                        <div><span style={{ color: '#64748b', display: 'block', textTransform: 'uppercase', fontSize: '0.7rem', marginBottom: 2 }}>Categoría</span><div style={{ color: '#e2e8f0' }}>{p.category}</div></div>
+                        <div><span style={{ color: '#64748b', display: 'block', textTransform: 'uppercase', fontSize: '0.7rem', marginBottom: 2 }}>Marca</span><div style={{ color: '#e2e8f0' }}>{p.brand || '—'}</div></div>
+                        <div><span style={{ color: '#64748b', display: 'block', textTransform: 'uppercase', fontSize: '0.7rem', marginBottom: 2 }}>Instalado</span><div style={{ color: '#e2e8f0' }}>{fmtDate(p.installed_at)}</div></div>
+                        <div><span style={{ color: '#64748b', display: 'block', textTransform: 'uppercase', fontSize: '0.7rem', marginBottom: 2 }}>Km</span><div style={{ color: '#e2e8f0' }}>{p.installed_mileage ? p.installed_mileage.toLocaleString('es-CL') : '—'}</div></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Mantenciones */}
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button onClick={() => toggleTab('maintenance')} style={{ width: '100%', padding: '1.25rem', background: expandedTabs['maintenance'] ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: 'none', textAlign: 'left', color: expandedTabs['maintenance'] ? '#60a5fa' : '#f8fafc', fontSize: '1.1rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif' }}>
+            <span>📅 Mantenciones ({maintenance_records.length})</span>
+            <span style={{ opacity: 0.6 }}>{expandedTabs['maintenance'] ? '▲' : '▼'}</span>
+          </button>
+          {expandedTabs['maintenance'] && (
+            <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', animation: 'fadeIn 0.3s' }}>
+              {maintenance_records.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Sin mantenciones registradas.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {maintenance_records.map(r => (
+                    <div key={r.id} className="glass-card" style={{ padding: '1.25rem', borderLeft: '4px solid #10b981' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontWeight: 600 }}>{r.maintenance_type}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                          {fmtDate(r.date_performed)} • {r.mileage?.toLocaleString('es-CL')} km
                         </span>
                       </div>
-                      <span style={{
-                        color: color, fontWeight: 600, fontSize: '0.8rem',
-                        padding: '0.25rem 0.8rem', background: `${color}18`,
-                        borderRadius: 20, border: `1px solid ${color}40`,
-                      }}>{ins.status}</span>
+                      <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                        {r.description}
+                      </p>
+                      {r.product_details && (
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', color: '#94a3b8', padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: 6 }}>
+                          📦 {r.product_details}
+                        </div>
+                      )}
+                      {r.cost && (
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
+                          {fmt(r.cost)}
+                        </div>
+                      )}
                     </div>
-
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      <strong>Mecánico:</strong> {ins.mechanic}
-                    </div>
-
-                    {ins.notes && (
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
-                        "{ins.notes}"
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'parts' && (
-        <div>
-          {parts.length === 0 ? (
-            <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              Sin repuestos registrados.
-            </div>
-          ) : (
-            <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                      {['Parte', 'OEM', 'Marca', 'Categoría', 'Instalado', 'Km'].map(h => (
-                        <th key={h} style={{
-                          padding: '0.75rem 1rem', textAlign: 'left',
-                          fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase',
-                          letterSpacing: 1, fontWeight: 600,
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parts.map((p, i) => (
-                      <tr key={p.id} style={{
-                        borderBottom: i < parts.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      }}>
-                        <td style={{ padding: '0.7rem 1rem', fontWeight: 500, fontSize: '0.9rem' }}>{p.name}</td>
-                        <td style={{ padding: '0.7rem 1rem', fontFamily: 'monospace', fontSize: '0.8rem', color: '#94a3b8' }}>{p.oem_number}</td>
-                        <td style={{ padding: '0.7rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{p.brand || '—'}</td>
-                        <td style={{ padding: '0.7rem 1rem', fontSize: '0.85rem' }}>{p.category}</td>
-                        <td style={{ padding: '0.7rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{fmtDate(p.installed_at)}</td>
-                        <td style={{ padding: '0.7rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                          {p.installed_mileage ? `${p.installed_mileage.toLocaleString('es-CL')}` : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'maintenance' && (
-        <div>
-          {maintenance_records.length === 0 ? (
-            <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              Sin mantenciones registradas.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {maintenance_records.map(r => (
-                <div key={r.id} className="glass-card" style={{
-                  padding: '1.25rem', borderLeft: '4px solid #10b981',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontWeight: 600 }}>{r.maintenance_type}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      {fmtDate(r.date_performed)} • {r.mileage?.toLocaleString('es-CL')} km
-                    </span>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    {r.description}
-                  </p>
-                  {r.product_details && (
-                    <div style={{
-                      marginTop: '0.5rem', fontSize: '0.8rem', color: '#94a3b8',
-                      padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.2)', borderRadius: 6,
-                    }}>
-                      📦 {r.product_details}
-                    </div>
-                  )}
-                  {r.cost && (
-                    <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600 }}>
-                      {fmt(r.cost)}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
-      )}
 
-      {activeTab === 'scheduled' && (
-        <div>
-          {scheduled_maintenance.length === 0 ? (
-            <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              Sin mantenciones programadas.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {scheduled_maintenance.map(s => {
-                const st = MAINT_STATUS[s.raw_status] || MAINT_STATUS.PENDING;
-                return (
-                  <div key={s.id} className="glass-card" style={{
-                    padding: '1.25rem',
-                    borderLeft: `4px solid ${st.color}`,
-                    opacity: s.raw_status === 'COMPLETED' ? 0.6 : 1,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                      <span style={{ fontWeight: 600 }}>
-                        {st.icon} {s.maintenance_type}
-                      </span>
-                      <span style={{
-                        fontSize: '0.75rem', fontWeight: 600, color: st.color,
-                        padding: '0.2rem 0.6rem', background: `${st.color}18`,
-                        borderRadius: 12,
-                      }}>{s.status}</span>
-                    </div>
-                    <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                      {s.description}
-                    </p>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                      {s.due_date && <span>📅 {fmtDate(s.due_date)}</span>}
-                      {s.due_date && s.due_mileage && <span> • </span>}
-                      {s.due_mileage && <span>🛣️ {s.due_mileage.toLocaleString('es-CL')} km</span>}
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Mantenciones Programadas */}
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <button onClick={() => toggleTab('scheduled')} style={{ width: '100%', padding: '1.25rem', background: expandedTabs['scheduled'] ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.02)', border: 'none', textAlign: 'left', color: expandedTabs['scheduled'] ? '#60a5fa' : '#f8fafc', fontSize: '1.1rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'Outfit, sans-serif' }}>
+            <span>⏰ Próximas ({scheduled_maintenance.filter(s => s.raw_status !== 'COMPLETED').length})</span>
+            <span style={{ opacity: 0.6 }}>{expandedTabs['scheduled'] ? '▲' : '▼'}</span>
+          </button>
+          {expandedTabs['scheduled'] && (
+            <div style={{ padding: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', animation: 'fadeIn 0.3s' }}>
+              {scheduled_maintenance.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                  Sin mantenciones programadas.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {scheduled_maintenance.map(s => {
+                    const st = MAINT_STATUS[s.raw_status] || MAINT_STATUS.PENDING;
+                    return (
+                      <div key={s.id} className="glass-card" style={{ padding: '1.25rem', borderLeft: `4px solid ${st.color}`, opacity: s.raw_status === 'COMPLETED' ? 0.6 : 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                          <span style={{ fontWeight: 600 }}>
+                            {st.icon} {s.maintenance_type}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: st.color, padding: '0.2rem 0.6rem', background: `${st.color}18`, borderRadius: 12 }}>
+                            {s.status}
+                          </span>
+                        </div>
+                        <p style={{ margin: '0.25rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                          {s.description}
+                        </p>
+                        <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                          {s.due_date && <span>📅 {fmtDate(s.due_date)}</span>}
+                          {s.due_date && s.due_mileage && <span> • </span>}
+                          {s.due_mileage && <span>🛣️ {s.due_mileage.toLocaleString('es-CL')} km</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+
+      </div>
     </div>
   );
 };
