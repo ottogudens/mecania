@@ -359,10 +359,11 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
   }
   if (!data) return null;
 
-  const { vehicle, parts, maintenance_records, scheduled_maintenance, work_orders } = data;
+  const { vehicle, parts, maintenance_records, scheduled_maintenance, work_orders, visual_inspections = [] } = data;
   const tabs = [
     { id: 'info',     label: '📋 Datos',         count: null },
     { id: 'orders',   label: '🛠️ Atenciones',    count: work_orders.length },
+    { id: 'inspections', label: '🔎 Inspecciones', count: visual_inspections.length },
     { id: 'parts',    label: '🔩 Repuestos',     count: parts.length },
     { id: 'maintenance', label: '📅 Mantenciones', count: maintenance_records.length },
     { id: 'scheduled', label: '⏰ Próximas',     count: scheduled_maintenance.filter(s => s.raw_status !== 'COMPLETED').length },
@@ -512,6 +513,51 @@ const VehicleDetail = ({ vehicleId, onBack }) => {
                             </span>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'inspections' && (
+        <div>
+          {visual_inspections.length === 0 ? (
+            <div className="glass-card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+              Sin inspecciones visuales registradas.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {visual_inspections.map(ins => {
+                const isCompleted = ins.raw_status === 'COMPLETED';
+                const color = isCompleted ? '#10b981' : (ins.raw_status === 'PENDING' ? '#f59e0b' : '#3b82f6');
+                
+                return (
+                  <div key={ins.id} className="glass-card" style={{ padding: '1.25rem', borderLeft: `4px solid ${color}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <div>
+                        <span style={{ fontWeight: 600 }}>Inspección #{ins.id}</span>
+                        <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.8rem' }}>
+                          {fmtDate(ins.created_at)}
+                        </span>
+                      </div>
+                      <span style={{
+                        color: color, fontWeight: 600, fontSize: '0.8rem',
+                        padding: '0.25rem 0.8rem', background: `${color}18`,
+                        borderRadius: 20, border: `1px solid ${color}40`,
+                      }}>{ins.status}</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      <strong>Mecánico:</strong> {ins.mechanic}
+                    </div>
+
+                    {ins.notes && (
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+                        "{ins.notes}"
                       </div>
                     )}
                   </div>

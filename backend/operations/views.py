@@ -1057,12 +1057,26 @@ class ClientVehicleDetailView(APIView):
                 } for item in items],
             })
 
+        # Inspecciones Visuales
+        from .models import VisualInspection
+        visual_inspections = VisualInspection.objects.filter(vehicle=vehicle).order_by('-created_at')
+        inspections_data = [{
+            'id': ins.id,
+            'status': ins.get_status_display(),
+            'raw_status': ins.status,
+            'created_at': ins.created_at,
+            'mechanic': ins.mechanic.first_name if (ins.mechanic and ins.mechanic.first_name) else (ins.mechanic.username if ins.mechanic else "No asignado"),
+            'notes': ins.notes,
+            'items_json': ins.items_json
+        } for ins in visual_inspections]
+
         return Response({
             'vehicle': vehicle_data,
             'parts': parts_data,
             'maintenance_records': records_data,
             'scheduled_maintenance': scheduled_data,
             'work_orders': wo_data,
+            'visual_inspections': inspections_data,
         })
 
 
