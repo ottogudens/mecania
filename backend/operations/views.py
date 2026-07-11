@@ -1136,29 +1136,61 @@ class AIVehicleSummaryView(APIView):
         try:
             client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
             
+            try:
+                transmission_display = vehicle.get_transmission_type_display()
+            except Exception:
+                transmission_display = getattr(vehicle, 'transmission_type', 'No especificado') or 'No especificado'
+
             prompt = f"""
-            Eres un experto automotriz. Genera un breve resumen estructurado e interesante sobre el siguiente vehículo.
-            Incluye curiosidades breves del modelo (si existen) y las mantenciones preventivas más críticas que suele requerir este modelo.
-            
-            Datos del vehículo:
-            Marca: {vehicle.make}
-            Modelo: {vehicle.model}
-            Año: {vehicle.year}
-            VIN: {vehicle.vin or 'No especificado'}
-            Motor (Número): {vehicle.engine_number or 'No especificado'}
-            Transmisión: {vehicle.get_transmission_type_display() or 'No especificado'}
-            
-            El resumen debe ser directo, máximo 3 o 4 párrafos cortos, con tono profesional pero amigable, listo para ser leído por el mecánico o cliente.
-            """
+Eres un experto automotriz enciclopédico. Genera un informe técnico detallado y profesional sobre el siguiente vehículo, basándote en su marca, modelo y año.
+
+Datos del vehículo:
+- Marca: {vehicle.make}
+- Modelo: {vehicle.model}
+- Año: {vehicle.year}
+- VIN: {vehicle.vin or 'No especificado'}
+- Número de motor: {vehicle.engine_number or 'No especificado'}
+- Tipo de transmisión: {transmission_display}
+
+Genera el informe con EXACTAMENTE este formato estructurado (usa estos encabezados sin modificarlos):
+
+🔧 MECÁNICA
+Tipo de motor: [gasolina/diésel/eléctrico/híbrido], cilindrada y número de cilindros.
+Potencia: [HP / kW aproximados para este modelo y año].
+Torque: [Nm aproximados].
+Transmisión: [manual/automática/CVT — describir brevemente sus características para este modelo].
+Curiosidad mecánica: [dato técnico interesante o peculiaridad conocida del motor/mecánica de este modelo].
+
+🛡️ SEGURIDAD
+Frenos: [sistema ABS, EBD, frenado de emergencia si aplica].
+Control de estabilidad: [ESP/VSC — indicar si trae en este año y nivel de equipamiento].
+Airbags: [cantidad estándar y ubicación].
+Asistencias activas: [frenado autónomo, control crucero adaptativo, asistente de carril — según año y versión].
+
+🪑 CONFORT Y DISEÑO
+Interior: [descripción del espacio, materiales predominantes, cantidad de pasajeros].
+Maletero: [capacidad en litros aproximada].
+Climatización: [tipo — aire acondicionado manual, automático, bizona].
+Asientos: [ergonomía, ajustes eléctricos/manuales, tapizado].
+Diseño exterior: [estilo de carrocería, rasgo visual distintivo del modelo].
+
+📱 TECNOLOGÍA
+Infoentretenimiento: [tamaño de pantalla táctil, sistema operativo si aplica].
+Conectividad: [Apple CarPlay, Android Auto, Bluetooth, USB].
+Instrumentación: [cuadro de instrumentos analógico/digital, head-up display si aplica].
+Extras tecnológicos: [cámara de retroceso, sensores de estacionamiento, carga inalámbrica, u otros según año/versión].
+
+Usa información técnica precisa para el {vehicle.year} {vehicle.make} {vehicle.model}. Si algún dato varía según versión, indícalo. Tono profesional, claro y directo.
+"""
             
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Eres un asistente mecánico experto y una enciclopedia automotriz."},
+                    {"role": "system", "content": "Eres un asistente técnico automotriz experto. Tu especialidad es generar informes precisos, estructurados y profesionales sobre vehículos. Siempre organizas la información en las secciones exactas que te piden, con datos técnicos verificables."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=400,
-                temperature=0.7
+                max_tokens=900,
+                temperature=0.5
             )
             
             ai_message = response.choices[0].message.content

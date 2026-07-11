@@ -349,19 +349,20 @@ const VisualInspection = () => {
       });
       
       const summary = res.data.summary;
-      const newNotes = (selectedInspection.notes || '') + '\n\n=== Resumen IA (Curiosidades y Mantenciones) ===\n' + summary;
+      const updatedItemsJson = { ...(selectedInspection.items_json || {}), ai_summary: summary };
       
       // Update local state and backend
-      const updatedInspection = { ...selectedInspection, notes: newNotes.trim() };
+      const updatedInspection = { ...selectedInspection, items_json: updatedItemsJson };
       setSelectedInspection(updatedInspection);
+      setActiveItemsData(updatedItemsJson);
       
       await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, {
-        notes: newNotes.trim()
+        items_json: updatedItemsJson
       }, {
         headers: { Authorization: `Token ${token}` }
       });
       
-      toast({ title: 'Resumen IA Generado', message: 'Se ha agregado el resumen al campo de notas de la inspección.', type: 'success' });
+      toast({ title: 'Análisis IA Generado', message: 'Se ha agregado el informe estructurado del vehículo.', type: 'success' });
       fetchInspections(true);
     } catch (err) {
       console.error(err);
@@ -584,23 +585,82 @@ const VisualInspection = () => {
             </div>
           </div>
 
-          {/* Notas Generales y Resumen IA */}
+          {/* Resumen IA Estructurado */}
+          {selectedInspection?.items_json?.ai_summary && (
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', backgroundColor: 'rgba(139, 92, 246, 0.05)', borderColor: 'rgba(139, 92, 246, 0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h4 style={{ margin: 0, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  ✨ Ficha Técnica e Informe de Vehículo (IA)
+                </h4>
+                <button 
+                  className="btn btn-sm" 
+                  style={{ backgroundColor: 'transparent', color: 'var(--status-red)', border: '1px solid var(--status-red)' }} 
+                  onClick={async () => {
+                    const confirmDel = window.confirm("¿Seguro que deseas eliminar este informe IA?");
+                    if (!confirmDel) return;
+                    const updatedItemsJson = { ...selectedInspection.items_json };
+                    delete updatedItemsJson.ai_summary;
+                    setSelectedInspection({ ...selectedInspection, items_json: updatedItemsJson });
+                    setActiveItemsData(updatedItemsJson);
+                    const token = localStorage.getItem('token');
+                    await axios.patch(`/api/operations/inspections/${selectedInspection.id}/`, { items_json: updatedItemsJson }, { headers: { Authorization: `Token ${token}` } });
+                  }}
+                >
+                  ✖ Eliminar
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                {selectedInspection.items_json.ai_summary.split(/\n{2,}/).map((block, bIdx) => {
+                  const lines = block.split('\n').filter(l => l.trim().length > 0);
+                  if (lines.length === 0) return null;
+                  const sectionTitle = lines[0];
+                  const sectionContent = lines.slice(1);
+                  return (
+                    <div key={bIdx} style={{ backgroundColor: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #8b5cf6' }}>
+                      <h5 style={{ margin: '0 0 0.8rem 0', color: '#c4b5fd', fontSize: '1.05rem' }}>{sectionTitle}</h5>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {sectionContent.map((line, lIdx) => {
+                          const boldMatch = line.match(/^([^:]+):(.*)$/);
+                          if (boldMatch) {
+                            return (
+                              <p key={lIdx} style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textAlign: 'justify', lineHeight: '1.5' }}>
+                                <strong style={{ color: '#e0e7ff' }}>{boldMatch[1]}:</strong>{boldMatch[2]}
+                              </p>
+                            );
+                          }
+                          return (
+                            <p key={lIdx} style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textAlign: 'justify', lineHeight: '1.5' }}>
+                              {line}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Notas Generales */}
           <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h4 style={{ margin: 0, color: 'var(--primary)' }}>Notas Generales de la Inspección</h4>
-              <button 
-                className="btn btn-sm" 
-                style={{ backgroundColor: '#8b5cf6', color: 'white', borderColor: 'transparent', display: 'flex', gap: '0.5rem', alignItems: 'center' }} 
-                onClick={handleGenerateAISummary}
-                disabled={generatingSummary}
-              >
-                {generatingSummary ? '⏳ Generando...' : '✨ Generar Resumen IA (Vehículo)'}
-              </button>
+              <h4 style={{ margin: 0, color: 'var(--primary)' }}>Notas Especiales o Diagnóstico Adicional</h4>
+              {!selectedInspection?.items_json?.ai_summary && (
+                <button 
+                  className="btn btn-sm" 
+                  style={{ backgroundColor: '#8b5cf6', color: 'white', borderColor: 'transparent', display: 'flex', gap: '0.5rem', alignItems: 'center' }} 
+                  onClick={handleGenerateAISummary}
+                  disabled={generatingSummary}
+                >
+                  {generatingSummary ? '⏳ Generando...' : '✨ Generar Ficha Automotriz (IA)'}
+                </button>
+              )}
             </div>
             <textarea
               className="input-field"
               style={{ width: '100%', minHeight: '80px', resize: 'vertical' }}
-              placeholder="Añade notas generales adicionales a la inspección..."
+              placeholder="Añade notas adicionales..."
               value={selectedInspection?.notes || ''}
               onChange={async (e) => {
                 const newNotes = e.target.value;
