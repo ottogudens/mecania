@@ -8,7 +8,27 @@ const clientAuth = () => ({ Authorization: `ClientToken ${clientToken()}` });
 const fmt = (n) =>
   new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CL') : '—';
 
+export const handleDownloadPDF = async (url, filename) => {
+  try {
+    const token = localStorage.getItem('clientToken');
+    const response = await axios.get(url, {
+      headers: { Authorization: `ClientToken ${token}` },
+      responseType: 'blob'
+    });
+    const objectUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (error) {
+    console.error(error);
+    alert('No se pudo descargar el archivo PDF.');
+  }
+};
 const STATUS_COLORS = {
   PENDING: { color: '#f59e0b', label: 'Pendiente', progress: 25 },
   IN_PROGRESS: { color: '#3b82f6', label: 'En Progreso', progress: 60 },
@@ -1035,27 +1055,6 @@ const ClientPortal = () => {
   const handleLogout = () => {
     localStorage.removeItem('clientToken');
     window.location.href = '/portal-cliente';
-  };
-
-  const handleDownloadPDF = async (url, filename) => {
-    try {
-      const token = localStorage.getItem('clientToken');
-      const response = await axios.get(url, {
-        headers: { Authorization: `ClientToken ${token}` },
-        responseType: 'blob'
-      });
-      const objectUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = objectUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      toast({ title: 'Descarga exitosa', message: 'El PDF ha sido descargado localmente.', type: 'success' });
-    } catch (error) {
-      console.error(error);
-      toast({ title: 'Error', message: 'No se pudo descargar el archivo PDF.', type: 'error' });
-    }
   };
 
   if (!authenticated) {

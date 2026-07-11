@@ -1092,10 +1092,11 @@ class ClientWorkOrderPDFView(APIView):
         if not work_order:
             return Response({'error': 'OT no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
             
-        # We can reuse the same PDF logic from WorkOrderViewSet
         viewset = WorkOrderViewSet()
         viewset.kwargs = {'pk': pk}
         viewset.request = request
+        viewset.get_object = lambda: work_order
+        viewset.permission_classes = []
         return viewset.generate_pdf(request, pk=pk)
 
 class ClientInspectionPDFView(APIView):
@@ -1115,6 +1116,8 @@ class ClientInspectionPDFView(APIView):
         viewset = VisualInspectionViewSet()
         viewset.kwargs = {'pk': pk}
         viewset.request = request
+        viewset.get_object = lambda: inspection
+        viewset.permission_classes = []
         return viewset.generate_pdf(request, pk=pk)
 
 class AIVehicleSummaryView(APIView):
