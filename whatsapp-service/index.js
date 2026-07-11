@@ -32,6 +32,17 @@ const BACKEND_URL = tempBackendUrl.replace(/\/+$/, '');
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'mecania-default-internal-secret-token-key-2026';
 const AUTH_DIR = 'auth_info_baileys';
 
+// Phone formatting helper
+function formatChileanNumber(phone) {
+    let cleanNumber = String(phone).replace(/\D/g, '');
+    if (cleanNumber.length === 8) {
+        cleanNumber = `569${cleanNumber}`;
+    } else if (cleanNumber.length === 9 && cleanNumber.startsWith('9')) {
+        cleanNumber = `56${cleanNumber}`;
+    }
+    return cleanNumber;
+}
+
 // Middleware for validating internal API Requests from Django
 function requireInternalKey(req, res, next) {
     const providedKey = req.headers['x-mecania-secret-key'];
@@ -498,7 +509,7 @@ app.post('/api/resolve-number', requireInternalKey, async (req, res) => {
         if (!sock) {
             return res.status(503).json({ error: 'WhatsApp service not ready' });
         }
-        const cleanNumber = String(number).replace(/\D/g, '');
+        const cleanNumber = formatChileanNumber(number);
         const result = await sock.onWhatsApp(cleanNumber);
         return res.status(200).json({ number, cleanNumber, result });
     } catch (err) {
@@ -519,8 +530,8 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
             return res.status(503).json({ error: 'WhatsApp service not ready' });
         }
 
-        // Format number to JID
-        const cleanNumber = String(number).replace(/\D/g, '');
+        // Format number to JID securely with Chilean country code fallback
+        const cleanNumber = formatChileanNumber(number);
         let jid = `${cleanNumber}@s.whatsapp.net`;
         
         try {
