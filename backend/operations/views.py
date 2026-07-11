@@ -231,11 +231,22 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         """
         Bloquea el cambio directo de 'status' vía PUT/PATCH genérico. Todo
-        cambio de estado debe pasar por la acción change_status, que aplica
-        la validación de evidencia obligatoria y el descuento de inventario.
-        Otros campos (kilometraje, mecánico asignado, etc.) sí se pueden
-        editar normalmente por esta vía.
+        cambio de estado debe pasar por la acción change_status.
+        También bloquea edición si está PAGADA o ENTREGADA.
         """
+        work_order = self.get_object()
+        if work_order.status == 'DELIVERED':
+            return Response({'error': "No se puede editar una OT que ya fue entregada."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        has_paid_invoice = False
+        try:
+            if work_order.invoice.status == 'PAID':
+                has_paid_invoice = True
+        except Exception:
+            pass
+            
+        if has_paid_invoice:
+            return Response({'error': "No se puede editar una OT que ya fue pagada."}, status=status.HTTP_400_BAD_REQUEST)
         if 'status' in request.data:
             return Response(
                 {
@@ -246,6 +257,23 @@ class WorkOrderViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        work_order = self.get_object()
+        if work_order.status == 'DELIVERED':
+            return Response({'error': "No se puede eliminar una OT que ya fue entregada."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        has_paid_invoice = False
+        try:
+            if work_order.invoice.status == 'PAID':
+                has_paid_invoice = True
+        except Exception:
+            pass
+            
+        if has_paid_invoice:
+            return Response({'error': "No se puede eliminar una OT que ya fue pagada."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=True, methods=['post'])
     def change_status(self, request, pk=None):

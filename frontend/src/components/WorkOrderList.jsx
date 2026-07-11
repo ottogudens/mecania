@@ -13,6 +13,8 @@ const WorkOrderList = () => {
 
   // Modals state
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editOrderData, setEditOrderData] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -171,6 +173,44 @@ const WorkOrderList = () => {
       console.error(err);
       const msg = err.response?.data?.detail || 'No se pudo crear la OT. Revisa los datos.';
       toast({ title: 'Error', message: msg, type: 'error' });
+    }
+  };
+
+  const handleEditOrderSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('token');
+      await axios.patch(`/api/operations/work-orders/${editOrderData.id}/`, {
+        mileage: editOrderData.mileage,
+        fuel_level: editOrderData.fuel_level,
+        visit_reason: editOrderData.visit_reason,
+        desired_service: editOrderData.desired_service,
+        symptoms: editOrderData.symptoms,
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setShowEditModal(false);
+      setEditOrderData(null);
+      fetchData();
+      toast({ title: 'OT Actualizada', message: 'La orden fue modificada exitosamente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: err.response?.data?.error || 'No se pudo editar la OT.', type: 'error' });
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (!window.confirm("¿Estás seguro de que deseas eliminar permanentemente esta Orden de Trabajo?")) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/operations/work-orders/${orderId}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      fetchData();
+      toast({ title: 'OT Eliminada', message: 'La orden fue eliminada exitosamente.', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: err.response?.data?.error || 'No se pudo eliminar la OT.', type: 'error' });
     }
   };
 
@@ -604,6 +644,12 @@ const WorkOrderList = () => {
                             🤖 MecanIA
                           </button>
                         </div>
+                        {order.status !== 'DELIVERED' && order.invoice?.status !== 'PAID' && (
+                          <div className="ot-actions-row" style={{ marginTop: '0.5rem' }}>
+                            <button className="btn btn-outline" style={{ flex: 1, fontSize: '0.8rem', padding: '0.3rem' }} onClick={() => { setEditOrderData(order); setShowEditModal(true); }}>✏️ Editar OT</button>
+                            <button className="btn btn-outline" style={{ flex: 1, fontSize: '0.8rem', padding: '0.3rem', borderColor: 'var(--status-red)', color: 'var(--status-red)' }} onClick={() => handleDeleteOrder(order.id)}>🗑️ Eliminar</button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -794,6 +840,75 @@ const WorkOrderList = () => {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar OT */}
+      {showEditModal && editOrderData && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', 
+          justifyContent: 'center', alignItems: 'center', zIndex: 1000
+        }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: 0 }}>Editar OT #{editOrderData.id}</h3>
+              <button onClick={() => setShowEditModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
+            </div>
+            <form onSubmit={handleEditOrderSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Kilometraje</label>
+                  <input 
+                    type="number" className="input-field" style={{ width: '100%' }} required
+                    value={editOrderData.mileage} 
+                    onChange={(e) => setEditOrderData({...editOrderData, mileage: e.target.value})}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem' }}>Nivel Combustible (%)</label>
+                  <input 
+                    type="number" min="0" max="100" className="input-field" style={{ width: '100%' }} required
+                    value={editOrderData.fuel_level} 
+                    onChange={(e) => setEditOrderData({...editOrderData, fuel_level: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Motivo de Visita</label>
+                <input 
+                  type="text" className="input-field" style={{ width: '100%' }} 
+                  value={editOrderData.visit_reason || ''} 
+                  onChange={(e) => setEditOrderData({...editOrderData, visit_reason: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Servicio Deseado</label>
+                <input 
+                  type="text" className="input-field" style={{ width: '100%' }} 
+                  value={editOrderData.desired_service || ''} 
+                  onChange={(e) => setEditOrderData({...editOrderData, desired_service: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Síntomas</label>
+                <textarea 
+                  className="input-field" style={{ width: '100%', minHeight: '80px' }} 
+                  value={editOrderData.symptoms || ''} 
+                  onChange={(e) => setEditOrderData({...editOrderData, symptoms: e.target.value})}
+                />
+              </div>
+
+              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowEditModal(false)}>Cancelar</button>
+                <button type="submit" className="btn">Guardar Cambios</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
