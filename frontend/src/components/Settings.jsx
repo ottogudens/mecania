@@ -135,7 +135,10 @@ const Settings = ({ onSettingsUpdate }) => {
 
   const fetchWhatsAppStatus = async () => {
     try {
-      const response = await axios.get('/api/operations/whatsapp/status/');
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/operations/whatsapp/status/', {
+        headers: { Authorization: `Token ${token}` }
+      });
       setWaStatus(response.data.status);
       setQrCode(response.data.qr);
       setPairingCode(response.data.pairingCode);
