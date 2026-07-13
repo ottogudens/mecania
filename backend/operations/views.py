@@ -2010,6 +2010,9 @@ class WhatsAppManualSendView(APIView):
             client_obj.bot_silenced_until = timezone.now() + timedelta(hours=2)
             client_obj.save(update_fields=['bot_silenced_until'])
 
+        # Normalizar el número al del cliente si existe, para evitar bifurcaciones por números @lid o con variaciones de código de país
+        send_phone = client_obj.phone if (client_obj and client_obj.phone) else phone
+
         try:
             base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
             whatsapp_service_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
@@ -2021,12 +2024,12 @@ class WhatsAppManualSendView(APIView):
                 headers['X-Mecania-Secret-Key'] = expected_key
 
             resp = requests.post(whatsapp_service_url, json={
-                "number": phone,
+                "number": send_phone,
                 "text": text,
             }, headers=headers, timeout=10)
 
             msg = WhatsAppMessage.objects.create(
-                phone=phone,
+                phone=send_phone,
                 client=client_obj,
                 sender='operator',
                 text=text

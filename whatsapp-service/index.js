@@ -60,6 +60,104 @@ let connectionStatus = 'disconnected';
 // Map to keep track of phone-to-LID mappings for correct message thread routing
 const lidCache = new Map();
 
+// Helper to check if a phone JID or clean string represents a LID JID
+function isLidJid(numberStr) {
+    const clean = String(numberStr).replace(/\D/g, '');
+    return String(numberStr).includes('@lid') || 
+           clean.startsWith('2377') || 
+           (clean.length >= 14 && !clean.startsWith('56'));
+}
+
+// Extract possible phone numbers from different Baileys message properties
+function resolvePhoneJidFromMessage(msg) {
+    if (!msg) return null;
+    const candidates = [
+        msg.senderPn,
+        msg.key?.senderPn,
+        msg.participantPn,
+        msg.key?.participantPn,
+        msg.key?.remoteJidAlt,
+        msg.key?.participant,
+        msg.participant
+    ];
+    for (const cand of candidates) {
+        if (typeof cand === 'string' && cand.endsWith('@s.whatsapp.net')) {
+            return cand;
+        }
+    }
+    return null;
+}
+
+// Query state, Cache, and signalRepository to resolve a LID JID string to a phone JID string
+async function resolveJidToPhone(jid) {
+    if (!jid) return null;
+    if (jid.endsWith('@s.whatsapp.net')) return jid;
+    if (!jid.endsWith('@lid')) return null;
+
+    // 1. Check native Baileys signalRepository mapping
+    if (sock && sock.signalRepository && sock.signalRepository.lidMapping) {
+        try {
+            const resolved = await sock.signalRepository.lidMapping.getPNForLID(jid);
+            if (resolved && resolved.endsWith('@s.whatsapp.net')) {
+                return resolved;
+            }
+        } catch (e) {
+            console.error('[DEBUG] Error getting PN for LID from signalRepository:', e.message);
+        }
+    }
+
+    // 2. Reverse lookup in cacheMap
+    for (const [phone, cachedLid] of lidCache.entries()) {
+        if (cachedLid === jid) {
+            return `${phone}@s.whatsapp.net`;
+        }
+    }
+
+    // 3. Search in authState credentials mapping
+    if (sock && sock.authState && sock.authState.creds) {
+        const creds = sock.authState.creds;
+        const resolved = creds.lidToJid?.[jid] || creds.lidJidMap?.[jid];
+        if (resolved && resolved.endsWith('@s.whatsapp.net')) {
+            return resolved;
+        }
+    }
+
+    return null;
+}
+
+// Convert any incoming command phone parameter to final sending JID
+async function getToSendJid(number) {
+    if (!number) return null;
+    const clean = String(number).replace(/\D/g, '');
+    const isLid = isLidJid(number);
+
+    if (isLid) {
+        return number.includes('@lid') ? number : `${clean}@lid`;
+    }
+
+    const formattedPhone = formatChileanNumber(clean);
+    if (lidCache.has(formattedPhone)) {
+        return lidCache.get(formattedPhone);
+    }
+
+    // Check with onWhatsApp
+    try {
+        const result = await sock.onWhatsApp(formattedPhone);
+        if (result && result.length > 0 && result[0].exists) {
+            const resolvedJid = result[0].jid;
+            if (resolvedJid.endsWith('@lid')) {
+                lidCache.set(formattedPhone, resolvedJid);
+            }
+            return resolvedJid;
+        }
+    } catch (err) {
+        console.error('[DEBUG] Error resolving JID using onWhatsApp:', err.message);
+    }
+
+    return `${formattedPhone}@s.whatsapp.net`;
+}
+
+
 // Descarga sesión guardada desde la base de datos de Django con reintentos robustos en caso de fallo de red/servidor
 async function syncSessionFromDB() {
     const credsFile = path.join(AUTH_DIR, 'creds.json');
@@ -338,6 +436,52 @@ async function connectToWhatsApp() {
         await wrappedSaveCreds();
     });
 
+    currentSock.ev.on('contacts.upsert', async (contacts) => {
+        if (currentSock !== sock) return;
+        try {
+            console.log(`[DEBUG] Recibido evento contacts.upsert: ${contacts.length} contactos`);
+            for (const c of contacts) {
+                if (c.id && c.lid) {
+                    const phone = c.id.endsWith('@s.whatsapp.net') ? c.id : (c.phoneNumber ? `${c.phoneNumber}@s.whatsapp.net` : null);
+                    const lid = c.lid.endsWith('@lid') ? c.lid : `${c.lid}@lid`;
+                    if (phone && lid) {
+                        const cleanPhone = formatChileanNumber(phone);
+                        lidCache.set(cleanPhone, lid);
+                    }
+                }
+                if (c.id && c.id.endsWith('@lid') && c.phoneNumber) {
+                    const cleanPhone = formatChileanNumber(c.phoneNumber);
+                    lidCache.set(cleanPhone, c.id);
+                }
+            }
+        } catch (e) {
+            console.error('Error en contacts.upsert:', e.message);
+        }
+    });
+
+    currentSock.ev.on('contacts.update', async (updates) => {
+        if (currentSock !== sock) return;
+        try {
+            console.log(`[DEBUG] Recibido evento contacts.update: ${updates.length} actualizaciones`);
+            for (const c of updates) {
+                if (c.id && c.lid) {
+                    const phone = c.id.endsWith('@s.whatsapp.net') ? c.id : (c.phoneNumber ? `${c.phoneNumber}@s.whatsapp.net` : null);
+                    const lid = c.lid.endsWith('@lid') ? c.lid : `${c.lid}@lid`;
+                    if (phone && lid) {
+                        const cleanPhone = formatChileanNumber(phone);
+                        lidCache.set(cleanPhone, lid);
+                    }
+                }
+                if (c.id && c.id.endsWith('@lid') && c.phoneNumber) {
+                    const cleanPhone = formatChileanNumber(c.phoneNumber);
+                    lidCache.set(cleanPhone, c.id);
+                }
+            }
+        } catch (e) {
+            console.error('Error en contacts.update:', e.message);
+        }
+    });
+
     // Escuchar mensajes de WhatsApp (entrantes y salientes) y sincronizarlos con Django
     currentSock.ev.on('messages.upsert', async (m) => {
         if (currentSock !== sock) return;
@@ -354,7 +498,10 @@ async function connectToWhatsApp() {
             const originalSenderJid = senderJid;
             
             if (senderJid.endsWith('@lid')) {
-                const alt = msg.key.remoteJidAlt || msg.key.participant;
+                let alt = resolvePhoneJidFromMessage(msg);
+                if (!alt) {
+                    alt = await resolveJidToPhone(senderJid);
+                }
                 if (alt && alt.endsWith('@s.whatsapp.net')) {
                     console.log(`[DEBUG] Resolviendo LID ${senderJid} a ${alt}`);
                     senderJid = alt;
@@ -362,6 +509,8 @@ async function connectToWhatsApp() {
                     const cleanPhone = formatChileanNumber(alt);
                     lidCache.set(cleanPhone, originalSenderJid);
                     console.log(`[DEBUG] Cache mapeada: ${cleanPhone} -> ${originalSenderJid}`);
+                } else {
+                    console.warn(`[WARNING] No se pudo resolver la JID LID ${senderJid} a número real.`);
                 }
             }
             
@@ -453,6 +602,26 @@ async function connectToWhatsApp() {
         if (currentSock !== sock) return;
         try {
             console.log(`Recibido evento messaging-history.set. Procesando ${messages ? messages.length : 0} mensajes del historial...`);
+            
+            // Map any contacts received to the cache
+            if (contacts && contacts.length > 0) {
+                console.log(`[DEBUG] Historial: Procesando ${contacts.length} contactos para mapeo LID...`);
+                for (const c of contacts) {
+                    if (c.id && c.lid) {
+                        const phone = c.id.endsWith('@s.whatsapp.net') ? c.id : (c.phoneNumber ? `${c.phoneNumber}@s.whatsapp.net` : null);
+                        const lid = c.lid.endsWith('@lid') ? c.lid : `${c.lid}@lid`;
+                        if (phone && lid) {
+                            const cleanPhone = formatChileanNumber(phone);
+                            lidCache.set(cleanPhone, lid);
+                        }
+                    }
+                    if (c.id && c.id.endsWith('@lid') && c.phoneNumber) {
+                        const cleanPhone = formatChileanNumber(c.phoneNumber);
+                        lidCache.set(cleanPhone, c.id);
+                    }
+                }
+            }
+
             if (!messages || messages.length === 0) return;
 
             const formattedMessages = [];
@@ -464,7 +633,10 @@ async function connectToWhatsApp() {
                 if (!remoteJid) continue;
                 
                 if (remoteJid.endsWith('@lid')) {
-                    const alt = msg.key.remoteJidAlt || msg.key.participant;
+                    let alt = resolvePhoneJidFromMessage(msg);
+                    if (!alt) {
+                        alt = await resolveJidToPhone(remoteJid);
+                    }
                     if (alt && alt.endsWith('@s.whatsapp.net')) {
                         const cleanPhone = formatChileanNumber(alt);
                         lidCache.set(cleanPhone, remoteJid);
@@ -580,30 +752,9 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
             return res.status(503).json({ error: 'WhatsApp service not ready' });
         }
 
-        // Format number to JID securely with Chilean country code fallback
-        const cleanNumber = formatChileanNumber(number);
-        let jid = `${cleanNumber}@s.whatsapp.net`;
-        
-        if (lidCache.has(cleanNumber)) {
-            jid = lidCache.get(cleanNumber);
-            console.log(`[DEBUG] Usando LID desde cache para ${number} (${cleanNumber}) -> ${jid}`);
-        } else {
-            try {
-                const result = await sock.onWhatsApp(cleanNumber);
-                if (result && result.length > 0 && result[0].exists) {
-                    jid = result[0].jid;
-                    console.log(`Resolved JID for number ${number} using onWhatsApp -> ${jid}`);
-                    if (jid.endsWith('@lid')) {
-                        lidCache.set(cleanNumber, jid);
-                        console.log(`[DEBUG] Guardando LID resuelto en cache para ${cleanNumber} -> ${jid}`);
-                    }
-                } else {
-                    console.warn(`Number ${number} / ${cleanNumber} not found on WhatsApp, using fallback JID: ${jid}`);
-                }
-            } catch (err) {
-                console.error('Error resolving JID using onWhatsApp, reusing fallback:', err.message);
-            }
-        }
+        // Resolve the correct target JID asynchronously
+        const jid = await getToSendJid(number);
+        console.log(`[DEBUG] Target JID resuelto para enviar mensaje a ${number} -> ${jid}`);
         
         if (documentBase64) {
             await sock.sendMessage(jid, { 
