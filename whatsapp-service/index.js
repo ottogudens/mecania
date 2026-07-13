@@ -57,6 +57,9 @@ let currentQr = null;
 let currentPairingCode = null;
 let connectionStatus = 'disconnected';
 
+// Map to keep track of phone-to-LID mappings for correct message thread routing
+const lidCache = new Map();
+
 // Descarga sesión guardada desde la base de datos de Django con reintentos robustos en caso de fallo de red/servidor
 async function syncSessionFromDB() {
     const credsFile = path.join(AUTH_DIR, 'creds.json');
@@ -347,11 +350,18 @@ async function connectToWhatsApp() {
 
             if (!msg.message || !senderJid) return;
             
+            // Keep original JID (which could be @lid) for sending responses to the correct thread
+            const originalSenderJid = senderJid;
+            
             if (senderJid.endsWith('@lid')) {
                 const alt = msg.key.remoteJidAlt || msg.key.participant;
                 if (alt && alt.endsWith('@s.whatsapp.net')) {
                     console.log(`[DEBUG] Resolviendo LID ${senderJid} a ${alt}`);
                     senderJid = alt;
+                    
+                    const cleanPhone = formatChileanNumber(alt);
+                    lidCache.set(cleanPhone, originalSenderJid);
+                    console.log(`[DEBUG] Cache mapeada: ${cleanPhone} -> ${originalSenderJid}`);
                 }
             }
             
@@ -393,13 +403,13 @@ async function connectToWhatsApp() {
 
             if (response.data && response.data.reply) {
                 const replyText = response.data.reply;
-                console.log(`Respuesta IA para ${senderJid}: "${replyText}"`);
+                console.log(`Respuesta IA para ${senderJid} (JID de envío: ${originalSenderJid}): "${replyText}"`);
 
                 // Retry con limpieza de sesión si el primer intento falla
                 let sent = false;
                 for (let attempt = 1; attempt <= 2; attempt++) {
                     try {
-                        await sock.sendMessage(senderJid, { text: replyText });
+                        await sock.sendMessage(originalSenderJid, { text: replyText });
                         sent = true;
                         break;
                     } catch (sendErr) {
@@ -407,7 +417,7 @@ async function connectToWhatsApp() {
                         if (attempt === 1) {
                             // Limpiar sesión Signal corrupt para este contacto y reintentar
                             try {
-                                const cleanJid = senderJid.split('@')[0];
+                                const cleanJid = originalSenderJid.split('@')[0];
                                 const authDir = AUTH_DIR;
                                 const fs2 = require('fs');
                                 const files = fs2.readdirSync(authDir);
@@ -420,7 +430,7 @@ async function connectToWhatsApp() {
                                     }
                                 }
                                 if (cleared > 0) {
-                                    console.log(`Limpiadas ${cleared} sesión(es) corruptas para ${senderJid}. Reintentando envío...`);
+                                    console.log(`Limpiadas ${cleared} sesión(es) corruptas para ${originalSenderJid}. Reintentando envío...`);
                                     await new Promise(r => setTimeout(r, 500));
                                 }
                             } catch (cleanErr) {
@@ -430,7 +440,7 @@ async function connectToWhatsApp() {
                     }
                 }
                 if (!sent) {
-                    console.error(`No se pudo enviar respuesta a ${senderJid} tras 2 intentos.`);
+                    console.error(`No se pudo enviar respuesta a ${originalSenderJid} tras 2 intentos.`);
                 }
             }
         } catch (err) {
@@ -456,6 +466,9 @@ async function connectToWhatsApp() {
                 if (remoteJid.endsWith('@lid')) {
                     const alt = msg.key.remoteJidAlt || msg.key.participant;
                     if (alt && alt.endsWith('@s.whatsapp.net')) {
+                        const cleanPhone = formatChileanNumber(alt);
+                        lidCache.set(cleanPhone, remoteJid);
+                        console.log(`[DEBUG] Historial: Mapeando teléfono ${cleanPhone} a LID ${remoteJid}`);
                         remoteJid = alt;
                     }
                 }
@@ -571,16 +584,25 @@ app.post('/api/send-message', requireInternalKey, async (req, res) => {
         const cleanNumber = formatChileanNumber(number);
         let jid = `${cleanNumber}@s.whatsapp.net`;
         
-        try {
-            const result = await sock.onWhatsApp(cleanNumber);
-            if (result && result.length > 0 && result[0].exists) {
-                jid = result[0].jid;
-                console.log(`Resolved JID for number ${number} using onWhatsApp -> ${jid}`);
-            } else {
-                console.warn(`Number ${number} / ${cleanNumber} not found on WhatsApp, using fallback JID: ${jid}`);
+        if (lidCache.has(cleanNumber)) {
+            jid = lidCache.get(cleanNumber);
+            console.log(`[DEBUG] Usando LID desde cache para ${number} (${cleanNumber}) -> ${jid}`);
+        } else {
+            try {
+                const result = await sock.onWhatsApp(cleanNumber);
+                if (result && result.length > 0 && result[0].exists) {
+                    jid = result[0].jid;
+                    console.log(`Resolved JID for number ${number} using onWhatsApp -> ${jid}`);
+                    if (jid.endsWith('@lid')) {
+                        lidCache.set(cleanNumber, jid);
+                        console.log(`[DEBUG] Guardando LID resuelto en cache para ${cleanNumber} -> ${jid}`);
+                    }
+                } else {
+                    console.warn(`Number ${number} / ${cleanNumber} not found on WhatsApp, using fallback JID: ${jid}`);
+                }
+            } catch (err) {
+                console.error('Error resolving JID using onWhatsApp, reusing fallback:', err.message);
             }
-        } catch (err) {
-            console.error('Error resolving JID using onWhatsApp, reusing fallback:', err.message);
         }
         
         if (documentBase64) {
