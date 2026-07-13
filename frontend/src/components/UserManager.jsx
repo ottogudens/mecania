@@ -17,6 +17,7 @@ const UserManager = () => {
     first_name: '',
     last_name: '',
     role: 'MECHANIC',
+    phone: '',
     password: ''
   });
 
@@ -56,8 +57,11 @@ const UserManager = () => {
         email: currentUser.email,
         first_name: currentUser.first_name,
         last_name: currentUser.last_name,
+        role: currentUser.role,
+        phone: currentUser.phone,
         profile: {
-          role: currentUser.role
+          role: currentUser.role,
+          phone: currentUser.phone
         }
       };
       
@@ -90,6 +94,27 @@ const UserManager = () => {
     }
   };
 
+  const handleSendCredentials = async (user) => {
+    const tempPassword = window.prompt(
+      `¿Deseas incluir una contraseña temporal para ${user.username}? (Dejar en blanco si usará su contraseña actual o la configurada)`
+    );
+    if (tempPassword === null) return; // Cancelled
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/operations/users/${user.id}/send_credentials/`, {
+        password: tempPassword
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      alert(`Credenciales enviadas correctamente por WhatsApp a ${user.username}.`);
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || "Error al enviar credenciales por WhatsApp.";
+      alert(errMsg);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (id === parseInt(localStorage.getItem('user_id'))) {
       alert("No puedes eliminar tu propio usuario activo.");
@@ -117,7 +142,7 @@ const UserManager = () => {
     setIsEditing(false);
     setCurrentUserId(null);
     setCurrentUser({
-      username: '', email: '', first_name: '', last_name: '', role: 'MECHANIC', password: ''
+      username: '', email: '', first_name: '', last_name: '', role: 'MECHANIC', phone: '', password: ''
     });
     setShowModal(true);
   };
@@ -131,6 +156,7 @@ const UserManager = () => {
       first_name: user.first_name || '',
       last_name: user.last_name || '',
       role: user.role || 'MECHANIC',
+      phone: user.phone || '',
       password: '' // Keep password empty by default
     });
     setShowModal(true);
@@ -156,6 +182,7 @@ const UserManager = () => {
               <th style={{ padding: '1rem' }}>Usuario</th>
               <th style={{ padding: '1rem' }}>Nombre Completo</th>
               <th style={{ padding: '1rem' }}>Correo</th>
+              <th style={{ padding: '1rem' }}>Teléfono</th>
               <th style={{ padding: '1rem' }}>Rol</th>
               <th style={{ padding: '1rem', textAlign: 'right' }}>Acciones</th>
             </tr>
@@ -166,12 +193,22 @@ const UserManager = () => {
                 <td style={{ padding: '1rem', fontWeight: 'bold' }}>{user.username}</td>
                 <td style={{ padding: '1rem' }}>{user.first_name} {user.last_name}</td>
                 <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{user.email || '—'}</td>
+                <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>{user.phone || '—'}</td>
                 <td style={{ padding: '1rem' }}>
                   <span className={`badge ${user.role === 'ADMIN' ? 'in_progress' : 'pending'}`}>
                     {user.role === 'ADMIN' ? 'Administrador' : 'Mecánico'}
                   </span>
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'right' }}>
+                  {user.phone && (
+                    <button 
+                      className="btn btn-outline btn-sm" 
+                      style={{ marginRight: '0.5rem', borderColor: '#25D366', color: '#25D366' }} 
+                      onClick={() => handleSendCredentials(user)}
+                    >
+                      Enviar Credenciales
+                    </button>
+                  )}
                   <button className="btn btn-outline btn-sm" style={{ marginRight: '0.5rem' }} onClick={() => openEditModal(user)}>Editar</button>
                   <button className="btn btn-danger btn-sm" onClick={() => handleDelete(user.id)}>Eliminar</button>
                 </td>
@@ -219,6 +256,11 @@ const UserManager = () => {
               <div>
                 <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)' }}>Correo Electrónico</label>
                 <input type="email" name="email" value={currentUser.email} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: 'var(--text-muted)' }}>Teléfono (WhatsApp)</label>
+                <input type="text" name="phone" value={currentUser.phone || ''} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} placeholder="e.g. 56912345678" />
               </div>
 
               <div style={{ display: 'flex', gap: '1rem' }}>

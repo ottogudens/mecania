@@ -1514,18 +1514,36 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 class UserSerializer(serializers.ModelSerializer):
-    role = serializers.CharField(source='profile.role', required=False)
+    role = serializers.CharField(source='profile.role', required=False, allow_blank=True, allow_null=True)
+    phone = serializers.CharField(source='profile.phone', required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'password']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'phone', 'password']
         extra_kwargs = {'password': {'write_only': True, 'required': False}}
 
     def create(self, validated_data):
         profile_data = validated_data.pop('profile', {})
-        role = profile_data.get('role', 'MECHANIC')
+        role = profile_data.get('role')
+        phone = profile_data.get('phone')
         password = validated_data.pop('password', None)
         
+        request = self.context.get('request')
+        if request:
+            if not role:
+                role = request.data.get('role')
+                if not role and 'profile' in request.data:
+                    role = request.data['profile'].get('role')
+            if not phone:
+                phone = request.data.get('phone')
+                if not phone and 'profile' in request.data:
+                    phone = request.data['profile'].get('phone')
+                    
+        if not role:
+            role = 'MECHANIC'
+        if not phone:
+            phone = ''
+            
         user = User.objects.create(**validated_data)
         if password:
             user.set_password(password)
@@ -1533,6 +1551,7 @@ class UserSerializer(serializers.ModelSerializer):
             
         profile, _ = UserProfile.objects.get_or_create(user=user)
         profile.role = role
+        profile.phone = phone
         profile.save()
         
         if role == 'ADMIN':
@@ -1547,7 +1566,19 @@ class UserSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         profile_data = validated_data.pop('profile', {})
         role = profile_data.get('role')
+        phone = profile_data.get('phone')
         password = validated_data.pop('password', None)
+        
+        request = self.context.get('request')
+        if request:
+            if not role:
+                role = request.data.get('role')
+                if not role and 'profile' in request.data:
+                    role = request.data['profile'].get('role')
+            if not phone:
+                phone = request.data.get('phone')
+                if not phone and 'profile' in request.data:
+                    phone = request.data['profile'].get('phone')
         
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -1556,10 +1587,10 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         
+        profile, _ = UserProfile.objects.get_or_create(user=instance)
+        
         if role:
-            profile, _ = UserProfile.objects.get_or_create(user=instance)
             profile.role = role
-            profile.save()
             if role == 'ADMIN':
                 instance.is_staff = True
                 instance.is_superuser = True
@@ -1567,12 +1598,57 @@ class UserSerializer(serializers.ModelSerializer):
                 instance.is_staff = False
                 instance.is_superuser = False
             instance.save()
+            
+        if phone is not None:
+            profile.phone = phone
+            
+        profile.save()
         return instance
 
 class UserViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     queryset = User.objects.all().order_by('-id')
     serializer_class = UserSerializer
+
+    @action(detail=True, methods=['post'])
+    def send_credentials(self, request, pk=None):
+        """Envía las credenciales al usuario por WhatsApp, incluyendo el link al portal correspondiente."""
+        user = self.get_object()
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        phone = profile.phone
+        if not phone:
+            return Response(
+                {'error': 'El usuario no tiene un teléfono celular registrado.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        password = request.data.get('password')
+        role_label = 'Administrador' if profile.role == 'ADMIN' else 'Mecánico'
+        portal_url = "https://mecania.skale.cl/login"
+        
+        message = (
+            f"Hola {user.first_name or user.username}, aquí tienes tus credenciales de acceso para *MecanIA*:\n\n"
+            f"👤 *Usuario:* {user.username}\n"
+        )
+        if password:
+            message += f"🔑 *Contraseña:* {password}\n"
+        else:
+            message += f"🔑 *Contraseña:* (La configurada por tu administrador)\n"
+            
+        message += (
+            f"💼 *Rol:* {role_label}\n\n"
+            f"🌐 Accede al portal aquí: {portal_url}\n"
+        )
+        
+        from .services import send_whatsapp_message
+        success = send_whatsapp_message(number=phone, text=message)
+        if success:
+            return Response({'success': True, 'message': 'Credenciales enviadas correctamente por WhatsApp.'})
+        else:
+            return Response(
+                {'error': 'No se pudo enviar el mensaje por WhatsApp. Verifica la conexión del microservicio.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # ── ViewSets para Ficha del Vehículo ──
