@@ -2210,12 +2210,15 @@ class WhatsAppToggleSilenceView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .models import Client
+        from .models import Client, WhatsAppMessage
         from django.utils import timezone
         from datetime import timedelta
+        import requests
+        import os
         
         phone = request.data.get('phone')
         silenced = request.data.get('silenced') # true, false, o toggle si es omitido
+        transfer_human = request.data.get('transfer_human', False)
 
         if not phone:
             return Response({'error': 'phone es requerido'}, status=status.HTTP_400_BAD_REQUEST)
@@ -2227,13 +2230,55 @@ class WhatsAppToggleSilenceView(APIView):
             client_obj = Client.objects.filter(phone__icontains=suffix).first()
 
         if not client_obj:
-            return Response({'error': 'Cliente no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+            phone_val = phone if phone.startswith('+') else f"+{clean_num}"
+            existing = Client.objects.filter(phone=phone_val).first()
+            if existing:
+                client_obj = existing
+            else:
+                client_obj = Client.objects.create(
+                    first_name="Cliente",
+                    last_name="Nuevo",
+                    phone=phone_val,
+                    portal_enabled=False
+                )
 
-        if silenced is not None:
+        if transfer_human:
+            client_obj.bot_silenced_until = timezone.now() + timedelta(hours=24)
+            client_obj.save(update_fields=['bot_silenced_until'])
+
+            transfer_msg = "Hola! He derivado tu chat a un asistente humano. Te responderemos a la brevedad."
+            
+            # Registrar mensaje en la base de datos
+            WhatsAppMessage.objects.create(
+                phone=phone,
+                client=client_obj,
+                sender='assistant',
+                text=transfer_msg
+            )
+            
+            # Enviar notificación a WhatsApp
+            try:
+                base_whatsapp_url = os.environ.get('WHATSAPP_SERVICE_URL', 'http://localhost:3001')
+                send_url = f"{base_whatsapp_url.rstrip('/')}/api/send-message"
+                from django.conf import settings
+                expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
+                headers = {}
+                if expected_key:
+                    headers['X-Mecania-Secret-Key'] = expected_key
+
+                requests.post(send_url, json={
+                    "number": phone,
+                    "text": transfer_msg,
+                }, headers=headers, timeout=10)
+            except Exception as e:
+                print(f"Error sending transfer notification: {e}")
+
+        elif silenced is not None:
             if silenced:
                 client_obj.bot_silenced_until = timezone.now() + timedelta(hours=2)
             else:
                 client_obj.bot_silenced_until = None
+            client_obj.save(update_fields=['bot_silenced_until'])
         else:
             # Toggle
             now = timezone.now()
@@ -2242,8 +2287,7 @@ class WhatsAppToggleSilenceView(APIView):
                 client_obj.bot_silenced_until = None
             else:
                 client_obj.bot_silenced_until = now + timedelta(hours=2)
-
-        client_obj.save(update_fields=['bot_silenced_until'])
+            client_obj.save(update_fields=['bot_silenced_until'])
 
         now = timezone.now()
         is_silenced = client_obj.bot_silenced_until and client_obj.bot_silenced_until > now

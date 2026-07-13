@@ -153,6 +153,51 @@ const WhatsAppChat = () => {
       setSilencing(false);
     }
   };
+ 
+  // Derivar a Humano (Pausar bot por 24 horas y notificar)
+  const handleTransferHuman = async () => {
+    if (!selectedPhone) return;
+    if (!window.confirm('¿Estás seguro de que deseas derivar este chat a un asistente humano? Esto silenciará al bot por 24 horas y enviará una notificación automática de derivación al cliente.')) return;
+    setSilencing(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post('/api/operations/whatsapp-messages/toggle-silence/', {
+        phone: selectedPhone,
+        transfer_human: true
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      
+      const { is_bot_silenced, bot_silenced_until } = response.data;
+      toast({ 
+        title: 'Derivado a Humano', 
+        message: 'El bot ha sido silenciado por 24 horas y se ha notificado al cliente.', 
+        type: 'success' 
+      });
+      
+      // Actualizar localmente en el listado de chats
+      setChats(prevChats => prevChats.map(c => {
+        if (c.phone === selectedPhone) {
+          return {
+            ...c,
+            is_bot_silenced,
+            bot_silenced_until,
+            client: c.client ? { ...c.client, is_bot_silenced, bot_silenced_until } : null
+          };
+        }
+        return c;
+      }));
+    } catch (err) {
+      console.error("Error al derivar a humano:", err);
+      toast({ 
+        title: 'Error', 
+        message: 'No se pudo completar la transferencia a atención humana.', 
+        type: 'error' 
+      });
+    } finally {
+      setSilencing(false);
+    }
+  };
 
   // Initial load
   useEffect(() => {
@@ -478,40 +523,77 @@ const WhatsAppChat = () => {
                     </div>
                   </div>
 
-                  {selectedChatInfo.client_id && (
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>BOT DE AUTO-RESPUESTA</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>BOT DE AUTO-RESPUESTA</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {selectedChatInfo.is_bot_silenced ? (
-                          <>
-                            <span className="badge badge-pending" style={{ fontSize: '0.65rem', background: '#D97706', color: 'white' }}>Silenciado (2h)</span>
-                            <button
-                              onClick={handleToggleSilence}
-                              disabled={silencing}
-                              className="btn btn-ghost btn-sm"
-                              style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '4px', cursor: 'pointer' }}
-                              title="Re-activar bot inteligente de inmediato"
-                            >
-                              ⚡ Activar BOT
-                            </button>
-                          </>
+                          (() => {
+                            let isHumanTransfer = false;
+                            if (selectedChatInfo.bot_silenced_until) {
+                              const until = new Date(selectedChatInfo.bot_silenced_until);
+                              const now = new Date();
+                              const diffHrs = (until - now) / (1000 * 60 * 60);
+                              if (diffHrs > 3) {
+                                isHumanTransfer = true;
+                              }
+                            }
+                            return (
+                              <span 
+                                className="badge badge-pending" 
+                                style={{ fontSize: '0.65rem', background: isHumanTransfer ? '#DC2626' : '#D97706', color: 'white' }}
+                              >
+                                {isHumanTransfer ? 'Derivado a Humano' : 'Silenciado (2h)'}
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span className="badge badge-delivered" style={{ fontSize: '0.65rem', background: '#059669', color: 'white' }}>Activo</span>
+                        )}
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        {selectedChatInfo.is_bot_silenced ? (
+                          <button
+                            onClick={handleToggleSilence}
+                            disabled={silencing}
+                            className="btn btn-ghost btn-sm"
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Re-activar bot inteligente de inmediato"
+                          >
+                            ⚡ Activar BOT
+                          </button>
                         ) : (
                           <>
-                            <span className="badge badge-delivered" style={{ fontSize: '0.65rem', background: '#059669', color: 'white' }}>Activo</span>
                             <button
                               onClick={handleToggleSilence}
                               disabled={silencing}
                               className="btn btn-ghost btn-sm"
-                              style={{ padding: '2px 8px', fontSize: '0.75rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer' }}
+                              style={{ padding: '4px 10px', fontSize: '0.75rem', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                               title="Silenciar bot inteligente por 2 horas"
                             >
-                              🔕 Silenciar
+                              🔕 Silenciar (2h)
+                            </button>
+                            <button
+                              onClick={handleTransferHuman}
+                              disabled={silencing}
+                              className="btn btn-ghost btn-sm"
+                              style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#f87171', border: '1px solid #f87171', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Derivar a soporte humano y notificar al cliente"
+                            >
+                              👥 Derivar a Humano
                             </button>
                           </>
                         )}
                       </div>
+                      
+                      {selectedChatInfo.is_bot_silenced && selectedChatInfo.bot_silenced_until && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                          Silenciado hasta: {new Date(selectedChatInfo.bot_silenced_until).toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {selectedChatInfo.vehicles && selectedChatInfo.vehicles.length > 0 ? (
                     <div>

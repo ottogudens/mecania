@@ -160,7 +160,33 @@ class WhatsAppAgentView(APIView):
                     break
             if matched_flow:
                 break
-                
+
+        # 1b. Intentar emparejar opción seleccionada (por ejemplo 1, 2, 3 o el texto de la opción) del último mensaje
+        if not matched_flow:
+            last_assistant_msg = WhatsAppMessage.objects.filter(phone=clean_num, sender='assistant').order_by('-timestamp').first()
+            if last_assistant_msg and last_assistant_msg.text:
+                import re
+                lines = last_assistant_msg.text.split('\n')
+                for line in lines:
+                    cleaned_line = line.strip()
+                    # Detectar prefijo: "1. Agendar" o "1️⃣ Agendar" o "🔵 Agendar" o "• Agendar" o "1) Agendar"
+                    match = re.match(r'^(\d+|[①-⑩]|1️⃣|2️⃣|3️⃣|4️⃣|5️⃣|6️⃣|7️⃣|8️⃣|9️⃣|🔟|🔵|•|🔘)[\s\.\-\):]*(.+)$', cleaned_line)
+                    if match:
+                        prefix, label = match.groups()
+                        norm_prefix = prefix.replace('1️⃣','1').replace('2️⃣','2').replace('3️⃣','3').replace('4️⃣','4').replace('5️⃣','5').replace('6️⃣','6').replace('7️⃣','7').replace('8️⃣','8').replace('9️⃣','9').replace('🔟','10')
+                        norm_input = text_lower.strip(' .-)').replace('1️⃣','1').replace('2️⃣','2').replace('3️⃣','3').replace('4️⃣','4').replace('5️⃣','5').replace('6️⃣','6').replace('7️⃣','7').replace('8️⃣','8').replace('9️⃣','9').replace('🔟','10')
+                        label_clean = label.strip().lower()
+                        # Si el cliente escribió exactamente el número de la opción o el texto de la opción
+                        if (norm_prefix != '🔵' and norm_prefix != '•' and norm_prefix != '🔘' and norm_prefix == norm_input) or norm_input == label_clean:
+                            # Buscamos un flujo que coincida con este texto (por keywords o por nombre)
+                            for flow in active_flows.filter(trigger_type='keyword'):
+                                flow_keywords = [k.strip().lower() for k in flow.keywords.split(',') if k.strip()]
+                                if label_clean in flow_keywords or flow.name.lower() in label_clean or label_clean in flow.name.lower():
+                                    matched_flow = flow
+                                    break
+                            if matched_flow:
+                                break
+                 
         # 2. Coincidencia por bienvenida (Welcome flow) si el mensaje es de inicio o saludo
         if not matched_flow:
             greetings = ['hola', 'buen', 'aló', 'alo', 'estimados', 'saludos', 'comenzar', 'empezar', 'inicio']
@@ -174,8 +200,9 @@ class WhatsAppAgentView(APIView):
 
         # Procesar flujos con respuestas estáticas o acciones directas
         if matched_flow:
+            reply_msg = ""
             if matched_flow.action_type == 'static':
-                return save_and_response(matched_flow.response_text)
+                reply_msg = matched_flow.response_text
                 
             elif matched_flow.action_type == 'portal_link':
                 if client_obj:
@@ -185,7 +212,6 @@ class WhatsAppAgentView(APIView):
                 
                 if matched_flow.response_text.strip():
                     reply_msg = matched_flow.response_text.replace('{link}', 'https://mecania.skale.cl/client')
-                return save_and_response(reply_msg)
                 
             elif matched_flow.action_type == 'human_transfer':
                 reply_msg = "He pausado la automatización y he notificado a nuestro equipo. Un asesor técnico se comunicará contigo en breves minutos."
@@ -196,7 +222,24 @@ class WhatsAppAgentView(APIView):
                     from datetime import timedelta
                     client_obj.bot_silenced_until = timezone.now() + timedelta(hours=6)
                     client_obj.save(update_fields=['bot_silenced_until'])
-                return save_and_response(reply_msg, {"action": "human_transfer"})
+
+            if reply_msg:
+                # Si el flujo tiene botones/opciones definidos
+                if hasattr(matched_flow, 'buttons') and matched_flow.buttons and matched_flow.buttons.strip():
+                    lines = [line.strip() for line in matched_flow.buttons.split('\n') if line.strip()]
+                    if lines:
+                        options_str = "\n\n*Selecciona una opción o escribe tu respuesta:*\n"
+                        for opt in lines:
+                            cleaned_opt = opt
+                            import re
+                            if not re.match(r'^[\d①-⑩➕➖🔲🔘⚽⚙️🔧⭐•\-]', cleaned_opt):
+                                options_str += f"🔵 {cleaned_opt}\n"
+                            else:
+                                options_str += f"{cleaned_opt}\n"
+                        reply_msg += options_str
+                
+                action_prop = {"action": "human_transfer"} if matched_flow.action_type == 'human_transfer' else None
+                return save_and_response(reply_msg, action_prop)
 
         # 2. Recolectar contexto del cliente y vehículos
         client_context = "Cliente: Anónimo / No registrado.\n"
@@ -279,6 +322,10 @@ class WhatsAppAgentView(APIView):
                - Proporciónale el link del portal: https://mecania.skale.cl/client y recuérdale que puede ingresar con su teléfono.
             6. **Tono**: Sé conciso (máximo 2-3 párrafos cortos por respuesta). Usa emojis de forma moderada para ser amigable.
             """
+
+        # Agregar botones al final del prompt del asistente IA para guiarlo
+        if matched_flow and hasattr(matched_flow, 'buttons') and matched_flow.buttons and matched_flow.buttons.strip():
+            system_prompt += f"\n\nOpciones/Botones disponibles para ofrecer al cliente:\n{matched_flow.buttons}\n"
 
         # OpenAI tools (Function calling)
         tools = [
@@ -443,6 +490,20 @@ class WhatsAppAgentView(APIView):
             else:
                 reply = assistant_msg.content
 
+            # Si el flujo matched_flow tiene botones definidos, los añadimos al final del reply del AI assistant
+            if matched_flow and hasattr(matched_flow, 'buttons') and matched_flow.buttons and matched_flow.buttons.strip():
+                lines = [line.strip() for line in matched_flow.buttons.split('\n') if line.strip()]
+                if lines:
+                    options_str = "\n\n*Selecciona una opción o escribe tu respuesta:*\n"
+                    for opt in lines:
+                        cleaned_opt = opt
+                        import re
+                        if not re.match(r'^[\d①-⑩➕➖🔲🔘⚽⚙️🔧⭐•\-]', cleaned_opt):
+                            options_str += f"🔵 {cleaned_opt}\n"
+                        else:
+                            options_str += f"{cleaned_opt}\n"
+                    reply += options_str
+
             return save_and_response(reply)
         except Exception as e:
             # Fallback robusto en caso de error de OpenAI
@@ -453,6 +514,20 @@ class WhatsAppAgentView(APIView):
             else:
                 reply = f"Hola, gracias por comunicarte con {workshop.name or 'nuestro taller'}. En este momento estamos experimentando una conexión lenta. Si tienes alguna urgencia, por favor llámanos directamente al número {workshop.phone or 'de contacto'} o visítanos en {workshop.address or 'nuestro taller'}. ¡Estaremos encantados de ayudarte!"
             
+            # Si el flujo fallback tiene botones definidos, los añadimos
+            if fallback_flow and hasattr(fallback_flow, 'buttons') and fallback_flow.buttons and fallback_flow.buttons.strip():
+                lines = [line.strip() for line in fallback_flow.buttons.split('\n') if line.strip()]
+                if lines:
+                    options_str = "\n\n*Selecciona una opción o escribe tu respuesta:*\n"
+                    for opt in lines:
+                        cleaned_opt = opt
+                        import re
+                        if not re.match(r'^[\d①-⑩➕➖🔲🔘⚽⚙️🔧⭐•\-]', cleaned_opt):
+                            options_str += f"🔵 {cleaned_opt}\n"
+                        else:
+                            options_str += f"{cleaned_opt}\n"
+                    reply += options_str
+
             return save_and_response(reply, {"openai_error": str(e)})
 
 

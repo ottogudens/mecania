@@ -401,6 +401,12 @@ class WhatsAppFlow(models.Model):
         verbose_name="Mensaje de Respuesta / Instrucciones de IA", 
         help_text="El texto estático para responder, o las instrucciones de comportamiento personalizadas para el agente de IA."
     )
+    buttons = models.TextField(
+        blank=True, 
+        default='', 
+        verbose_name="Opciones / Botones (Uno por línea)", 
+        help_text="Lista de opciones o botones de respuesta rápida para el cliente, una por línea."
+    )
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

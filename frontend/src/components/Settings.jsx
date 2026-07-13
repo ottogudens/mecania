@@ -106,6 +106,7 @@ const Settings = ({ onSettingsUpdate }) => {
     keywords: '',
     action_type: 'static',
     response_text: '',
+    buttons: '',
     is_active: true
   });
 
@@ -752,6 +753,7 @@ const Settings = ({ onSettingsUpdate }) => {
                       keywords: '',
                       action_type: 'static',
                       response_text: '',
+                      buttons: '',
                       is_active: true
                     });
                   }} 
@@ -845,6 +847,7 @@ const Settings = ({ onSettingsUpdate }) => {
                                     keywords: flow.keywords,
                                     action_type: flow.action_type,
                                     response_text: flow.response_text,
+                                    buttons: flow.buttons || '',
                                     is_active: flow.is_active
                                   });
                                 }} 
@@ -973,6 +976,23 @@ const Settings = ({ onSettingsUpdate }) => {
                     </small>
                   </div>
                 )}
+
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '1rem', marginBottom: '1rem' }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: '500' }}>
+                    Opciones / Botones Interactivos (Opcional)
+                  </label>
+                  <textarea 
+                    className="input-field" 
+                    rows={4}
+                    placeholder={`Escribe una opción por línea. Ej:\n1️⃣ Agendar Hora\n2️⃣ Ver Estado\n3️⃣ Hablar con Humano`}
+                    value={flowForm.buttons || ''} 
+                    onChange={e => setFlowForm({...flowForm, buttons: e.target.value})} 
+                    style={{ padding: '10px', height: 'auto' }}
+                  />
+                  <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                    Si se configuran, estas opciones se mostrarán como una lista interactiva numerada o con viñetas al final del mensaje.
+                  </small>
+                </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '0.5rem' }}>
                   <input 
