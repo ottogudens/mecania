@@ -30,7 +30,7 @@ if (tempBackendUrl && !tempBackendUrl.startsWith('http://') && !tempBackendUrl.s
 }
 const BACKEND_URL = tempBackendUrl.replace(/\/+$/, '');
 const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'mecania-default-internal-secret-token-key-2026';
-const AUTH_DIR = 'auth_info_baileys';
+const AUTH_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || 'auth_info_baileys';
 
 // Phone formatting helper
 function formatChileanNumber(phone) {
