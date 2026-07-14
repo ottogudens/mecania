@@ -227,14 +227,14 @@ const WhatsAppCanvas = () => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}>
-            <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-4) var(--space-6)' }}>
-                <div>
-                    <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Constructor de Flujos de WhatsApp</h2>
+            <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-6)' }}>
+                <div style={{ flex: '1 1 min-content' }}>
+                    <h2 style={{ fontSize: 'clamp(1rem, 3vw, 1.2rem)', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Constructor de Flujos de WhatsApp</h2>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Une las respuestas del cliente para enrutar los flujos automáticamente.</p>
                 </div>
                 <div>
                     <button onClick={onSave} className="btn">
-                        💾 Guardar Posiciones y Rutas
+                        💾 Guardar
                     </button>
                 </div>
             </div>
