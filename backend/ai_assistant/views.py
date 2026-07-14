@@ -178,14 +178,39 @@ class WhatsAppAgentView(APIView):
                         label_clean = label.strip().lower()
                         # Si el cliente escribió exactamente el número de la opción o el texto de la opción
                         if (norm_prefix != '🔵' and norm_prefix != '•' and norm_prefix != '🔘' and norm_prefix == norm_input) or norm_input == label_clean:
-                            # Buscamos un flujo que coincida con este texto (por keywords o por nombre)
-                            for flow in active_flows.filter(trigger_type='keyword'):
-                                flow_keywords = [k.strip().lower() for k in flow.keywords.split(',') if k.strip()]
-                                if label_clean in flow_keywords or flow.name.lower() in label_clean or label_clean in flow.name.lower():
-                                    matched_flow = flow
-                                    break
+                            # 1. Tratar de encontrar el flujo padre a traves de los textos
+                            parent_flow = active_flows.filter(buttons__icontains=label).first()
+                            if parent_flow and parent_flow.button_routes:
+                                # Buscar el índice del botón
+                                btn_lines = [b.strip() for b in parent_flow.buttons.split('\n') if b.strip()]
+                                btn_idx = -1
+                                for i, b in enumerate(btn_lines):
+                                    if b.strip() == label.strip():
+                                        btn_idx = i
+                                        break
+                                
+                                if btn_idx != -1 and str(btn_idx) in parent_flow.button_routes:
+                                    target_id = parent_flow.button_routes[str(btn_idx)]
+                                    matched_flow = active_flows.filter(id=target_id).first()
+                                    if matched_flow:
+                                        break
+                            
+                            if not matched_flow:
+                                # Comportamiento heredado: Buscamos un flujo que coincida con este texto
+                                for flow in active_flows.filter(trigger_type='keyword'):
+                                    flow_keywords = [k.strip().lower() for k in flow.keywords.split(',') if k.strip()]
+                                    if label_clean in flow_keywords or flow.name.lower() in label_clean or label_clean in flow.name.lower():
+                                        matched_flow = flow
+                                        break
                             if matched_flow:
                                 break
+                                
+            # 1c. Si no hay matched_flow, ver si el último mensaje tenía un next_step predeterminado
+            if not matched_flow and last_assistant_msg and last_assistant_msg.text:
+                # Tratar de encontrar el flujo padre a traves de los textos
+                parent_flow = active_flows.filter(response_text__icontains=last_assistant_msg.text[:50]).first()
+                if parent_flow and parent_flow.next_step:
+                    matched_flow = parent_flow.next_step
                  
         # 2. Coincidencia por bienvenida (Welcome flow) si el mensaje es de inicio o saludo
         if not matched_flow:

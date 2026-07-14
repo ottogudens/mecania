@@ -24,6 +24,7 @@ import CashMovements from './components/CashMovements';
 import SuppliersManager from './components/SuppliersManager';
 import SupplierInvoicesList from './components/SupplierInvoicesList';
 import FinancialReports from './components/FinancialReports';
+import WhatsAppCanvas from './components/WhatsAppCanvas';
 
 /* ── Icons (inline SVG, no extra dep) ── */
 const Icon = ({ path, size = 18, ...props }) => (
@@ -69,6 +70,7 @@ const NAV_ITEMS = [
   { id: 'clients',    label: 'Clientes',            icon: 'clients' },
   { id: 'vehicles',   label: 'Vehículos',           icon: 'car' },
   { id: 'whatsapp_chat', label: 'Chat de WhatsApp', icon: 'chat' },
+  { id: 'whatsapp_canvas', label: 'Flujos WhatsApp', icon: 'orders' },
   
   // Finance Submodule IDs
   { id: 'finance_billing', label: 'Clientes y Facturación', icon: 'finance' },
@@ -93,6 +95,7 @@ const PAGE_TITLES = {
   clients:    { title: 'Clientes',            subtitle: 'Directorio y contacto de clientes' },
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
   whatsapp_chat: { title: 'Chat de WhatsApp', subtitle: 'Atención al cliente y control del asistente de IA' },
+  whatsapp_canvas: { title: 'Flujos WhatsApp (Canvas)', subtitle: 'Diseñador visual de automatizaciones de WhatsApp' },
   finance_billing: { title: 'Clientes y Facturación', subtitle: 'Boletas, facturas y pagos del taller' },
   finance_cash_register: { title: 'Control de Caja (Turnos)', subtitle: 'Aperturas, cierres y reportes X/Z de caja' },
   finance_cash_movements: { title: 'Movimientos de Caja', subtitle: 'Registro manual de ingresos y egresos de caja' },
@@ -259,6 +262,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     clients:                    <ClientList />,
     vehicles:                   <VehicleList />,
     whatsapp_chat:              <WhatsAppChat />,
+    whatsapp_canvas:            <WhatsAppCanvas />,
 
     finance_billing:            <FinanceDashboard />,
     finance_cash_register:      <CashRegister />,

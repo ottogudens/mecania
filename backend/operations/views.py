@@ -1889,7 +1889,8 @@ class WhatsAppChatListView(APIView):
         from .models import WhatsAppMessage, Client
 
         # Obtener los números de teléfono únicos y su último mensaje timestamp
-        chats_qs = WhatsAppMessage.objects.values('phone').annotate(
+        # Eliminar el ordering por defecto de Meta para que el annotate agrupe correctamente por 'phone'
+        chats_qs = WhatsAppMessage.objects.order_by().values('phone').annotate(
             last_timestamp=Max('timestamp')
         ).order_by('-last_timestamp')
 

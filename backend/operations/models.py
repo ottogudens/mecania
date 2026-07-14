@@ -408,6 +408,9 @@ class WhatsAppFlow(models.Model):
         help_text="Lista de opciones o botones de respuesta rápida para el cliente, una por línea."
     )
     is_active = models.BooleanField(default=True, verbose_name="Activo")
+    canvas_position = models.JSONField(default=dict, blank=True, help_text="Posición X, Y en el canvas UI")
+    next_step = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='incoming_static_routes', help_text="Flujo siguiente por defecto")
+    button_routes = models.JSONField(default=dict, blank=True, help_text="Mapeo de opciones a IDs de flujos siguientes")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
