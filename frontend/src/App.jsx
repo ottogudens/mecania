@@ -351,8 +351,8 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     finance_supplier_invoices:  <SupplierInvoicesList />,
     finance_reports:            <FinancialReports />,
 
-    client_offers:              <div style={{ padding: '2rem', textAlign: 'center' }}><i className="fa-solid fa-tags" style={{ fontSize: '3rem', color: 'var(--primary)', marginBottom: '1rem' }}></i><h3>Gestión de Ofertas</h3><p>Módulo en construcción para crear y publicar ofertas promocionales hacia el Portal del Cliente.</p></div>,
-    client_blog:                <div style={{ padding: '2rem', textAlign: 'center' }}><i className="fa-solid fa-newspaper" style={{ fontSize: '3rem', color: 'var(--primary)', marginBottom: '1rem' }}></i><h3>Blog de Mecánica</h3><p>Módulo en construcción para administrar artículos y consejos de mantenimiento que verán tus clientes.</p></div>,
+    client_offers:              <ClientPortalOffers />,
+    client_blog:                <ClientPortalBlog />,
 
     finance:                    <FinanceDashboard />,
     pos:                        <POSDashboard onNavigate={setActiveTab} />,

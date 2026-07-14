@@ -14,12 +14,13 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment, PortalOffer, PortalBlogPost
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
     WorkOrderItemSerializer, VisualInspectionSerializer, VisualInspectionListSerializer, WorkshopSettingsSerializer,
     VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer,
-    WhatsAppFlowSerializer, WhatsAppMessageSerializer, WorkOrderAttachmentSerializer
+    WhatsAppFlowSerializer, WhatsAppMessageSerializer, WorkOrderAttachmentSerializer,
+    PortalOfferSerializer, PortalBlogPostSerializer
 )
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
@@ -2352,3 +2353,14 @@ class WhatsAppClearChatsView(APIView):
         from .models import WhatsAppMessage
         WhatsAppMessage.objects.all().delete()
         return Response({'success': True, 'message': 'Todos los historiales de chat sincronizados han sido eliminados.'})
+
+
+class PortalOfferViewSet(viewsets.ModelViewSet):
+    queryset = PortalOffer.objects.all()
+    serializer_class = PortalOfferSerializer
+    permission_classes = [IsAuthenticated]
+
+class PortalBlogPostViewSet(viewsets.ModelViewSet):
+    queryset = PortalBlogPost.objects.all()
+    serializer_class = PortalBlogPostSerializer
+    permission_classes = [IsAuthenticated]

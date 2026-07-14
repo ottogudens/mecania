@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
     WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
-    WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment
+    WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment, PortalOffer, PortalBlogPost
 )
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -235,4 +235,12 @@ class WhatsAppMessageSerializer(serializers.ModelSerializer):
             return f"{obj.client.first_name} {obj.client.last_name}"
         return None
 
+class PortalOfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PortalOffer
+        fields = '__all__'
 
+class PortalBlogPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PortalBlogPost
+        fields = '__all__'

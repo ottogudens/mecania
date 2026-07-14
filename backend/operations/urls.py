@@ -12,8 +12,10 @@ from .views import (
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
+    WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
     DatabaseBackupView, DatabaseRestoreView, WhatsAppClearChatsView, WhatsAppRequestPairingCodeView,
-    AIVehicleSummaryView, ClientWorkOrderPDFView, ClientInspectionPDFView
+    AIVehicleSummaryView, ClientWorkOrderPDFView, ClientInspectionPDFView,
+    PortalOfferViewSet, PortalBlogPostViewSet
 )
 
 router = DefaultRouter()
@@ -28,6 +30,8 @@ router.register(r'vehicle-parts', VehiclePartViewSet, basename='vehiclepart')
 router.register(r'maintenance-records', MaintenanceRecordViewSet, basename='maintenancerecord')
 router.register(r'scheduled-maintenance', ScheduledMaintenanceViewSet, basename='scheduledmaintenance')
 router.register(r'whatsapp-flows', WhatsAppFlowViewSet, basename='whatsappflow')
+router.register(r'portal-offers', PortalOfferViewSet, basename='portaloffer')
+router.register(r'portal-blogs', PortalBlogPostViewSet, basename='portalblog')
 
 urlpatterns = [
     path('dashboard-stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
