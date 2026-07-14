@@ -25,7 +25,7 @@ export default function ClientPortalBlog() {
     setLoading(true);
     try {
       const res = await axios.get('/api/operations/portal-blogs/');
-      setBlogs(res.data);
+      setBlogs(res.data.results || res.data);
     } catch (err) {
       addToast('Error al cargar artículos', 'error');
     } finally {

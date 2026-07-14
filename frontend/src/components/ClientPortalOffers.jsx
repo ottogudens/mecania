@@ -25,7 +25,7 @@ export default function ClientPortalOffers() {
     setLoading(true);
     try {
       const res = await axios.get('/api/operations/portal-offers/');
-      setOffers(res.data);
+      setOffers(res.data.results || res.data);
     } catch (err) {
       addToast('Error al cargar ofertas', 'error');
     } finally {
