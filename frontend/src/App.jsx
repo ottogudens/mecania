@@ -87,6 +87,10 @@ const NAV_ITEMS = [
   { id: 'finance_supplier_invoices', label: 'Facturas de Compra',      icon: 'orders',  group: 'Finanzas' },
   { id: 'finance_reports',           label: 'Reportes Financieros',    icon: 'finance', group: 'Finanzas' },
 
+  // Portal Web Clientes (Submenú)
+  { id: 'client_offers', label: 'Ofertas y Promociones', icon: 'pos',  group: 'Portal Clientes' },
+  { id: 'client_blog',   label: 'Blog de Mecánica',      icon: 'history', group: 'Portal Clientes' },
+
   // Sistema
   { id: 'settings',   label: 'Configuración',     icon: 'settings', group: 'Sistema' },
   { id: 'users',      label: 'Usuarios',          icon: 'users',    group: 'Sistema' },
@@ -108,6 +112,8 @@ const PAGE_TITLES = {
   finance_suppliers: { title: 'Proveedores', subtitle: 'Catálogo de proveedores y datos de contacto' },
   finance_supplier_invoices: { title: 'Facturas de Compra y Programador', subtitle: 'Carga inteligente DTE/PDF e historial de pagos' },
   finance_reports: { title: 'Reportes Financieros', subtitle: 'Ingresos, egresos y flujo corporativo del taller' },
+  client_offers:   { title: 'Ofertas y Promociones', subtitle: 'Gestión de ofertas publicadas en el portal del cliente' },
+  client_blog:     { title: 'Blog de Mecánica', subtitle: 'Artículos informativos para educar a los clientes' },
   pos:        { title: 'Punto de Venta',      subtitle: 'Caja rápida y venta directa de repuestos' },
   estimates:  { title: 'Presupuestos',        subtitle: 'Cotizaciones y pre-aprobaciones' },
   settings:   { title: 'Configuración',       subtitle: 'Ajustes del taller e integraciones' },
@@ -128,6 +134,7 @@ function GearLogo() {
 function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, closeSidebar, logoUrl }) {
   const initials = username ? username.slice(0, 2).toUpperCase() : 'U';
   const [financeOpen, setFinanceOpen] = useState(true);
+  const [portalOpen, setPortalOpen] = useState(false);
 
   return (
     <>
@@ -243,18 +250,55 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
             </button>
           ))}
 
-          <div style={{ height: '1rem' }} />
-          <Link
-            to="/client"
-            className="nav-item"
-            style={{ textDecoration: 'none' }}
-            onClick={closeSidebar}
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Portal Web</div>
+          <button
+            type="button"
+            className={`nav-item ${NAV_ITEMS.filter(i => i.group === 'Portal Clientes').map(i => i.id).includes(activeTab) ? 'active' : ''}`}
+            onClick={() => setPortalOpen(prev => !prev)}
+            style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', textAlign: 'left' }}
           >
-            <span className="nav-icon">
-              <Icon path={ICONS.car} />
+            <span style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span className="nav-icon">
+                <Icon path={ICONS.car} />
+              </span>
+              <span className="nav-label" style={{ fontWeight: 600 }}>Portal Clientes</span>
             </span>
-            <span className="nav-label">Portal Cliente ↗</span>
-          </Link>
+            <span style={{ fontSize: '0.75rem', paddingRight: '4px' }}>{portalOpen ? '▼' : '►'}</span>
+          </button>
+
+          {portalOpen && (
+            <div className="sidebar-submenu" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)', marginLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
+              {NAV_ITEMS.filter(i => i.group === 'Portal Clientes').map(item => (
+                <button
+                  key={item.id}
+                  data-key={item.id}
+                  className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+                  onClick={() => { setActiveTab(item.id); closeSidebar(); }}
+                  style={{ height: '36px', fontSize: '0.85rem' }}
+                >
+                  <span className="nav-icon" style={{ transform: 'scale(0.8)' }}>
+                    <Icon path={ICONS[item.icon]} />
+                  </span>
+                  <span className="nav-label">{item.label}</span>
+                </button>
+              ))}
+              
+              {/* Acceso en vivo al portal */}
+              <Link
+                to="/client"
+                className="nav-item"
+                style={{ height: '36px', fontSize: '0.85rem', textDecoration: 'none' }}
+                onClick={closeSidebar}
+              >
+                <span className="nav-icon" style={{ transform: 'scale(0.8)' }}>
+                  <Icon path={ICONS.history} />
+                </span>
+                <span className="nav-label" style={{ color: 'var(--primary)' }}>Ver Portal Público ↗</span>
+              </Link>
+            </div>
+          )}
+
+          <div style={{ height: '1rem' }} />
         </nav>
 
         <div className="sidebar-footer">
@@ -306,6 +350,9 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
     finance_suppliers:          <SuppliersManager />,
     finance_supplier_invoices:  <SupplierInvoicesList />,
     finance_reports:            <FinancialReports />,
+
+    client_offers:              <div style={{ padding: '2rem', textAlign: 'center' }}><i className="fa-solid fa-tags" style={{ fontSize: '3rem', color: 'var(--primary)', marginBottom: '1rem' }}></i><h3>Gestión de Ofertas</h3><p>Módulo en construcción para crear y publicar ofertas promocionales hacia el Portal del Cliente.</p></div>,
+    client_blog:                <div style={{ padding: '2rem', textAlign: 'center' }}><i className="fa-solid fa-newspaper" style={{ fontSize: '3rem', color: 'var(--primary)', marginBottom: '1rem' }}></i><h3>Blog de Mecánica</h3><p>Módulo en construcción para administrar artículos y consejos de mantenimiento que verán tus clientes.</p></div>,
 
     finance:                    <FinanceDashboard />,
     pos:                        <POSDashboard onNavigate={setActiveTab} />,
