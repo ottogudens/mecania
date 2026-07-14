@@ -14,9 +14,61 @@ import 'reactflow/dist/style.css';
 import axios from 'axios';
 import { useSuccessToast, useErrorToast } from './Toast';
 
-/** 
- * Custom Node for WhatsApp Flow
- */
+const ASSISTANT_TEMPLATES = [
+  {
+    id: 'mecanica',
+    name: '🔧 Taller Mecánico',
+    prompt: `Eres 'MecanIA Bot', el agente inteligente de ventas y atención.
+Tu labor es asistir a los clientes de forma amable, profesional y rápida vía WhatsApp.
+
+Reglas:
+1. Saludos e Identificación: Si el cliente está identificado, usa su nombre.
+2. Agendar Horas: Solicita Nombre, Patente, Marca y Síntoma.
+3. Derivaciones: Menciona que un asesor técnico se comunicará.`
+  },
+  {
+    id: 'salon',
+    name: '💇 Salón de Belleza',
+    prompt: `Eres asistente de atención virtual estrella del Salón.
+Ayudas a cotizar servicios y agendar citas.
+
+Reglas:
+1. Identificación: Saluda y pregunta su nombre.
+2. Coordinación de Citas: Pregunta servicio, fecha y profesional.
+3. Tono: Mantén un tono elegante, súper amable y entusiasta.`
+  }
+];
+
+const FLOW_TEMPLATES = [
+    {
+        name: "Inicio / Bienvenida",
+        trigger_type: "greeting",
+        keywords: "hola,buenos dias,buenas,hi",
+        action_type: "static",
+        response_text: "¡Hola! Bienvenido a nuestro servicio automático. ¿En qué te podemos ayudar el día de hoy?",
+        buttons: "Agendar Hora\nHablar con Humano",
+        is_active: true
+    },
+    {
+        name: "Agendar Hora",
+        trigger_type: "keyword",
+        keywords: "agendar,cita,hora,reserva",
+        action_type: "static",
+        response_text: "Perfecto. Por favor, indícanos tus datos básicos y la fecha aproximada que deseas agendar para revisar disponibilidad de nuestro equipo.",
+        buttons: "",
+        is_active: true
+    },
+    {
+        name: "Derivación a Humano",
+        trigger_type: "keyword",
+        keywords: "humano,persona,ejecutivo,agente",
+        action_type: "escalate",
+        response_text: "Comprendo. He notificado a nuestro equipo y un ejecutivo humano continuará esta conversación a la brevedad. ¡Gracias por tu paciencia!",
+        buttons: "",
+        is_active: true
+    }
+];
+
 const FlowNode = ({ data, isConnectable }) => {
     return (
         <div style={{
@@ -28,12 +80,13 @@ const FlowNode = ({ data, isConnectable }) => {
             width: '260px',
             color: 'var(--text-primary)',
             overflow: 'hidden',
-            fontFamily: 'Outfit, sans-serif'
+            fontFamily: 'Outfit, sans-serif',
+            cursor: 'grab'
         }}>
             <Handle type="target" position={Position.Top} isConnectable={isConnectable} style={{ background: 'var(--text-secondary)' }} />
             
             <div style={{
-                background: 'rgba(239, 68, 68, 0.15)', // primary-dim
+                background: 'rgba(239, 68, 68, 0.15)',
                 borderBottom: '1px solid var(--border-subtle)',
                 padding: 'var(--space-2) var(--space-3)',
                 display: 'flex',
@@ -49,16 +102,6 @@ const FlowNode = ({ data, isConnectable }) => {
             </div>
             
             <div style={{ padding: 'var(--space-3)', fontSize: '0.85rem' }}>
-                <div style={{ marginBottom: 'var(--space-2)' }}>
-                    <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Trigger: </span>
-                    <span style={{ color: 'var(--text-primary)' }}>{data.trigger_type}</span>
-                </div>
-                {data.keywords && (
-                    <div style={{ marginBottom: 'var(--space-2)' }}>
-                        <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Keywords: </span>
-                        <span style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>{data.keywords}</span>
-                    </div>
-                )}
                 <div style={{ marginBottom: 'var(--space-2)' }}>
                     <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Acción: </span>
                     <span style={{ color: 'var(--text-primary)' }}>{data.action_type}</span>
@@ -100,20 +143,49 @@ const WhatsAppCanvas = () => {
     const showError = useErrorToast();
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
-    const [flows, setFlows] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Fetch Flows
+    const [workshopSettings, setWorkshopSettings] = useState({ assistant_prompt: '' });
+    
+    // Modal & Side-panel states
+    const [isFlowModalOpen, setIsFlowModalOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    
+    const [flowForm, setFlowForm] = useState({
+        id: null,
+        name: '',
+        trigger_type: 'keyword',
+        keywords: '',
+        action_type: 'static',
+        response_text: '',
+        buttons: '',
+        is_active: true
+    });
+
+    const [savingSettings, setSavingSettings] = useState(false);
+
+    useEffect(() => {
+        fetchFlows();
+        fetchWorkshopSettings();
+    }, []);
+
+    const fetchWorkshopSettings = async () => {
+        try {
+            const res = await axios.get('/api/operations/settings/');
+            setWorkshopSettings(res.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const fetchFlows = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`/api/operations/whatsapp-flows/`, {
+            const response = await axios.get('/api/operations/whatsapp-flows/', {
                 headers: { Authorization: `Token ${token}` },
             });
-            const data = response.data;
-            setFlows(data);
+            const data = response.data.results || response.data;
             
-            // Map Database to React Flow Nodes
             const initialNodes = data.map((flow, i) => {
                 let position = flow.canvas_position && flow.canvas_position.x !== undefined 
                     ? flow.canvas_position 
@@ -127,10 +199,8 @@ const WhatsAppCanvas = () => {
                 };
             });
             
-            // Map Edges
             const initialEdges = [];
             data.forEach(flow => {
-                // Edge for generic next step
                 if (flow.next_step) {
                     initialEdges.push({
                         id: `e-${flow.id}-default-${flow.next_step}`,
@@ -143,7 +213,6 @@ const WhatsAppCanvas = () => {
                     });
                 }
                 
-                // Edges for button routes
                 if (flow.button_routes && flow.buttons) {
                     const buttonsArray = flow.buttons.split('\n').filter(b => b.trim());
                     buttonsArray.forEach((btn, idx) => {
@@ -171,10 +240,6 @@ const WhatsAppCanvas = () => {
             setLoading(false);
         }
     };
-    
-    useEffect(() => {
-        fetchFlows();
-    }, []);
 
     const onNodesChange = useCallback(
         (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -189,13 +254,11 @@ const WhatsAppCanvas = () => {
         []
     );
 
-    const onSave = async () => {
+    const onSaveStructure = async () => {
         try {
             const token = localStorage.getItem('token');
             const promises = nodes.map(node => {
-                // Encontrar edges que salen de este nodo
                 const nodeOutgoingEdges = edges.filter(e => e.source === node.id);
-                
                 let next_step = null;
                 let button_routes = {};
                 
@@ -218,23 +281,109 @@ const WhatsAppCanvas = () => {
             });
             
             await Promise.all(promises);
-            showSuccess("Estructura de flujos guardada");
+            showSuccess("Estructura y conexiones guardadas.");
         } catch (error) {
             console.error("Error guardando flujo", error);
             showError("Error al guardar la posición y conexiones.");
         }
     };
 
+    const handleNodeDoubleClick = (e, node) => {
+        setFlowForm({
+            id: node.data.id,
+            name: node.data.name,
+            trigger_type: node.data.trigger_type,
+            keywords: node.data.keywords || '',
+            action_type: node.data.action_type,
+            response_text: node.data.response_text || '',
+            buttons: node.data.buttons || '',
+            is_active: node.data.is_active
+        });
+        setIsFlowModalOpen(true);
+    };
+
+    const handleSaveNode = async (e) => {
+        e.preventDefault();
+        try {
+            if (flowForm.id) {
+                await axios.put(`/api/operations/whatsapp-flows/${flowForm.id}/`, flowForm);
+                showSuccess("Nodo modificado");
+            } else {
+                await axios.post('/api/operations/whatsapp-flows/', flowForm);
+                showSuccess("Nuevo nodo creado");
+            }
+            setIsFlowModalOpen(false);
+            fetchFlows();
+        } catch (err) {
+            console.error(err);
+            showError("Error al guardar el nodo.");
+        }
+    };
+
+    const handleDeleteNode = async () => {
+        if (!flowForm.id || !window.confirm("¿Eliminar este nodo?")) return;
+        try {
+            await axios.delete(`/api/operations/whatsapp-flows/${flowForm.id}/`);
+            showSuccess("Nodo eliminado");
+            setIsFlowModalOpen(false);
+            fetchFlows();
+        } catch (err) {
+            showError("Error al eliminar nodo.");
+        }
+    };
+
+    const handleSaveAssistantPrompt = async () => {
+        setSavingSettings(true);
+        try {
+            await axios.put('/api/operations/settings/', {
+                assistant_prompt: workshopSettings.assistant_prompt || '',
+            });
+            showSuccess('Prompt del asistente guardado correctamente.');
+            setIsSettingsOpen(false);
+        } catch (err) {
+            console.error(err);
+            showError('Error al guardar el prompt del asistente.');
+        } finally {
+            setSavingSettings(false);
+        }
+    };
+
+    const loadFlowTemplates = async () => {
+        if (!window.confirm("Se crearán varios nodos estándar (Bienvenida, Agendar, Derivar humano). ¿Continuar?")) return;
+        try {
+            for (const tpl of FLOW_TEMPLATES) {
+                await axios.post('/api/operations/whatsapp-flows/', tpl);
+            }
+            showSuccess("Plantillas de flujos generadas con éxito.");
+            fetchFlows();
+        } catch (err) {
+            console.error(err);
+            showError("Error al crear plantillas.");
+        }
+    };
+
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)', position: 'relative' }}>
             <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4) var(--space-6)' }}>
                 <div style={{ flex: '1 1 min-content' }}>
-                    <h2 style={{ fontSize: 'clamp(1rem, 3vw, 1.2rem)', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Constructor de Flujos de WhatsApp</h2>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Une las respuestas del cliente para enrutar los flujos automáticamente.</p>
+                    <h2 style={{ fontSize: 'clamp(1rem, 3vw, 1.2rem)', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Gestión de Enrutamiento y Comportamiento</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Dibuja, conecta y edita los flujos de respuesta de WhatsApp. Haz doble click en un nodo para editarlo.</p>
                 </div>
-                <div>
-                    <button onClick={onSave} className="btn">
-                        💾 Guardar
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button onClick={() => {
+                        setFlowForm({ id: null, name: '', trigger_type: 'keyword', keywords: '', action_type: 'static', response_text: '', buttons: '', is_active: true });
+                        setIsFlowModalOpen(true);
+                    }} className="btn btn-outline">
+                         <i className="fa-solid fa-plus"></i> Crear Nodo
+                    </button>
+                    <button onClick={loadFlowTemplates} className="btn btn-outline">
+                         <i className="fa-solid fa-magic"></i> Plantillas
+                    </button>
+                    <button onClick={() => setIsSettingsOpen(true)} className="btn btn-outline" style={{ borderColor: 'var(--info)' }}>
+                         <i className="fa-solid fa-robot"></i> Instruir IA
+                    </button>
+                    <button onClick={onSaveStructure} className="btn">
+                        💾 Guardar Canvas
                     </button>
                 </div>
             </div>
@@ -252,6 +401,7 @@ const WhatsAppCanvas = () => {
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         nodeTypes={nodeTypes}
+                        onNodeDoubleClick={handleNodeDoubleClick}
                         fitView
                         style={{ background: 'var(--bg-secondary)', width: '100%', height: '100%' }}
                     >
@@ -265,6 +415,81 @@ const WhatsAppCanvas = () => {
                     </ReactFlow>
                 )}
             </div>
+
+            {/* Modal for Creating/Editing Nodes */}
+            {isFlowModalOpen && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+                    <div className="glass-card" style={{ width: '90%', maxWidth: '500px', padding: '2rem' }}>
+                        <h3 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>{flowForm.id ? 'Editar Nodo' : 'Crear Nodo'}</h3>
+                        <form onSubmit={handleSaveNode} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <div className="form-group">
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nombre del Flujo</label>
+                                <input className="input-field" type="text" required value={flowForm.name} onChange={e => setFlowForm({...flowForm, name: e.target.value})} />
+                            </div>
+                            <div className="form-group">
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Acción a Ejecutar</label>
+                                <select className="input-field" value={flowForm.action_type} onChange={e => setFlowForm({...flowForm, action_type: e.target.value})}>
+                                    <option value="static">Texto Estático (Manual)</option>
+                                    <option value="ai_completion">IA: GPT Completado Inmediato</option>
+                                    <option value="escalate">Derivar a Humano Inmediatamente</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Respuesta de Texto</label>
+                                <textarea className="input-field" rows="3" value={flowForm.response_text} onChange={e => setFlowForm({...flowForm, response_text: e.target.value})} />
+                            </div>
+                            <div className="form-group">
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Opciones / Botones (Uno por línea)</label>
+                                <textarea className="input-field" rows="3" placeholder="Sí&#10;No&#10;Volver al menú" value={flowForm.buttons} onChange={e => setFlowForm({...flowForm, buttons: e.target.value})} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                                <button type="submit" className="btn" style={{ flex: 1, backgroundColor: 'var(--primary)' }}>Guardar Nodo</button>
+                                {flowForm.id && <button type="button" onClick={handleDeleteNode} className="btn" style={{ backgroundColor: 'var(--status-red)' }}>Eliminar</button>}
+                                <button type="button" onClick={() => setIsFlowModalOpen(false)} className="btn btn-outline" style={{ flex: 1 }}>Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Right Sidebar for Prompt Settings */}
+            {isSettingsOpen && (
+                <div style={{ position: 'absolute', top: 0, right: 0, width: '400px', height: '100%', background: 'var(--surface-1)', borderLeft: '1px solid var(--border-color)', padding: '2rem', zIndex: 900, boxShadow: '-5px 0 20px rgba(0,0,0,0.5)', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h3 style={{ margin: 0, color: 'var(--primary)' }}><i className="fa-solid fa-robot"></i> Instrucciones IA</h3>
+                        <button onClick={() => setIsSettingsOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+                    </div>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1rem' }}>Define la personalidad e instrucciones maestras del asistente de IA.</p>
+                    
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Plantillas Rápidas</label>
+                        <select className="input-field" onChange={(e) => {
+                            const tpl = ASSISTANT_TEMPLATES.find(t => t.id === e.target.value);
+                            if (tpl && window.confirm("¿Sobrescribir el prompt actual?")) {
+                                setWorkshopSettings({ ...workshopSettings, assistant_prompt: tpl.prompt });
+                            }
+                        }}>
+                            <option value="">Seleccionar plantilla...</option>
+                            {ASSISTANT_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>System Prompt Personalizado</label>
+                        <textarea 
+                            className="input-field" 
+                            rows={15} 
+                            value={workshopSettings.assistant_prompt || ''}
+                            onChange={e => setWorkshopSettings({ ...workshopSettings, assistant_prompt: e.target.value })}
+                            style={{ fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.5' }}
+                        />
+                    </div>
+
+                    <button disabled={savingSettings} onClick={handleSaveAssistantPrompt} className="btn" style={{ width: '100%', backgroundColor: 'var(--primary)' }}>
+                        {savingSettings ? "Guardando..." : "💾 Aplicar Instrucciones"}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
