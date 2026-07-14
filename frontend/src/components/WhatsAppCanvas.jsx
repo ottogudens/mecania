@@ -42,7 +42,7 @@ Reglas:
 const FLOW_TEMPLATES = [
     {
         name: "Inicio / Bienvenida",
-        trigger_type: "greeting",
+        trigger_type: "keyword",
         keywords: "hola,buenos dias,buenas,hi",
         action_type: "static",
         response_text: "¡Hola! Bienvenido a nuestro servicio automático. ¿En qué te podemos ayudar el día de hoy?",
@@ -62,7 +62,7 @@ const FLOW_TEMPLATES = [
         name: "Derivación a Humano",
         trigger_type: "keyword",
         keywords: "humano,persona,ejecutivo,agente",
-        action_type: "escalate",
+        action_type: "human_transfer",
         response_text: "Comprendo. He notificado a nuestro equipo y un ejecutivo humano continuará esta conversación a la brevedad. ¡Gracias por tu paciencia!",
         buttons: "",
         is_active: true
@@ -307,11 +307,15 @@ const WhatsAppCanvas = () => {
         try {
             const token = localStorage.getItem('token');
             const config = { headers: { Authorization: `Token ${token}` } };
+            const payload = { ...flowForm };
+            if (!payload.id) {
+                delete payload.id;
+            }
             if (flowForm.id) {
-                await axios.put(`/api/operations/whatsapp-flows/${flowForm.id}/`, flowForm, config);
+                await axios.put(`/api/operations/whatsapp-flows/${flowForm.id}/`, payload, config);
                 showSuccess("Nodo modificado");
             } else {
-                await axios.post('/api/operations/whatsapp-flows/', flowForm, config);
+                await axios.post('/api/operations/whatsapp-flows/', payload, config);
                 showSuccess("Nuevo nodo creado");
             }
             setIsFlowModalOpen(false);
