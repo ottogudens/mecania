@@ -305,11 +305,13 @@ const WhatsAppCanvas = () => {
     const handleSaveNode = async (e) => {
         e.preventDefault();
         try {
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Token ${token}` } };
             if (flowForm.id) {
-                await axios.put(`/api/operations/whatsapp-flows/${flowForm.id}/`, flowForm);
+                await axios.put(`/api/operations/whatsapp-flows/${flowForm.id}/`, flowForm, config);
                 showSuccess("Nodo modificado");
             } else {
-                await axios.post('/api/operations/whatsapp-flows/', flowForm);
+                await axios.post('/api/operations/whatsapp-flows/', flowForm, config);
                 showSuccess("Nuevo nodo creado");
             }
             setIsFlowModalOpen(false);
@@ -323,7 +325,8 @@ const WhatsAppCanvas = () => {
     const handleDeleteNode = async () => {
         if (!flowForm.id || !window.confirm("¿Eliminar este nodo?")) return;
         try {
-            await axios.delete(`/api/operations/whatsapp-flows/${flowForm.id}/`);
+            const token = localStorage.getItem('token');
+            await axios.delete(`/api/operations/whatsapp-flows/${flowForm.id}/`, { headers: { Authorization: `Token ${token}` } });
             showSuccess("Nodo eliminado");
             setIsFlowModalOpen(false);
             fetchFlows();
@@ -335,9 +338,11 @@ const WhatsAppCanvas = () => {
     const handleSaveAssistantPrompt = async () => {
         setSavingSettings(true);
         try {
+            // Note: Update settings might use session authentication or need token depending on the backend, let's include it
+            const token = localStorage.getItem('token');
             await axios.put('/api/operations/settings/', {
                 assistant_prompt: workshopSettings.assistant_prompt || '',
-            });
+            }, { headers: { Authorization: `Token ${token}` } });
             showSuccess('Prompt del asistente guardado correctamente.');
             setIsSettingsOpen(false);
         } catch (err) {
@@ -351,8 +356,10 @@ const WhatsAppCanvas = () => {
     const loadFlowTemplates = async () => {
         if (!window.confirm("Se crearán varios nodos estándar (Bienvenida, Agendar, Derivar humano). ¿Continuar?")) return;
         try {
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Token ${token}` } };
             for (const tpl of FLOW_TEMPLATES) {
-                await axios.post('/api/operations/whatsapp-flows/', tpl);
+                await axios.post('/api/operations/whatsapp-flows/', tpl, config);
             }
             showSuccess("Plantillas de flujos generadas con éxito.");
             fetchFlows();
@@ -360,6 +367,30 @@ const WhatsAppCanvas = () => {
             console.error(err);
             showError("Error al crear plantillas.");
         }
+    };
+
+    const [customPrompts, setCustomPrompts] = useState([]);
+    useEffect(() => {
+        const stored = localStorage.getItem('custom_assistant_prompts');
+        if (stored) {
+            try {
+                setCustomPrompts(JSON.parse(stored));
+            } catch (e) {}
+        }
+    }, [isSettingsOpen]);
+
+    const handleSaveCustomPrompt = () => {
+        const name = window.prompt("Nombre de esta plantilla personalizada:");
+        if (!name || name.trim() === '') return;
+        const newTemplate = {
+            id: 'custom_' + Date.now(),
+            name: '⭐ ' + name,
+            prompt: workshopSettings.assistant_prompt
+        };
+        const updated = [...customPrompts, newTemplate];
+        setCustomPrompts(updated);
+        localStorage.setItem('custom_assistant_prompts', JSON.stringify(updated));
+        showSuccess("Plantilla predeterminada guardada.");
     };
 
     return (
@@ -464,13 +495,23 @@ const WhatsAppCanvas = () => {
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Plantillas Rápidas</label>
                         <select className="input-field" onChange={(e) => {
-                            const tpl = ASSISTANT_TEMPLATES.find(t => t.id === e.target.value);
+                            const val = e.target.value;
+                            if (!val) return;
+                            const tpl = [...ASSISTANT_TEMPLATES, ...customPrompts].find(t => t.id === val);
                             if (tpl && window.confirm("¿Sobrescribir el prompt actual?")) {
                                 setWorkshopSettings({ ...workshopSettings, assistant_prompt: tpl.prompt });
                             }
+                            e.target.value = "";
                         }}>
                             <option value="">Seleccionar plantilla...</option>
-                            {ASSISTANT_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            <optgroup label="Plantillas de Sistema">
+                                {ASSISTANT_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </optgroup>
+                            {customPrompts.length > 0 && (
+                                <optgroup label="Mis Plantillas Personalizadas">
+                                    {customPrompts.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </optgroup>
+                            )}
                         </select>
                     </div>
 
@@ -481,8 +522,12 @@ const WhatsAppCanvas = () => {
                             rows={15} 
                             value={workshopSettings.assistant_prompt || ''}
                             onChange={e => setWorkshopSettings({ ...workshopSettings, assistant_prompt: e.target.value })}
-                            style={{ fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.5' }}
+                            style={{ fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.5', marginBottom: '0.5rem' }}
                         />
+                        <button type="button" onClick={handleSaveCustomPrompt} className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '6px 10px', float: 'right' }}>
+                             Guardar como plantilla
+                        </button>
+                        <div style={{ clear: 'both' }}></div>
                     </div>
 
                     <button disabled={savingSettings} onClick={handleSaveAssistantPrompt} className="btn" style={{ width: '100%', backgroundColor: 'var(--primary)' }}>
