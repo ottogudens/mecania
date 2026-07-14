@@ -738,6 +738,9 @@ const ClientDashboard = ({ clientName, onLogout }) => {
   const [error, setError] = useState('');
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  
+  const [offers, setOffers] = useState([]);
+  const [blogs, setBlogs] = useState([]);
 
   // States for PIN changing modal
   const [showPinModal, setShowPinModal] = useState(false);
@@ -825,6 +828,14 @@ const ClientDashboard = ({ clientName, onLogout }) => {
     try {
       const { data } = await axios.get(`${API}/api/operations/client/data/`, { headers: clientAuth() });
       setVehicles(data.vehicles || []);
+      
+      // Fetch offers and blogs concurrently
+      const [offersRes, blogsRes] = await Promise.all([
+        axios.get(`${API}/api/operations/portal-offers/`),
+        axios.get(`${API}/api/operations/portal-blogs/`)
+      ]);
+      setOffers((offersRes.data.results || offersRes.data).filter(o => o.is_active));
+      setBlogs((blogsRes.data.results || blogsRes.data).filter(b => b.is_published));
     } catch (err) {
       if (err.response?.status === 401) {
         onLogout();
@@ -1034,6 +1045,72 @@ const ClientDashboard = ({ clientName, onLogout }) => {
               onClick={() => setSelectedVehicle(item.vehicle.id)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Offers & Blogs Section */}
+      {(offers.length > 0 || blogs.length > 0) && (
+        <div style={{ marginTop: '3rem' }}>
+          <h3 style={{ fontSize: '1.4rem', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+            Novedades y Beneficios
+          </h3>
+
+          {offers.length > 0 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h4 style={{ color: '#60a5fa', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-tags"></i> Ofertas Exclusivas
+              </h4>
+              <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem', scrollbarWidth: 'thin' }}>
+                {offers.map(offer => (
+                  <div key={offer.id} className="glass-card" style={{ minWidth: 300, maxWidth: 350, display: 'flex', flexDirection: 'column', flexShrink: 0, padding: 0, overflow: 'hidden' }}>
+                    {offer.image_url ? (
+                      <img src={offer.image_url} alt={offer.title} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: 160, background: 'linear-gradient(45deg, #3b82f633, #8b5cf633)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🎁</div>
+                    )}
+                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>{offer.title}</h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flex: 1 }}>{offer.description}</p>
+                      {offer.valid_until && (
+                        <div style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#fbbf24', fontWeight: 600 }}>
+                          ⏳ Válido hasta: {fmtDate(offer.valid_until)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {blogs.length > 0 && (
+            <div>
+              <h4 style={{ color: '#8b5cf6', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="fa-solid fa-newspaper"></i> Blog de Mecánica
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                {blogs.map(blog => (
+                  <div key={blog.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                    {blog.image_url ? (
+                      <img src={blog.image_url} alt={blog.title} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: 140, background: 'linear-gradient(45deg, #10b98133, #3b82f633)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🔧</div>
+                    )}
+                    <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>{blog.title}</h4>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', flex: 1, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {blog.content.replace(/<[^>]+>/g, '')}
+                      </p>
+                      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                        <span style={{ color: '#64748b' }}>Por: {blog.author}</span>
+                        <span style={{ color: '#3b82f6', fontWeight: 600 }}>Leer más →</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
