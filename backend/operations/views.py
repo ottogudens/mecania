@@ -1895,16 +1895,27 @@ class WhatsAppChatListView(APIView):
         ).order_by('-last_timestamp')
 
         chats = []
+        clients_handled = set()
+        
         for chat in chats_qs:
             phone = chat['phone']
             last_msg = WhatsAppMessage.objects.filter(phone=phone).order_by('-timestamp').first()
 
-            # Intentar encontrar el cliente correspondiente
+            # Attempt to find the client
             clean_num = ''.join(filter(str.isdigit, phone))
             client_obj = None
             if len(clean_num) >= 8:
                 suffix = clean_num[-8:]
                 client_obj = Client.objects.filter(phone__icontains=suffix).first()
+
+            if client_obj:
+                if client_obj.id in clients_handled:
+                    continue  # Already added a grouped chat for this client
+                clients_handled.add(client_obj.id)
+                # Find the global last message for THIS CLIENT across all their possible phones
+                all_client_msgs = WhatsAppMessage.objects.filter(client=client_obj).order_by('-timestamp')
+                if all_client_msgs.exists():
+                    last_msg = all_client_msgs.first()
 
             client_info = None
             if client_obj:
@@ -1912,22 +1923,15 @@ class WhatsAppChatListView(APIView):
                 try:
                     for v in client_obj.vehicles.all():
                         vehicles_list.append({
-                            "id": v.id,
-                            "make": v.make,
-                            "model": v.model,
-                            "year": v.year,
-                            "license_plate": v.license_plate
+                            "id": v.id, "make": v.make, "model": v.model,
+                            "year": v.year, "license_plate": v.license_plate
                         })
                 except Exception:
-                    # Fallback in case relationship name is different
                     try:
                         for v in client_obj.vehicle_set.all():
                             vehicles_list.append({
-                                "id": v.id,
-                                "make": v.make,
-                                "model": v.model,
-                                "year": v.year,
-                                "license_plate": v.license_plate
+                                "id": v.id, "make": v.make, "model": v.model,
+                                "year": v.year, "license_plate": v.license_plate
                             })
                     except Exception:
                         pass
@@ -1952,11 +1956,11 @@ class WhatsAppChatListView(APIView):
             bot_silenced_until = client_info["bot_silenced_until"] if client_info else None
 
             chats.append({
-                "phone": phone,
+                "phone": client_info["phone"] if client_info else phone,
                 "last_message": last_msg.text if last_msg else "",
                 "last_sender": last_msg.sender if last_msg else "client",
-                "last_timestamp": chat['last_timestamp'],
-                "last_time": chat['last_timestamp'].isoformat() if chat['last_timestamp'] else None,
+                "last_timestamp": last_msg.timestamp if last_msg else chat['last_timestamp'],
+                "last_time": last_msg.timestamp.isoformat() if last_msg else (chat['last_timestamp'].isoformat() if chat['last_timestamp'] else None),
                 "client_name": client_name,
                 "client_id": client_id,
                 "vehicles": vehicles_list,
@@ -1964,6 +1968,10 @@ class WhatsAppChatListView(APIView):
                 "is_bot_silenced": is_bot_silenced,
                 "bot_silenced_until": bot_silenced_until
             })
+
+        from datetime import datetime
+        # Sort combined list: prioritized by human transfer (is_bot_silenced=True), then chronological
+        chats.sort(key=lambda x: (x["is_bot_silenced"], x["last_timestamp"] or datetime.min), reverse=True)
 
         return Response(chats, status=status.HTTP_200_OK)
 

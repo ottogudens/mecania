@@ -96,8 +96,8 @@ class WhatsAppAgentView(APIView):
         if not number or not text:
             return Response({"error": "Number and text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Limpiar número telefónico para match (ej: remover @s.whatsapp.net o signos)
-        clean_num = number.replace('@s.whatsapp.net', '')
+        # 1. Limpiar número telefónico para match (ej: remover @s.whatsapp.net o signos y sufijos de sesión como :0)
+        clean_num = number.replace('@s.whatsapp.net', '').split(':')[0]
         if not clean_num.startswith('+'):
             # Baileys usualmente entrega el número sin el '+'
             clean_num = '+' + clean_num

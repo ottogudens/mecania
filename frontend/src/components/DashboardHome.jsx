@@ -22,6 +22,16 @@ const DashboardHome = ({ onNavigate }) => {
     fetchRecentChats();
   }, []);
 
+  useEffect(() => {
+    // Play sound if any recent chat is waiting for a human
+    if (recentChats.some(chat => chat.is_bot_silenced)) {
+      try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.play().catch(e => console.warn("Audio autoplay prevented", e));
+      } catch (err) {}
+    }
+  }, [recentChats]);
+
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -295,30 +305,48 @@ const DashboardHome = ({ onNavigate }) => {
             <span className="badge green" style={{ fontSize: '0.75rem', backgroundColor: 'rgba(16, 185, 129, 0.2)', color: '#10b981' }}>{recentChats.length}</span>
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-            {recentChats.map((chat, idx) => (
-              <div key={idx} style={{
-                padding: '0.8rem',
-                backgroundColor: 'rgba(255,255,255,0.02)',
-                borderRadius: '8px',
-                borderLeft: '3px solid #10b981',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.5rem',
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                  <strong style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    📱 {chat.client_name && chat.client_name !== "Desconocido" ? `${chat.client_name} (${chat.phone})` : chat.phone}
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {new Date(chat.last_time).toLocaleString()}
-                    </span>
-                  </strong>
-                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {chat.last_message}
-                  </p>
+            {recentChats.map((chat, idx) => {
+              const requiresAttention = chat.is_bot_silenced;
+              return (
+                <div 
+                  key={idx} 
+                  onClick={() => onNavigate && onNavigate('whatsapp_chat')}
+                  style={{
+                    padding: '0.8rem',
+                    backgroundColor: requiresAttention ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.02)',
+                    borderRadius: '8px',
+                    borderLeft: `3px solid ${requiresAttention ? '#ef4444' : '#10b981'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    animation: requiresAttention ? 'pulse-border 2s infinite' : 'none'
+                  }}
+                  className="interactive"
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%' }}>
+                    <strong style={{ fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', width: '100%' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        📱 {chat.client_name && chat.client_name !== "Desconocido" ? `${chat.client_name} (${chat.phone})` : chat.phone}
+                        {requiresAttention && (
+                          <span style={{ fontSize: '0.65rem', backgroundColor: '#ef4444', color: 'white', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold' }}>
+                            ESPERANDO
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {new Date(chat.last_time).toLocaleString()}
+                      </span>
+                    </strong>
+                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {chat.last_message}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
