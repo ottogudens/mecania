@@ -19,46 +19,64 @@ import { useSuccessToast, useErrorToast } from './Toast';
  */
 const FlowNode = ({ data, isConnectable }) => {
     return (
-        <div className="bg-white border-2 border-indigo-500 rounded-lg shadow-lg w-64">
-            <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+        <div style={{
+            background: 'var(--surface-1)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-md)',
+            width: '260px',
+            color: 'var(--text-primary)',
+            overflow: 'hidden',
+            fontFamily: 'Outfit, sans-serif'
+        }}>
+            <Handle type="target" position={Position.Top} isConnectable={isConnectable} style={{ background: 'var(--text-secondary)' }} />
             
-            <div className="bg-indigo-600 text-white font-bold p-2 rounded-t-sm flex justify-between items-center">
-                <span className="truncate">{data.name}</span>
+            <div style={{
+                background: 'rgba(239, 68, 68, 0.15)', // primary-dim
+                borderBottom: '1px solid var(--border-subtle)',
+                padding: 'var(--space-2) var(--space-3)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontWeight: '600'
+            }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.name}</span>
                 {data.is_active ? 
-                    <span className="w-3 h-3 bg-green-400 rounded-full" title="Activo"></span> : 
-                    <span className="w-3 h-3 bg-red-400 rounded-full" title="Inactivo"></span>
+                    <span style={{ width: '10px', height: '10px', background: 'var(--status-green)', borderRadius: '50%' }} title="Activo"></span> : 
+                    <span style={{ width: '10px', height: '10px', background: 'var(--status-red)', borderRadius: '50%' }} title="Inactivo"></span>
                 }
             </div>
             
-            <div className="p-3 text-sm">
-                <div className="mb-2">
-                    <span className="font-semibold text-gray-600 text-xs uppercase">Trigger: </span>
-                    <span className="text-gray-800">{data.trigger_type}</span>
+            <div style={{ padding: 'var(--space-3)', fontSize: '0.85rem' }}>
+                <div style={{ marginBottom: 'var(--space-2)' }}>
+                    <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Trigger: </span>
+                    <span style={{ color: 'var(--text-primary)' }}>{data.trigger_type}</span>
                 </div>
                 {data.keywords && (
-                    <div className="mb-2">
-                        <span className="font-semibold text-gray-600 text-xs uppercase">Keywords: </span>
-                        <span className="text-gray-800 text-xs bg-gray-100 p-1 rounded">{data.keywords}</span>
+                    <div style={{ marginBottom: 'var(--space-2)' }}>
+                        <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Keywords: </span>
+                        <span style={{ display: 'inline-block', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>{data.keywords}</span>
                     </div>
                 )}
-                <div className="mb-2">
-                    <span className="font-semibold text-gray-600 text-xs uppercase">Acción: </span>
-                    <span className="text-gray-800">{data.action_type}</span>
+                <div style={{ marginBottom: 'var(--space-2)' }}>
+                    <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase' }}>Acción: </span>
+                    <span style={{ color: 'var(--text-primary)' }}>{data.action_type}</span>
                 </div>
                 {data.buttons && (
-                    <div className="mt-2 border-t pt-2">
-                        <span className="font-semibold text-gray-600 text-xs uppercase block mb-1">Opciones:</span>
-                        <div className="space-y-1">
+                    <div style={{ marginTop: 'var(--space-3)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--border-subtle)' }}>
+                        <span style={{ fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.75rem', textTransform: 'uppercase', display: 'block', marginBottom: 'var(--space-2)' }}>Opciones:</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             {data.buttons.split('\n').map((btn, idx) => (
                                 btn.trim() && (
-                                    <div key={idx} className="bg-gray-100 p-1 rounded text-xs flex justify-between items-center relative">
+                                    <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
                                         <span>{btn}</span>
                                         <Handle 
                                             type="source" 
                                             position={Position.Right} 
                                             id={`btn-${idx}`}
-                                            className="w-2 h-2 !bg-indigo-500 absolute -right-2 top-1/2 transform -translate-y-1/2"
                                             isConnectable={isConnectable}
+                                            style={{ background: 'var(--status-blue)', width: '10px', height: '10px', right: '-10px' }}
                                         />
                                     </div>
                                 )
@@ -68,7 +86,7 @@ const FlowNode = ({ data, isConnectable }) => {
                 )}
             </div>
             
-            <Handle type="source" position={Position.Bottom} id="default" isConnectable={isConnectable} className="w-3 h-3 !bg-green-500" />
+            <Handle type="source" position={Position.Bottom} id="default" isConnectable={isConnectable} style={{ background: 'var(--status-green)', width: '12px', height: '12px' }} />
         </div>
     );
 };
@@ -208,25 +226,24 @@ const WhatsAppCanvas = () => {
     };
 
     return (
-        <div className="h-full w-full bg-gray-50 flex flex-col pt-16">
-            <div className="bg-white px-6 py-4 border-b flex justify-between items-center shadow-sm">
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 'var(--space-4)' }}>
+            <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-4) var(--space-6)' }}>
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Constructor de Flujos de WhatsApp</h1>
-                    <p className="text-sm text-gray-500">Une las respuestas del cliente para enrutar los flujos automáticamente.</p>
+                    <h2 style={{ fontSize: '1.2rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>Constructor de Flujos de WhatsApp</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Une las respuestas del cliente para enrutar los flujos automáticamente.</p>
                 </div>
-                <div className="flex gap-3">
-                    <button 
-                        onClick={onSave}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition"
-                    >
+                <div>
+                    <button onClick={onSave} className="btn">
                         💾 Guardar Posiciones y Rutas
                     </button>
                 </div>
             </div>
             
-            <div className="flex-1 w-full h-[calc(100vh-140px)] relative">
+            <div className="glass-card" style={{ flex: 1, padding: 0, overflow: 'hidden', minHeight: '600px', display: 'flex' }}>
                 {loading ? (
-                    <div className="flex justify-center items-center h-full">Cargando flujos...</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%', color: 'var(--text-secondary)' }}>
+                        Cargando flujos...
+                    </div>
                 ) : (
                     <ReactFlow
                         nodes={nodes}
@@ -236,16 +253,15 @@ const WhatsAppCanvas = () => {
                         onConnect={onConnect}
                         nodeTypes={nodeTypes}
                         fitView
-                        className="bg-gray-100"
+                        style={{ background: 'var(--bg-secondary)', width: '100%', height: '100%' }}
                     >
-                        <Controls />
+                        <Controls style={{ button: { background: 'var(--surface-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' } }} />
                         <MiniMap 
-                            nodeColor={(node) => {
-                                return node.data?.is_active ? '#4f46e5' : '#9ca3af';
-                            }}
-                            nodeStrokeWidth={3}
+                            nodeColor={(node) => node.data?.is_active ? 'var(--primary)' : 'var(--status-gray)'}
+                            maskColor="rgba(0, 0, 0, 0.7)"
+                            style={{ background: 'var(--surface-1)' }}
                         />
-                        <Background color="#ccc" gap={16} />
+                        <Background color="var(--border-muted)" gap={20} size={1} />
                     </ReactFlow>
                 )}
             </div>
