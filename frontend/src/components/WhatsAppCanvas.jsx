@@ -12,8 +12,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import axios from 'axios';
-import { toast } from 'react-toastify';
-import { FaSave, FaPlus, FaTrash, FaEdit } from 'react-icons/fa';
+import { useSuccessToast, useErrorToast } from './Toast';
 
 /** 
  * Custom Node for WhatsApp Flow
@@ -79,6 +78,8 @@ const nodeTypes = {
 };
 
 const WhatsAppCanvas = () => {
+    const showSuccess = useSuccessToast();
+    const showError = useErrorToast();
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
     const [flows, setFlows] = useState([]);
@@ -148,7 +149,7 @@ const WhatsAppCanvas = () => {
             setLoading(false);
         } catch (error) {
             console.error("Error cargando flujos", error);
-            toast.error("Error cargando flujos");
+            showError("Error cargando flujos");
             setLoading(false);
         }
     };
@@ -199,10 +200,10 @@ const WhatsAppCanvas = () => {
             });
             
             await Promise.all(promises);
-            toast.success("Estructura de flujos guardada correctamente");
+            showSuccess("Estructura de flujos guardada");
         } catch (error) {
             console.error("Error guardando flujo", error);
-            toast.error("Error al guardar la posición y conexiones.");
+            showError("Error al guardar la posición y conexiones.");
         }
     };
 
@@ -218,7 +219,7 @@ const WhatsAppCanvas = () => {
                         onClick={onSave}
                         className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition"
                     >
-                        <FaSave /> Guardar Posiciones y Rutas
+                        💾 Guardar Posiciones y Rutas
                     </button>
                 </div>
             </div>
