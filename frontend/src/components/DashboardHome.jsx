@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell 
 } from 'recharts';
 
-const DashboardHome = () => {
+const DashboardHome = ({ onNavigate }) => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -122,6 +122,38 @@ const DashboardHome = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
+      {/* Quick Actions / Accesos Rápidos */}
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <button 
+          className="glass-card interactive" 
+          onClick={() => onNavigate && onNavigate('pos')}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px', 
+            padding: 'var(--space-4) var(--space-5)', 
+            cursor: 'pointer',
+            borderLeft: '4px solid var(--primary)',
+            background: 'linear-gradient(45deg, rgba(239, 68, 68, 0.05) 0%, rgba(20, 20, 20, 0) 100%)'
+          }}
+        >
+          <div style={{ 
+            width: '40px', height: '40px', borderRadius: '50%', 
+            background: 'rgba(239, 68, 68, 0.15)', display: 'flex', 
+            alignItems: 'center', justifyContent: 'center',
+            color: 'var(--primary)'
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+            </svg>
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Punto de Venta (POS)</h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Abrir caja y venta de mesón</span>
+          </div>
+        </button>
+      </div>
+
       {/* Ventas Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
         <div className="glass-card" style={{ borderLeft: '4px solid #ef4444', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

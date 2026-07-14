@@ -62,28 +62,34 @@ const ICONS = {
 };
 
 const NAV_ITEMS = [
-  { id: 'dashboard',  label: 'Inicio / Panel',      icon: 'history' },
-  { id: 'orders',     label: 'Órdenes de Trabajo', icon: 'orders' },
-  { id: 'inspection', label: 'Inspección Visual',   icon: 'inspection' },
-  { id: 'inventory',  label: 'Inventario',          icon: 'inventory' },
-  { id: 'scan',       label: 'Escanear Stock',      icon: 'scan' },
-  { id: 'clients',    label: 'Clientes',            icon: 'clients' },
-  { id: 'vehicles',   label: 'Vehículos',           icon: 'car' },
-  { id: 'whatsapp_chat', label: 'Chat de WhatsApp', icon: 'chat' },
-  { id: 'whatsapp_canvas', label: 'Flujos WhatsApp', icon: 'orders' },
-  
-  // Finance Submodule IDs
-  { id: 'finance_billing', label: 'Clientes y Facturación', icon: 'finance' },
-  { id: 'finance_cash_register', label: 'Control de Caja', icon: 'history' },
-  { id: 'finance_cash_movements', label: 'Movimientos de Caja', icon: 'pos' },
-  { id: 'finance_suppliers', label: 'Proveedores del Taller', icon: 'users' },
-  { id: 'finance_supplier_invoices', label: 'Facturas y Programador de Pagos', icon: 'orders' },
-  { id: 'finance_reports', label: 'Reportes Financieros', icon: 'finance' },
+  // Operaciones
+  { id: 'dashboard',  label: 'Inicio / Panel',      icon: 'history',    group: 'Operaciones' },
+  { id: 'orders',     label: 'Órdenes de Trabajo', icon: 'orders',     group: 'Operaciones' },
+  { id: 'inspection', label: 'Inspección Visual',   icon: 'inspection', group: 'Operaciones' },
+  { id: 'estimates',  label: 'Presupuestos',        icon: 'orders',     group: 'Operaciones' },
 
-  { id: 'pos',        label: 'Punto de Venta',      icon: 'pos' },
-  { id: 'estimates',  label: 'Presupuestos',        icon: 'orders' },
-  { id: 'settings',   label: 'Configuración',     icon: 'settings' },
-  { id: 'users',      label: 'Usuarios',          icon: 'users' },
+  // Recepción y Comunicación
+  { id: 'whatsapp_chat',   label: 'Chat de WhatsApp', icon: 'chat',    group: 'Comunicación' },
+  { id: 'whatsapp_canvas', label: 'Flujos WhatsApp',  icon: 'orders',  group: 'Comunicación' },
+  { id: 'clients',         label: 'Clientes',         icon: 'clients', group: 'Comunicación' },
+  { id: 'vehicles',        label: 'Vehículos',        icon: 'car',     group: 'Comunicación' },
+
+  // Logística y Productos
+  { id: 'inventory',  label: 'Inventario',          icon: 'inventory', group: 'Logística' },
+  { id: 'scan',       label: 'Escanear Stock',      icon: 'scan',      group: 'Logística' },
+
+  // Finanzas y Ventas (Submenú)
+  { id: 'finance_billing',           label: 'Clientes y Facturación',  icon: 'finance', group: 'Finanzas' },
+  { id: 'pos',                       label: 'Punto de Venta',          icon: 'pos',     group: 'Finanzas' },
+  { id: 'finance_cash_register',     label: 'Control de Caja',         icon: 'history', group: 'Finanzas' },
+  { id: 'finance_cash_movements',    label: 'Movimientos de Caja',     icon: 'pos',     group: 'Finanzas' },
+  { id: 'finance_suppliers',         label: 'Proveedores del Taller',  icon: 'users',   group: 'Finanzas' },
+  { id: 'finance_supplier_invoices', label: 'Facturas de Compra',      icon: 'orders',  group: 'Finanzas' },
+  { id: 'finance_reports',           label: 'Reportes Financieros',    icon: 'finance', group: 'Finanzas' },
+
+  // Sistema
+  { id: 'settings',   label: 'Configuración',     icon: 'settings', group: 'Sistema' },
+  { id: 'users',      label: 'Usuarios',          icon: 'users',    group: 'Sistema' },
 ];
 
 const PAGE_TITLES = {
@@ -142,8 +148,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-section-label">Principal</div>
-          {NAV_ITEMS.slice(0, 8).map(item => (
+          <div className="nav-section-label">Operaciones</div>
+          {NAV_ITEMS.filter(i => i.group === 'Operaciones').map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -157,10 +163,40 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
             </button>
           ))}
 
-          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Finanzas</div>
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Comunicación</div>
+          {NAV_ITEMS.filter(i => i.group === 'Comunicación').map(item => (
+            <button
+              key={item.id}
+              data-key={item.id}
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => { setActiveTab(item.id); closeSidebar(); }}
+            >
+              <span className="nav-icon">
+                <Icon path={ICONS[item.icon]} />
+              </span>
+              <span className="nav-label">{item.label}</span>
+            </button>
+          ))}
+
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Logística</div>
+          {NAV_ITEMS.filter(i => i.group === 'Logística').map(item => (
+            <button
+              key={item.id}
+              data-key={item.id}
+              className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
+              onClick={() => { setActiveTab(item.id); closeSidebar(); }}
+            >
+              <span className="nav-icon">
+                <Icon path={ICONS[item.icon]} />
+              </span>
+              <span className="nav-label">{item.label}</span>
+            </button>
+          ))}
+
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Finanzas & Ventas</div>
           <button
             type="button"
-            className={`nav-item ${activeTab.startsWith('finance_') ? 'active' : ''}`}
+            className={`nav-item ${NAV_ITEMS.filter(i => i.group === 'Finanzas').map(i => i.id).includes(activeTab) ? 'active' : ''}`}
             onClick={() => setFinanceOpen(prev => !prev)}
             style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'transparent', textAlign: 'left' }}
           >
@@ -168,14 +204,14 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
               <span className="nav-icon">
                 <Icon path={ICONS.finance} />
               </span>
-              <span className="nav-label" style={{ fontWeight: 600 }}>Finanzas</span>
+              <span className="nav-label" style={{ fontWeight: 600 }}>Caja y Finanzas</span>
             </span>
             <span style={{ fontSize: '0.75rem', paddingRight: '4px' }}>{financeOpen ? '▼' : '►'}</span>
           </button>
 
           {financeOpen && (
             <div className="sidebar-submenu" style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '1.25rem', borderLeft: '1px solid var(--border-color)', marginLeft: '1rem', marginTop: '0.25rem', marginBottom: '0.25rem' }}>
-              {NAV_ITEMS.slice(8, 14).map(item => (
+              {NAV_ITEMS.filter(i => i.group === 'Finanzas').map(item => (
                 <button
                   key={item.id}
                   data-key={item.id}
@@ -192,8 +228,8 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
             </div>
           )}
 
-          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Ventas y Sistema</div>
-          {NAV_ITEMS.slice(14).map(item => (
+          <div className="nav-section-label" style={{ marginTop: '0.5rem' }}>Sistema</div>
+          {NAV_ITEMS.filter(i => i.group === 'Sistema').map(item => (
             <button
               key={item.id}
               data-key={item.id}
@@ -254,7 +290,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
   const pageInfo = PAGE_TITLES[activeTab] || { title: '', subtitle: '' };
 
   const PANELS = {
-    dashboard:                  <DashboardHome />,
+    dashboard:                  <DashboardHome onNavigate={setActiveTab} />,
     orders:                     <WorkOrderList />,
     inspection:                 <VisualInspection />,
     inventory:                  <InventoryDashboard />,
