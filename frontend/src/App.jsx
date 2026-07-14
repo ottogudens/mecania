@@ -25,7 +25,8 @@ import SuppliersManager from './components/SuppliersManager';
 import SupplierInvoicesList from './components/SupplierInvoicesList';
 import FinancialReports from './components/FinancialReports';
 import WhatsAppCanvas from './components/WhatsAppCanvas';
-
+import ClientPortalOffers from './components/ClientPortalOffers';
+import ClientPortalBlog from './components/ClientPortalBlog';
 /* ── Icons (inline SVG, no extra dep) ── */
 const Icon = ({ path, size = 18, ...props }) => (
   <svg

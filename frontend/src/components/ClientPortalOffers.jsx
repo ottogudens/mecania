@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useToast } from '../contexts/ToastContext';
+import { useToast } from './Toast';
 
 export default function ClientPortalOffers() {
   const [offers, setOffers] = useState([]);
