@@ -1224,7 +1224,7 @@ const ServiceCatalog = () => {
 
 // ─── componente principal ─────────────────────────────────────────────────────
 const POSDashboard = ({ onNavigate }) => {
-  const [activeTab, setActiveTab] = useState('charge');
+  const [activeTab, setActiveTab] = useState('counter');
   const [cashOpen, setCashOpen] = useState(null); // null = loading, true/false
 
   useEffect(() => {
