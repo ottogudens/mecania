@@ -741,6 +741,8 @@ const ClientDashboard = ({ clientName, onLogout }) => {
   
   const [offers, setOffers] = useState([]);
   const [blogs, setBlogs] = useState([]);
+  
+  const [selectedBlog, setSelectedBlog] = useState(null);
 
   // States for PIN changing modal
   const [showPinModal, setShowPinModal] = useState(false);
@@ -1012,6 +1014,42 @@ const ClientDashboard = ({ clientName, onLogout }) => {
         </div>
       )}
 
+      {/* Visor de Blog (Modal) */}
+      {selectedBlog && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(8px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+          zIndex: 1100, padding: '2rem 1rem', overflowY: 'auto'
+        }} onClick={() => setSelectedBlog(null)}>
+          <div className="glass-card" style={{ maxWidth: 700, width: '100%', padding: '0', overflow: 'hidden', cursor: 'default' }} onClick={(e) => e.stopPropagation()}>
+            {selectedBlog.image && (
+              <img src={selectedBlog.image} alt={selectedBlog.title} style={{ width: '100%', maxHeight: '300px', objectFit: 'cover' }} />
+            )}
+            <div style={{ padding: '2rem' }}>
+              <button 
+                onClick={() => setSelectedBlog(null)} 
+                className="btn btn-outline" 
+                style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', marginBottom: '1rem', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                ← Volver al inicio
+              </button>
+              <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#fff' }}>{selectedBlog.title}</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '2rem', paddingBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                <span>Por: {selectedBlog.author}</span>
+                <span>{fmtDate(selectedBlog.updated_at || selectedBlog.created_at)}</span>
+              </div>
+              <div style={{ 
+                color: '#cbd5e1', lineHeight: '1.8', fontSize: '1.05rem', 
+                whiteSpace: 'pre-wrap', paddingBottom: '2rem' 
+              }}>
+                {selectedBlog.content}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div style={{
           padding: '1rem', borderRadius: 8, marginBottom: '1rem',
@@ -1063,8 +1101,8 @@ const ClientDashboard = ({ clientName, onLogout }) => {
               <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem', scrollbarWidth: 'thin' }}>
                 {offers.map(offer => (
                   <div key={offer.id} className="glass-card" style={{ minWidth: 300, maxWidth: 350, display: 'flex', flexDirection: 'column', flexShrink: 0, padding: 0, overflow: 'hidden' }}>
-                    {offer.image_url ? (
-                      <img src={offer.image_url} alt={offer.title} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
+                    {offer.image ? (
+                      <img src={offer.image} alt={offer.title} style={{ width: '100%', height: 160, objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '100%', height: 160, background: 'linear-gradient(45deg, #3b82f633, #8b5cf633)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🎁</div>
                     )}
@@ -1090,9 +1128,9 @@ const ClientDashboard = ({ clientName, onLogout }) => {
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                 {blogs.map(blog => (
-                  <div key={blog.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                    {blog.image_url ? (
-                      <img src={blog.image_url} alt={blog.title} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
+                  <div key={blog.id} className="glass-card" onClick={() => setSelectedBlog(blog)} style={{ display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', cursor: 'pointer', transition: 'transform 0.2s' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
+                    {blog.image ? (
+                      <img src={blog.image} alt={blog.title} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: '100%', height: 140, background: 'linear-gradient(45deg, #10b98133, #3b82f633)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>🔧</div>
                     )}
