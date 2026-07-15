@@ -131,35 +131,35 @@ export default function ClientPortalBlog() {
       </table>
 
       {isModalOpen && (
-        <div className="modal show" style={{ display: 'flex' }}>
-          <div className="modal-content" style={{ maxWidth: '700px', width: '100%' }}>
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', width: '100%' }}>
             <div className="modal-header">
-              <h3>{formData.id ? 'Editar Artículo' : 'Nuevo Artículo'}</h3>
-              <button className="close-btn" onClick={handleCloseModal}>×</button>
+              <h3 className="modal-title">{formData.id ? 'Editar Artículo' : 'Nuevo Artículo'}</h3>
+              <button type="button" className="modal-close" onClick={handleCloseModal}>×</button>
             </div>
             <div className="modal-body">
-              <form onSubmit={handleSave}>
-                <div className="form-group">
-                  <label>Título del Artículo</label>
-                  <input type="text" className="form-control" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+              <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Título del Artículo</label>
+                  <input type="text" className="input-field" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
                 </div>
-                <div className="form-group" style={{ display: 'flex', gap: '1rem' }}>
-                  <div style={{ flex: 1 }}>
-                    <label>Autor</label>
-                    <input type="text" className="form-control" required value={formData.author} onChange={e => setFormData({...formData, author: e.target.value})} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="input-group">
+                    <label className="input-label">Autor</label>
+                    <input type="text" className="input-field" required value={formData.author} onChange={e => setFormData({...formData, author: e.target.value})} />
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label>URL de Imagen Portada (Opcional)</label>
-                    <input type="url" className="form-control" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} />
+                  <div className="input-group">
+                    <label className="input-label">URL de Imagen Portada (Opcional)</label>
+                    <input type="url" className="input-field" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} />
                   </div>
                 </div>
-                <div className="form-group">
-                  <label>Contenido del Artículo (Puedes usar HTML/Markdown)</label>
-                  <textarea className="form-control" required rows="10" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} style={{ fontFamily: 'monospace' }}></textarea>
+                <div className="input-group">
+                  <label className="input-label">Contenido del Artículo (Puedes usar HTML/Markdown)</label>
+                  <textarea className="input-field" required rows="10" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} style={{ fontFamily: 'monospace' }}></textarea>
                 </div>
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="input-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
                   <input type="checkbox" id="isPublished" checked={formData.is_published} onChange={e => setFormData({...formData, is_published: e.target.checked})} />
-                  <label htmlFor="isPublished" style={{ margin: 0 }}>Publicar inmediatamente</label>
+                  <label className="input-label" htmlFor="isPublished" style={{ margin: 0 }}>Publicar inmediatamente</label>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
                   <button type="button" className="btn btn-ghost" onClick={handleCloseModal}>Cancelar</button>

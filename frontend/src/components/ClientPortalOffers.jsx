@@ -125,33 +125,33 @@ export default function ClientPortalOffers() {
       </div>
 
       {isModalOpen && (
-        <div className="modal show" style={{ display: 'flex' }}>
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div className="modal-header">
-              <h3>{formData.id ? 'Editar Oferta' : 'Nueva Oferta'}</h3>
-              <button className="close-btn" onClick={handleCloseModal}>×</button>
+              <h3 className="modal-title">{formData.id ? 'Editar Oferta' : 'Nueva Oferta'}</h3>
+              <button type="button" className="modal-close" onClick={handleCloseModal}>×</button>
             </div>
             <div className="modal-body">
-              <form onSubmit={handleSave}>
-                <div className="form-group">
-                  <label>Título de la Oferta</label>
-                  <input type="text" className="form-control" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+              <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Título de la Oferta</label>
+                  <input type="text" className="input-field" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
                 </div>
-                <div className="form-group">
-                  <label>Descripción</label>
-                  <textarea className="form-control" required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
+                <div className="input-group">
+                  <label className="input-label">Descripción</label>
+                  <textarea className="input-field" required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                 </div>
-                <div className="form-group">
-                  <label>URL de la Imagen Promocional (Opcional)</label>
-                  <input type="url" className="form-control" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} />
+                <div className="input-group">
+                  <label className="input-label">URL de la Imagen Promocional (Opcional)</label>
+                  <input type="url" className="input-field" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} />
                 </div>
-                <div className="form-group">
-                  <label>Válida hasta (Opcional)</label>
-                  <input type="date" className="form-control" value={formData.valid_until} onChange={e => setFormData({...formData, valid_until: e.target.value})} />
+                <div className="input-group">
+                  <label className="input-label">Válida hasta (Opcional)</label>
+                  <input type="date" className="input-field" value={formData.valid_until} onChange={e => setFormData({...formData, valid_until: e.target.value})} />
                 </div>
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="input-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
                   <input type="checkbox" id="isActive" checked={formData.is_active} onChange={e => setFormData({...formData, is_active: e.target.checked})} />
-                  <label htmlFor="isActive" style={{ margin: 0 }}>Oferta Activa</label>
+                  <label className="input-label" htmlFor="isActive" style={{ margin: 0 }}>Oferta Activa</label>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
                   <button type="button" className="btn btn-ghost" onClick={handleCloseModal}>Cancelar</button>
