@@ -3,7 +3,7 @@ from django.core.validators import MinValueValidator
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    sku = models.CharField(max_length=50, unique=True)
+    sku = models.CharField(max_length=50, unique=True, blank=True)
     category = models.CharField(max_length=100, blank=True, default='', verbose_name="Categoría")
     stock_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio de Venta (IVA incluido)")
@@ -16,6 +16,18 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.sku})"
+
+    def save(self, *args, **kwargs):
+        if not self.sku:
+            import string
+            import random
+            def generate_sku():
+                return 'SKU-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            new_sku = generate_sku()
+            while Product.objects.filter(sku=new_sku).exists():
+                new_sku = generate_sku()
+            self.sku = new_sku
+        super().save(*args, **kwargs)
 
 
 class ServiceCategory(models.Model):

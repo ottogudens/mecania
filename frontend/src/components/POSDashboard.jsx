@@ -171,7 +171,7 @@ const ChargeWorkOrder = () => {
   const handleScanBarcode = async (e) => {
     e.preventDefault();
     if (!barcodeInput.trim()) return;
-    const p = catalogProducts.find(prod => prod.sku === barcodeInput.trim() || prod.id.toString() === barcodeInput.trim());
+    const p = catalogProducts.find(prod => String(prod.barcode) === barcodeInput.trim() || String(prod.sku) === barcodeInput.trim() || String(prod.id) === barcodeInput.trim());
     if (p) {
       try {
         const payload = {
@@ -747,6 +747,7 @@ const CounterSale = () => {
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('products');
+  const [searchFilter, setSearchFilter] = useState('');
 
   useEffect(() => {
     const h = { headers: authHeader() };
@@ -772,7 +773,7 @@ const CounterSale = () => {
   const handleScan = (e) => {
     e.preventDefault();
     if (!barcodeInput.trim()) return;
-    const p = products.find(prod => prod.sku === barcodeInput.trim() || prod.id.toString() === barcodeInput.trim());
+    const p = products.find(prod => String(prod.barcode) === barcodeInput.trim() || String(prod.sku) === barcodeInput.trim() || String(prod.id) === barcodeInput.trim());
     if (p) {
       addProduct(p);
       setBarcodeInput('');
@@ -852,22 +853,33 @@ const CounterSale = () => {
           ))}
         </div>
 
-        <form onSubmit={handleScan} style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem' }}>
+        <form onSubmit={handleScan} style={{ marginBottom: '1.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <input 
             type="text" 
             className="glass-input" 
-            placeholder="Escanear SKU con pistola lectora..." 
+            placeholder="Escanear SKU o Código de barras..." 
             value={barcodeInput} 
             onChange={e => setBarcodeInput(e.target.value)} 
             autoFocus 
-            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px' }} 
+            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', minWidth: '200px' }} 
           />
           <button type="submit" className="btn btn-outline" style={{ padding: '0 1rem' }}>Escanear</button>
         </form>
 
         {tab === 'products' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
-            {products.map(p => (
+          <>
+            <div style={{ marginBottom: '1rem' }}>
+              <input 
+                type="text" 
+                className="glass-input" 
+                placeholder="🔍 Buscar producto por nombre..." 
+                value={searchFilter} 
+                onChange={e => setSearchFilter(e.target.value)} 
+                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '8px' }} 
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem' }}>
+              {products.filter(p => !searchFilter || p.name.toLowerCase().includes(searchFilter.toLowerCase())).map(p => (
               <div key={p.id} className="glass-card" style={{ padding: '1rem', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
                 onClick={() => p.stock_quantity > 0 && addProduct(p)}>
                 {p.image_url && (
@@ -889,6 +901,7 @@ const CounterSale = () => {
               </div>
             ))}
           </div>
+          </>
         )}
 
         {tab === 'services' && (
