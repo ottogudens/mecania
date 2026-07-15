@@ -13,7 +13,7 @@ export default function ClientPortalBlog() {
     title: '',
     content: '',
     author: 'Equipo MecanIA',
-    image_url: '',
+    image: null,
     is_published: true
   });
 
@@ -40,7 +40,7 @@ export default function ClientPortalBlog() {
         title: blog.title,
         content: blog.content,
         author: blog.author,
-        image_url: blog.image_url || '',
+        image: null,
         is_published: blog.is_published
       });
     } else {
@@ -49,7 +49,7 @@ export default function ClientPortalBlog() {
         title: '',
         content: '',
         author: 'Equipo MecanIA',
-        image_url: '',
+        image: null,
         is_published: true
       });
     }
@@ -62,12 +62,26 @@ export default function ClientPortalBlog() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    const uploadData = new FormData();
+    uploadData.append('title', formData.title);
+    uploadData.append('content', formData.content);
+    uploadData.append('author', formData.author);
+    uploadData.append('is_published', formData.is_published);
+    if (formData.image) {
+      uploadData.append('image', formData.image);
+    }
+
     try {
       if (formData.id) {
-        await axios.put(`/api/operations/portal-blogs/${formData.id}/`, formData);
+        await axios.patch(`/api/operations/portal-blogs/${formData.id}/`, uploadData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         addToast('Artículo actualizado exitosamente', 'success');
       } else {
-        await axios.post('/api/operations/portal-blogs/', formData);
+        await axios.post('/api/operations/portal-blogs/', uploadData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         addToast('Artículo publicado exitosamente', 'success');
       }
       setIsModalOpen(false);
@@ -149,8 +163,8 @@ export default function ClientPortalBlog() {
                     <input type="text" className="input-field" required value={formData.author} onChange={e => setFormData({...formData, author: e.target.value})} />
                   </div>
                   <div className="input-group">
-                    <label className="input-label">URL de Imagen Portada (Opcional)</label>
-                    <input type="url" className="input-field" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} />
+                    <label className="input-label">Imagen de Portada (Opcional)</label>
+                    <input type="file" accept="image/*" className="input-field" onChange={e => setFormData({...formData, image: e.target.files[0]})} />
                   </div>
                 </div>
                 <div className="input-group">

@@ -12,7 +12,7 @@ export default function ClientPortalOffers() {
     id: null,
     title: '',
     description: '',
-    image_url: '',
+    image: null,
     valid_until: '',
     is_active: true
   });
@@ -39,7 +39,7 @@ export default function ClientPortalOffers() {
         id: offer.id,
         title: offer.title,
         description: offer.description,
-        image_url: offer.image_url || '',
+        image: null,
         valid_until: offer.valid_until || '',
         is_active: offer.is_active
       });
@@ -48,7 +48,7 @@ export default function ClientPortalOffers() {
         id: null,
         title: '',
         description: '',
-        image_url: '',
+        image: null,
         valid_until: '',
         is_active: true
       });
@@ -62,12 +62,26 @@ export default function ClientPortalOffers() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+
+    const uploadData = new FormData();
+    uploadData.append('title', formData.title);
+    uploadData.append('description', formData.description);
+    if (formData.valid_until) uploadData.append('valid_until', formData.valid_until);
+    uploadData.append('is_active', formData.is_active);
+    if (formData.image) {
+      uploadData.append('image', formData.image);
+    }
+
     try {
       if (formData.id) {
-        await axios.put(`/api/operations/portal-offers/${formData.id}/`, formData);
+        await axios.patch(`/api/operations/portal-offers/${formData.id}/`, uploadData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         addToast('Oferta actualizada exitosamente', 'success');
       } else {
-        await axios.post('/api/operations/portal-offers/', formData);
+        await axios.post('/api/operations/portal-offers/', uploadData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         addToast('Oferta generada exitosamente', 'success');
       }
       setIsModalOpen(false);
@@ -101,8 +115,8 @@ export default function ClientPortalOffers() {
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
         {offers.length === 0 ? <p>No hay ofertas creadas.</p> : offers.map(offer => (
           <div key={offer.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-            {offer.image_url ? (
-              <img src={offer.image_url} alt={offer.title} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '4px' }} />
+            {offer.image ? (
+              <img src={offer.image} alt={offer.title} style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '4px' }} />
             ) : (
               <div style={{ width: '100%', height: '150px', backgroundColor: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🖼 Sin Imagen</div>
             )}
@@ -142,8 +156,8 @@ export default function ClientPortalOffers() {
                   <textarea className="input-field" required rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                 </div>
                 <div className="input-group">
-                  <label className="input-label">URL de la Imagen Promocional (Opcional)</label>
-                  <input type="url" className="input-field" value={formData.image_url} onChange={e => setFormData({...formData, image_url: e.target.value})} />
+                  <label className="input-label">Imagen Promocional (Opcional)</label>
+                  <input type="file" accept="image/*" className="input-field" onChange={e => setFormData({...formData, image: e.target.files[0]})} />
                 </div>
                 <div className="input-group">
                   <label className="input-label">Válida hasta (Opcional)</label>
