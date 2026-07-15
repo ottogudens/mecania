@@ -87,8 +87,15 @@ class WhatsAppAgentView(APIView):
         from django.conf import settings
         expected_key = getattr(settings, 'INTERNAL_API_KEY', None)
         provided_key = request.headers.get('X-Mecania-Secret-Key') or request.META.get('HTTP_X_MECANIA_SECRET_KEY')
-        if expected_key and provided_key != expected_key:
-            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        simulate = request.data.get('simulate', False)
+        
+        if simulate:
+            if not request.user.is_authenticated:
+                return Response({"error": "Unauthorized via session"}, status=status.HTTP_403_FORBIDDEN)
+        else:
+            if expected_key and provided_key != expected_key:
+                return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
 
         number = request.data.get('number', '').strip()
         text = request.data.get('text', '').strip()
@@ -115,7 +122,7 @@ class WhatsAppAgentView(APIView):
         start_dt = dt_now - datetime.timedelta(seconds=15)
         end_dt = dt_now + datetime.timedelta(seconds=15)
 
-        if client_obj and client_obj.bot_silenced_until and client_obj.bot_silenced_until > timezone.now():
+        if not simulate and client_obj and client_obj.bot_silenced_until and client_obj.bot_silenced_until > timezone.now():
             if not WhatsAppMessage.objects.filter(phone=clean_num, text=text, sender='client', timestamp__range=(start_dt, end_dt)).exists():
                 WhatsAppMessage.objects.create(
                     phone=clean_num,
@@ -126,7 +133,7 @@ class WhatsAppAgentView(APIView):
             return Response({"reply": None}, status=status.HTTP_200_OK)
 
         # Guardar el mensaje entrante del cliente si no fue registrado recientemente
-        if not WhatsAppMessage.objects.filter(phone=clean_num, text=text, sender='client', timestamp__range=(start_dt, end_dt)).exists():
+        if not simulate and not WhatsAppMessage.objects.filter(phone=clean_num, text=text, sender='client', timestamp__range=(start_dt, end_dt)).exists():
             WhatsAppMessage.objects.create(
                 phone=clean_num,
                 client=client_obj,
@@ -135,19 +142,24 @@ class WhatsAppAgentView(APIView):
             )
 
         def save_and_response(reply_text, extra_props=None):
-            WhatsAppMessage.objects.create(
-                phone=clean_num,
-                client=client_obj,
-                sender='assistant',
-                text=reply_text
-            )
+            if not simulate:
+                WhatsAppMessage.objects.create(
+                    phone=clean_num,
+                    client=client_obj,
+                    sender='assistant',
+                    text=reply_text
+                )
             data = {"reply": reply_text}
             if extra_props:
                 data.update(extra_props)
             return Response(data, status=status.HTTP_200_OK)
 
-        # Buscar coincidencias con los flujos activos configurados (similar al sistema de keywords/flows de BuilderBot)
-        active_flows = WhatsAppFlow.objects.filter(is_active=True)
+        # Buscar coincidencias con los flujos activos configurados (o todos si simulación)
+        if simulate:
+            active_flows = WhatsAppFlow.objects.all()
+        else:
+            active_flows = WhatsAppFlow.objects.filter(is_active=True)
+            
         matched_flow = None
         text_lower = text.lower()
         
@@ -242,7 +254,7 @@ class WhatsAppAgentView(APIView):
                 reply_msg = "He pausado la automatización y he notificado a nuestro equipo. Un asesor técnico se comunicará contigo en breves minutos."
                 if matched_flow.response_text.strip():
                     reply_msg = matched_flow.response_text
-                if client_obj:
+                if not simulate and client_obj:
                     from django.utils import timezone
                     from datetime import timedelta
                     client_obj.bot_silenced_until = timezone.now() + timedelta(hours=6)
@@ -443,23 +455,26 @@ class WhatsAppAgentView(APIView):
                         email = func_args.get("email")
 
                         try:
-                            # Buscar o crear/actualizar cliente por su teléfono actual
-                            c_obj, created = Client.objects.update_or_create(
-                                phone=clean_num,
-                                defaults={
-                                    'first_name': first_name,
-                                    'last_name': last_name,
-                                    'email': email or None,
-                                }
-                            )
-                            if created:
-                                pin = Client.generate_pin()
-                                c_obj.set_pin(pin)
-                                c_obj.portal_enabled = True
-                                c_obj.save()
-                                tool_result = f"Cliente creado exitosamente. Nombre: {first_name} {last_name}, Teléfono: {clean_num}. PIN de Portal: {pin}."
+                            if simulate:
+                                tool_result = f"[SIMULACIÓN] Cliente actualizado a: {first_name} {last_name}."
                             else:
-                                tool_result = f"Información del cliente actualizada exitosamente a: {first_name} {last_name}."
+                                # Buscar o crear/actualizar cliente por su teléfono actual
+                                c_obj, created = Client.objects.update_or_create(
+                                    phone=clean_num,
+                                    defaults={
+                                        'first_name': first_name,
+                                        'last_name': last_name,
+                                        'email': email or None,
+                                    }
+                                )
+                                if created:
+                                    pin = Client.generate_pin()
+                                    c_obj.set_pin(pin)
+                                    c_obj.portal_enabled = True
+                                    c_obj.save()
+                                    tool_result = f"Cliente creado exitosamente. Nombre: {first_name} {last_name}, Teléfono: {clean_num}. PIN de Portal: {pin}."
+                                else:
+                                    tool_result = f"Información del cliente actualizada exitosamente a: {first_name} {last_name}."
                         except Exception as ex:
                             tool_result = f"Error al registrar/actualizar cliente: {str(ex)}"
 
@@ -470,31 +485,34 @@ class WhatsAppAgentView(APIView):
                         year = func_args.get("year")
 
                         # Re-buscar el cliente
-                        current_client = Client.objects.filter(phone__icontains=clean_num[-8:]).first()
+                        current_client = Client.objects.filter(phone__icontains=clean_num[-8:]).first() if not simulate else Client(first_name="Simulación", phone=clean_num)
 
-                        if not current_client:
+                        if not current_client and not simulate:
                             tool_result = "Error: Primero debes registrar los datos del cliente (nombre y apellido) usando register_client, antes de registrar el vehículo."
                         else:
-                            try:
-                                validate_license_plate(raw_plate)
-
-                                vehicle_obj, v_created = Vehicle.objects.update_or_create(
-                                    license_plate=raw_plate,
-                                    defaults={
-                                        'make': make,
-                                        'model': model,
-                                        'year': year or 2020,
-                                        'client': current_client
-                                    }
-                                )
-                                if v_created:
-                                    tool_result = f"Vehículo registrado exitosamente (Patente: {raw_plate}, Marca: {make}, Modelo: {model}) y vinculado a {current_client.first_name} {current_client.last_name}."
-                                else:
-                                    tool_result = f"Vehículo patente {raw_plate} actualizado y vinculado a {current_client.first_name} {current_client.last_name}."
-                            except ValidationError as ve:
-                                tool_result = f"Error de validación de patente: {ve.message if hasattr(ve, 'message') else str(ve)}. Avísale al cliente que la patente es inválida y pídele una patente válida."
-                            except Exception as ex:
-                                tool_result = f"Error al registrar vehículo: {str(ex)}"
+                            if simulate:
+                                tool_result = f"[SIMULACIÓN] Vehículo registrado (Patente: {raw_plate}, Marca: {make}, Modelo: {model})."
+                            else:
+                                try:
+                                    validate_license_plate(raw_plate)
+    
+                                    vehicle_obj, v_created = Vehicle.objects.update_or_create(
+                                        license_plate=raw_plate,
+                                        defaults={
+                                            'make': make,
+                                            'model': model,
+                                            'year': year or 2020,
+                                            'client': current_client
+                                        }
+                                    )
+                                    if v_created:
+                                        tool_result = f"Vehículo registrado exitosamente (Patente: {raw_plate}, Marca: {make}, Modelo: {model}) y vinculado a {current_client.first_name} {current_client.last_name}."
+                                    else:
+                                        tool_result = f"Vehículo patente {raw_plate} actualizado y vinculado a {current_client.first_name} {current_client.last_name}."
+                                except ValidationError as ve:
+                                    tool_result = f"Error de validación de patente: {ve.message if hasattr(ve, 'message') else str(ve)}. Avísale al cliente que la patente es inválida y pídele una patente válida."
+                                except Exception as ex:
+                                    tool_result = f"Error al registrar vehículo: {str(ex)}"
 
                     # Agregar resultado de herramienta
                     messages.append({

@@ -163,6 +163,16 @@ const WhatsAppCanvas = () => {
     });
 
     const [savingSettings, setSavingSettings] = useState(false);
+    
+    // Simulator states
+    const [isSimulateChatOpen, setIsSimulateChatOpen] = useState(false);
+    const [simulatedMessages, setSimulatedMessages] = useState([
+        { sender: 'assistant', text: '¡Hola! Soy el simulador. Escribe un mensaje para probar los flujos.' }
+    ]);
+    const [simulateInputText, setSimulateInputText] = useState('');
+    
+    // Custom flow templates state
+    const [customFlowTemplates, setCustomFlowTemplates] = useState([]);
 
     useEffect(() => {
         fetchFlows();
@@ -373,15 +383,55 @@ const WhatsAppCanvas = () => {
         }
     };
 
+    const handleSendSimulatedMessage = async (e) => {
+        e.preventDefault();
+        if (!simulateInputText.trim()) return;
+
+        const newMsg = { sender: 'client', text: simulateInputText };
+        setSimulatedMessages([...simulatedMessages, newMsg]);
+        setSimulateInputText('');
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post('/api/ai/whatsapp-agent/', 
+                { number: 'Simulador', text: newMsg.text, simulate: true },
+                { headers: { Authorization: `Token ${token}` } }
+            );
+
+            if (res.data && res.data.reply) {
+                setSimulatedMessages(prev => [...prev, { sender: 'assistant', text: res.data.reply }]);
+            }
+        } catch (err) {
+            console.error('Error simulating chat:', err);
+            setSimulatedMessages(prev => [...prev, { sender: 'assistant', text: '⚠️ [Error del Simulador] No se pudo procesar la respuesta.' }]);
+        }
+    };
+
+    const handleSaveFlowAsTemplate = () => {
+        const tplName = window.prompt("Nombre de esta plantilla de flujo:");
+        if (!tplName || tplName.trim() === '') return;
+        const newTemplate = {
+            ...flowForm,
+            _id: 'custom_' + Date.now(),
+            name: '⭐ ' + tplName,
+        };
+        const updated = [...customFlowTemplates, newTemplate];
+        setCustomFlowTemplates(updated);
+        localStorage.setItem('custom_flow_templates', JSON.stringify(updated));
+        showSuccess("Plantilla de flujo guardada.");
+    };
+
     const [customPrompts, setCustomPrompts] = useState([]);
     useEffect(() => {
-        const stored = localStorage.getItem('custom_assistant_prompts');
-        if (stored) {
-            try {
-                setCustomPrompts(JSON.parse(stored));
-            } catch (e) {}
+        const storedAssistant = localStorage.getItem('custom_assistant_prompts');
+        if (storedAssistant) {
+            try { setCustomPrompts(JSON.parse(storedAssistant)); } catch (e) {}
         }
-    }, [isSettingsOpen]);
+        const storedFlows = localStorage.getItem('custom_flow_templates');
+        if (storedFlows) {
+            try { setCustomFlowTemplates(JSON.parse(storedFlows)); } catch (e) {}
+        }
+    }, [isSettingsOpen, isFlowModalOpen]);
 
     const handleSaveCustomPrompt = () => {
         const name = window.prompt("Nombre de esta plantilla personalizada:");
@@ -412,7 +462,10 @@ const WhatsAppCanvas = () => {
                          <i className="fa-solid fa-plus"></i> Crear Nodo
                     </button>
                     <button onClick={loadFlowTemplates} className="btn btn-outline">
-                         <i className="fa-solid fa-magic"></i> Plantillas
+                         <i className="fa-solid fa-magic"></i> Plantillas Init
+                    </button>
+                    <button onClick={() => setIsSimulateChatOpen(true)} className="btn btn-outline" style={{ borderColor: 'var(--primary)' }}>
+                         <i className="fa-solid fa-comment-dots"></i> Probar Flujos
                     </button>
                     <button onClick={() => setIsSettingsOpen(true)} className="btn btn-outline" style={{ borderColor: 'var(--info)' }}>
                          <i className="fa-solid fa-robot"></i> Instruir IA
@@ -456,6 +509,29 @@ const WhatsAppCanvas = () => {
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
                     <div className="glass-card" style={{ width: '90%', maxWidth: '500px', padding: '2rem' }}>
                         <h3 style={{ marginBottom: '1rem', color: 'var(--primary)' }}>{flowForm.id ? 'Editar Nodo' : 'Crear Nodo'}</h3>
+                        
+                        {customFlowTemplates.length > 0 && !flowForm.id && (
+                            <div style={{ marginBottom: '1rem' }}>
+                                <label style={{ display: 'block', color: 'var(--text-primary)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Cargar Plantilla Guardada:</label>
+                                <select className="input-field" onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (!val) return;
+                                    const tpl = customFlowTemplates.find(t => t._id === val);
+                                    if (tpl) {
+                                        setFlowForm({ 
+                                            id: null, name: tpl.name.replace('⭐ ', ''), trigger_type: tpl.trigger_type, 
+                                            keywords: tpl.keywords || '', action_type: tpl.action_type, 
+                                            response_text: tpl.response_text || '', buttons: tpl.buttons || '', is_active: true 
+                                        });
+                                    }
+                                    e.target.value = "";
+                                }}>
+                                    <option value="">Seleccionar plantilla personalizada...</option>
+                                    {customFlowTemplates.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
+                                </select>
+                            </div>
+                        )}
+
                         <form onSubmit={handleSaveNode} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <div className="form-group">
                                 <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Nombre del Flujo</label>
@@ -477,6 +553,13 @@ const WhatsAppCanvas = () => {
                                 <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Opciones / Botones (Uno por línea)</label>
                                 <textarea className="input-field" rows="3" placeholder="Sí&#10;No&#10;Volver al menú" value={flowForm.buttons} onChange={e => setFlowForm({...flowForm, buttons: e.target.value})} />
                             </div>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-0.5rem' }}>
+                                <button type="button" onClick={handleSaveFlowAsTemplate} className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '6px 10px' }}>
+                                    <i className="fa-solid fa-star"></i> Guardar como plantilla
+                                </button>
+                            </div>
+
                             <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
                                 <button type="submit" className="btn" style={{ flex: 1, backgroundColor: 'var(--primary)' }}>Guardar Nodo</button>
                                 {flowForm.id && <button type="button" onClick={handleDeleteNode} className="btn" style={{ backgroundColor: 'var(--status-red)' }}>Eliminar</button>}
@@ -484,6 +567,53 @@ const WhatsAppCanvas = () => {
                             </div>
                         </form>
                     </div>
+                </div>
+            )}
+
+            {/* Chat Simulator Sidebar */}
+            {isSimulateChatOpen && (
+                <div style={{ position: 'absolute', top: 0, right: 0, width: '380px', height: '100%', background: 'var(--surface-1)', borderLeft: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', zIndex: 900, boxShadow: '-5px 0 20px rgba(0,0,0,0.5)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                        <h3 style={{ margin: 0, color: 'var(--primary)', fontSize: '1.1rem' }}><i className="fa-solid fa-comment-dots"></i> Simulador de Flujos</h3>
+                        <button onClick={() => setIsSimulateChatOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+                    </div>
+                    <div style={{ padding: '1rem', backgroundColor: 'var(--brand-dark)', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center', borderBottom: '1px solid var(--border-subtle)' }}>
+                        Estas conversaciones solo son simulaciones de tus flujos activos e inactivos. No se guardarán.
+                    </div>
+                    
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {simulatedMessages.map((m, idx) => (
+                            <div key={idx} style={{ 
+                                alignSelf: m.sender === 'client' ? 'flex-end' : 'flex-start',
+                                maxWidth: '85%',
+                                padding: '10px 14px',
+                                borderRadius: '15px',
+                                backgroundColor: m.sender === 'client' ? 'var(--primary)' : 'var(--surface-2)',
+                                color: m.sender === 'client' ? '#fff' : 'var(--text-primary)',
+                                boxShadow: 'var(--shadow-sm)',
+                                fontSize: '0.9rem',
+                                whiteSpace: 'pre-wrap'
+                            }}>
+                                {m.text}
+                            </div>
+                        ))}
+                    </div>
+
+                    <form onSubmit={handleSendSimulatedMessage} style={{ padding: '1rem', borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-1)' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <input 
+                                type="text" 
+                                className="input-field" 
+                                placeholder="Escribe un mensaje..."
+                                value={simulateInputText}
+                                onChange={e => setSimulateInputText(e.target.value)}
+                                style={{ flex: 1 }}
+                            />
+                            <button type="submit" className="btn" style={{ background: 'var(--primary)', padding: '0 1rem' }}>
+                                <i className="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
 
