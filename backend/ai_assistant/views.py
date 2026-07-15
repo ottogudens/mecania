@@ -91,8 +91,13 @@ class WhatsAppAgentView(APIView):
         simulate = request.data.get('simulate', False)
         
         if simulate:
-            if not request.user.is_authenticated:
-                return Response({"error": "Unauthorized via session"}, status=status.HTTP_403_FORBIDDEN)
+            auth_header = request.META.get('HTTP_AUTHORIZATION')
+            if not auth_header or not auth_header.startswith('Token '):
+                return Response({"error": "Token missing for simulation"}, status=status.HTTP_403_FORBIDDEN)
+            token_key = auth_header.split(' ')[1]
+            from rest_framework.authtoken.models import Token
+            if not Token.objects.filter(key=token_key).exists():
+                return Response({"error": "Invalid token"}, status=status.HTTP_403_FORBIDDEN)
         else:
             if expected_key and provided_key != expected_key:
                 return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
