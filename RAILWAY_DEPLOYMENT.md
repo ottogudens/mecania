@@ -43,8 +43,8 @@ Railway detectará automáticamente el código base, pero para aplicaciones mono
    - `CORS_ALLOWED_ORIGINS`: `https://tu-dominio-frontend.up.railway.app` (El dominio que Railway le dé a tu Frontend).
    - `OPENAI_API_KEY`: `tu-api-key-de-openai` (Para el Asistente IA).
 5. **Comandos de Inicio (Start Command)**:
-   - Necesitarás un servidor WSGI para producción (gunicorn). Si no está en `requirements.txt`, deberás agregarlo.
-   - Start Command: `python manage.py migrate && gunicorn automaster.wsgi:application --bind 0.0.0.0:$PORT`
+   - Necesitarás un servidor ASGI para producción (daphne), ya que Gunicorn con WSGI no soporta WebSockets.
+   - Start Command: `python manage.py migrate && daphne -b 0.0.0.0 -p $PORT automaster.asgi:application`
 6. En **Settings** > **Networking**, haz clic en **Generate Domain** para obtener la URL pública del backend.
 
 ### C. Frontend (React / Vite)
