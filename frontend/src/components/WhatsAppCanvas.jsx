@@ -173,6 +173,11 @@ const WhatsAppCanvas = () => {
     
     // Custom flow templates state
     const [customFlowTemplates, setCustomFlowTemplates] = useState([]);
+    
+    // Canvas Environment Templates
+    const [canvasTemplates, setCanvasTemplates] = useState([]);
+    const [isCanvasTemplatesOpen, setIsCanvasTemplatesOpen] = useState(false);
+    const [newCanvasName, setNewCanvasName] = useState('');
 
     useEffect(() => {
         fetchFlows();
@@ -407,6 +412,87 @@ const WhatsAppCanvas = () => {
         }
     };
 
+    const handleSaveCanvasTemplate = () => {
+        if (!newCanvasName.trim()) return;
+        const newTemplate = {
+            id: 'canvas_' + Date.now(),
+            name: newCanvasName,
+            data: nodes.map(n => n.data),
+            createdAt: new Date().toISOString()
+        };
+        const updated = [...canvasTemplates, newTemplate];
+        setCanvasTemplates(updated);
+        localStorage.setItem('custom_canvas_templates', JSON.stringify(updated));
+        setNewCanvasName('');
+        showSuccess('Entorno de flujo guardado como plantilla.');
+    };
+
+    const handleLoadCanvasTemplate = async (template) => {
+        if (!window.confirm("¡Atención! Esto eliminará todos tus flujos actuales y los reemplazará por la plantilla seleccionada. ¿Estás seguro?")) return;
+        
+        setIsCanvasTemplatesOpen(false);
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Token ${token}` } };
+            
+            // 1. Delete all current flows
+            for (const n of nodes) {
+                await axios.delete(`/api/operations/whatsapp-flows/${n.id}/`, config).catch(e => console.warn(e));
+            }
+            
+            // 2. Create nodes (Pass 1 - without relations)
+            const oldToNew = {};
+            for (const data of template.data) {
+                const payload = { ...data };
+                delete payload.id;
+                delete payload.next_step;
+                delete payload.button_routes;
+                
+                const res = await axios.post('/api/operations/whatsapp-flows/', payload, config);
+                oldToNew[data.id] = res.data.id;
+            }
+            
+            // 3. Patch edges/relations (Pass 2)
+            for (const data of template.data) {
+                const newId = oldToNew[data.id];
+                if (!newId) continue;
+                
+                let relPayload = {};
+                if (data.next_step && oldToNew[data.next_step]) {
+                    relPayload.next_step = oldToNew[data.next_step];
+                }
+                if (data.button_routes) {
+                    const newRoutes = {};
+                    for (const [key, val] of Object.entries(data.button_routes)) {
+                        if (oldToNew[val]) newRoutes[key] = oldToNew[val];
+                    }
+                    if (Object.keys(newRoutes).length > 0) {
+                        relPayload.button_routes = newRoutes;
+                    }
+                }
+                
+                if (Object.keys(relPayload).length > 0) {
+                    await axios.patch(`/api/operations/whatsapp-flows/${newId}/`, relPayload, config);
+                }
+            }
+            
+            showSuccess(`Plantilla de entorno "${template.name}" cargada con éxito.`);
+            await fetchFlows();
+        } catch (err) {
+            console.error(err);
+            showError("Error al cargar la plantilla de entorno.");
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteCanvasTemplate = (id) => {
+        if (!window.confirm("¿Eliminar esta plantilla de entorno espacial?")) return;
+        const updated = canvasTemplates.filter(t => t.id !== id);
+        setCanvasTemplates(updated);
+        localStorage.setItem('custom_canvas_templates', JSON.stringify(updated));
+    };
+
     const handleSaveFlowAsTemplate = () => {
         const tplName = window.prompt("Nombre de esta plantilla de flujo:");
         if (!tplName || tplName.trim() === '') return;
@@ -431,7 +517,11 @@ const WhatsAppCanvas = () => {
         if (storedFlows) {
             try { setCustomFlowTemplates(JSON.parse(storedFlows)); } catch (e) {}
         }
-    }, [isSettingsOpen, isFlowModalOpen]);
+        const storedCanvas = localStorage.getItem('custom_canvas_templates');
+        if (storedCanvas) {
+            try { setCanvasTemplates(JSON.parse(storedCanvas)); } catch (e) {}
+        }
+    }, [isSettingsOpen, isFlowModalOpen, isCanvasTemplatesOpen]);
 
     const handleSaveCustomPrompt = () => {
         const name = window.prompt("Nombre de esta plantilla personalizada:");
@@ -461,8 +551,11 @@ const WhatsAppCanvas = () => {
                     }} className="btn btn-outline">
                          <i className="fa-solid fa-plus"></i> Crear Nodo
                     </button>
-                    <button onClick={loadFlowTemplates} className="btn btn-outline">
+                    <button onClick={loadFlowTemplates} className="btn btn-outline" style={{ display: 'none' }}>
                          <i className="fa-solid fa-magic"></i> Plantillas Init
+                    </button>
+                    <button onClick={() => setIsCanvasTemplatesOpen(true)} className="btn btn-outline" style={{ borderColor: 'var(--brand-dark)' }}>
+                         <i className="fa-solid fa-layer-group"></i> Entornos / Plantillas
                     </button>
                     <button onClick={() => setIsSimulateChatOpen(true)} className="btn btn-outline" style={{ borderColor: 'var(--primary)' }}>
                          <i className="fa-solid fa-comment-dots"></i> Probar Flujos
@@ -667,6 +760,51 @@ const WhatsAppCanvas = () => {
                     <button disabled={savingSettings} onClick={handleSaveAssistantPrompt} className="btn" style={{ width: '100%', backgroundColor: 'var(--primary)' }}>
                         {savingSettings ? "Guardando..." : "💾 Aplicar Instrucciones"}
                     </button>
+                </div>
+            )}
+            
+            {/* Modal for Canvas Templates */}
+            {isCanvasTemplatesOpen && (
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }}>
+                    <div className="glass-card" style={{ width: '90%', maxWidth: '600px', padding: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h3 style={{ color: 'var(--primary)', margin: 0 }}><i className="fa-solid fa-layer-group"></i> Entornos (Plantillas de Canvas)</h3>
+                            <button onClick={() => setIsCanvasTemplatesOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+                            Guarda tu diagrama y esquema de nodos actual como una plantilla para poder intercambiar configuraciones en un solo click (ej. Cambio de campaña, Estructuras distintas).
+                        </p>
+                        
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
+                            <input 
+                                type="text" 
+                                className="input-field" 
+                                placeholder="Ej: Flujo Agendamiento Enero..." 
+                                value={newCanvasName} 
+                                onChange={e => setNewCanvasName(e.target.value)} 
+                                style={{ flex: 1 }} 
+                            />
+                            <button onClick={handleSaveCanvasTemplate} className="btn btn-primary" disabled={nodes.length === 0}>Guardar Actual</button>
+                        </div>
+                        
+                        <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Tus Plantillas Guardadas:</h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                            {canvasTemplates.length === 0 ? (
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem', background: 'rgba(0,0,0,0.1)', borderRadius: '4px' }}>No tienes plantillas de entorno guardadas.</p>
+                            ) : canvasTemplates.map(tpl => (
+                                <div key={tpl.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border-subtle)', borderRadius: '6px' }}>
+                                    <div>
+                                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>{tpl.name}</div>
+                                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>{tpl.data.length} Nodos almacenados</div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                        <button onClick={() => handleDeleteCanvasTemplate(tpl.id)} className="btn btn-ghost btn-sm" style={{ color: 'var(--status-red)', padding: '4px 8px' }}>Eliminar</button>
+                                        <button onClick={() => handleLoadCanvasTemplate(tpl)} className="btn btn-outline btn-sm" style={{ borderColor: 'var(--primary)', color: 'var(--primary)', padding: '4px 8px' }}>Cargar Entorno</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
