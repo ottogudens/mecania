@@ -6,7 +6,7 @@ export default function ClientPortalBlog() {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   const [formData, setFormData] = useState({
     id: null,
@@ -27,7 +27,7 @@ export default function ClientPortalBlog() {
       const res = await axios.get('/api/operations/portal-blogs/');
       setBlogs(res.data.results || res.data);
     } catch (err) {
-      addToast('Error al cargar artículos', 'error');
+      toast({ message: 'Error al cargar artículos', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -75,15 +75,15 @@ export default function ClientPortalBlog() {
     try {
       if (formData.id) {
         await axios.patch(`/api/operations/portal-blogs/${formData.id}/`, uploadData);
-        addToast('Artículo actualizado exitosamente', 'success');
+        toast({ message: 'Artículo actualizado exitosamente', type: 'success' });
       } else {
         await axios.post('/api/operations/portal-blogs/', uploadData);
-        addToast('Artículo publicado exitosamente', 'success');
+        toast({ message: 'Artículo publicado exitosamente', type: 'success' });
       }
       setIsModalOpen(false);
       fetchBlogs();
     } catch (err) {
-      addToast('Error al guardar el artículo', 'error');
+      toast({ message: 'Error al guardar el artículo', type: 'error' });
     }
   };
 
@@ -91,10 +91,10 @@ export default function ClientPortalBlog() {
     if (window.confirm("¿Seguro que deseas eliminar este artículo?")) {
       try {
         await axios.delete(`/api/operations/portal-blogs/${id}/`);
-        addToast('Artículo eliminado', 'success');
+        toast({ message: 'Artículo eliminado', type: 'success' });
         fetchBlogs();
       } catch (err) {
-        addToast('Error al eliminar', 'error');
+        toast({ message: 'Error al eliminar', type: 'error' });
       }
     }
   };

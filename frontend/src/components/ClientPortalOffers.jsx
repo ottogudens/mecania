@@ -6,7 +6,7 @@ export default function ClientPortalOffers() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { addToast } = useToast();
+  const toast = useToast();
 
   const [formData, setFormData] = useState({
     id: null,
@@ -27,7 +27,7 @@ export default function ClientPortalOffers() {
       const res = await axios.get('/api/operations/portal-offers/');
       setOffers(res.data.results || res.data);
     } catch (err) {
-      addToast('Error al cargar ofertas', 'error');
+      toast({ message: 'Error al cargar ofertas', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -75,15 +75,15 @@ export default function ClientPortalOffers() {
     try {
       if (formData.id) {
         await axios.patch(`/api/operations/portal-offers/${formData.id}/`, uploadData);
-        addToast('Oferta actualizada exitosamente', 'success');
+        toast({ message: 'Oferta actualizada exitosamente', type: 'success' });
       } else {
         await axios.post('/api/operations/portal-offers/', uploadData);
-        addToast('Oferta generada exitosamente', 'success');
+        toast({ message: 'Oferta generada exitosamente', type: 'success' });
       }
       setIsModalOpen(false);
       fetchOffers();
     } catch (err) {
-      addToast('Error al guardar la oferta', 'error');
+      toast({ message: 'Error al guardar la oferta', type: 'error' });
     }
   };
 
@@ -91,10 +91,10 @@ export default function ClientPortalOffers() {
     if (window.confirm("¿Seguro que deseas eliminar esta oferta?")) {
       try {
         await axios.delete(`/api/operations/portal-offers/${id}/`);
-        addToast('Oferta eliminada', 'success');
+        toast({ message: 'Oferta eliminada', type: 'success' });
         fetchOffers();
       } catch (err) {
-        addToast('Error al eliminar', 'error');
+        toast({ message: 'Error al eliminar', type: 'error' });
       }
     }
   };
