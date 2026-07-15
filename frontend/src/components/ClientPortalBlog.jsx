@@ -74,14 +74,10 @@ export default function ClientPortalBlog() {
 
     try {
       if (formData.id) {
-        await axios.patch(`/api/operations/portal-blogs/${formData.id}/`, uploadData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await axios.patch(`/api/operations/portal-blogs/${formData.id}/`, uploadData);
         addToast('Artículo actualizado exitosamente', 'success');
       } else {
-        await axios.post('/api/operations/portal-blogs/', uploadData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await axios.post('/api/operations/portal-blogs/', uploadData);
         addToast('Artículo publicado exitosamente', 'success');
       }
       setIsModalOpen(false);

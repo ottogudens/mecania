@@ -740,6 +740,29 @@ body {
   outline: none;
 }
 
+input[type="file"].input-field {
+  padding: 0.4rem 0.5rem;
+  line-height: normal;
+  display: flex;
+  align-items: center;
+}
+
+input[type="file"].input-field::file-selector-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #fff;
+  padding: 0.3rem 0.75rem;
+  margin-right: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+input[type="file"].input-field::file-selector-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .glass-input:focus,
 .input-field:focus {
   border-color: var(--primary);
@@ -877,6 +900,7 @@ tbody td {
   width: 100%;
   max-width: 540px;
   max-height: 92vh;
+  margin: auto;
   overflow-y: auto;
   padding: var(--space-8);
   box-shadow: var(--shadow-lg), 0 0 0 1px rgba(102, 252, 241, 0.05);

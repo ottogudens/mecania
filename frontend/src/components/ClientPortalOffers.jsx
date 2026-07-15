@@ -74,14 +74,10 @@ export default function ClientPortalOffers() {
 
     try {
       if (formData.id) {
-        await axios.patch(`/api/operations/portal-offers/${formData.id}/`, uploadData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await axios.patch(`/api/operations/portal-offers/${formData.id}/`, uploadData);
         addToast('Oferta actualizada exitosamente', 'success');
       } else {
-        await axios.post('/api/operations/portal-offers/', uploadData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await axios.post('/api/operations/portal-offers/', uploadData);
         addToast('Oferta generada exitosamente', 'success');
       }
       setIsModalOpen(false);
