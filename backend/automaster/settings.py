@@ -37,7 +37,7 @@ import sys
 if not DEBUG and SECRET_KEY.startswith('django-insecure') and 'test' not in sys.argv:
     raise ValueError("SECRET_KEY must be set in production!")
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '.railway.app', '.skale.cl'])
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
