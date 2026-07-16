@@ -3,14 +3,6 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useToast } from './Toast';
 
-function GearIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.85)" strokeWidth="1.5">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -56,8 +48,8 @@ const Login = ({ onLogin }) => {
       <div className="login-card animate-fade-up">
         {/* Logo */}
         <div className="login-logo">
-          <div className="login-logo-icon">
-            <GearIcon />
+          <div className="login-logo-icon" style={{ background: 'transparent', boxShadow: 'none' }}>
+            <img src="/assets/logo.png" alt="MecanIA Logo" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
           </div>
           <div className="login-brand">MecanIA</div>
           <div className="login-tagline">Sistema de Gestión para Talleres Automotrices</div>
