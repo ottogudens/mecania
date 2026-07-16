@@ -1749,3 +1749,15 @@ html, body {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border-muted) !important;
 }
 
+
+@media (max-width: 768px) {
+  .mechanic-part-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  }
+  .mechanic-part-grid button {
+    min-height: 72px;
+  }
+  .status-selectors button {
+    min-height: 56px;
+  }
+}

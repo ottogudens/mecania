@@ -901,6 +901,8 @@ def _extract_client_id(request):
     return _read_client_token(auth.split(' ', 1)[1])
 
 
+from django.core.cache import cache
+
 class ClientAuthToken(APIView):
     """
     Login del portal de clientes — público.
@@ -921,26 +923,25 @@ class ClientAuthToken(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Rate limiting: max 5 intentos por teléfono por 15 min
+        cache_key = f"client_auth_attempts:{phone}"
+        attempts = cache.get(cache_key, 0)
+        if attempts >= 5:
+            return Response(
+                {'error': 'Demasiados intentos. Intenta nuevamente en 15 minutos.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
         client = Client.objects.filter(phone=phone).first()
 
-        if not client:
+        if not client or not client.portal_enabled or not client.check_pin(pin):
+            cache.set(cache_key, attempts + 1, timeout=900)  # 15 min
             return Response(
-                {'error': 'Teléfono no registrado en nuestros sistemas.'},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if not client.portal_enabled:
-            return Response(
-                {'error': 'Tu cuenta no tiene el portal habilitado. Consulta al taller.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if not client.check_pin(pin):
-            return Response(
-                {'error': 'PIN incorrecto. Verifica e intenta nuevamente.'},
+                {'error': 'Credenciales inválidas. Verifica tu teléfono y PIN.'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        cache.delete(cache_key)
         token = _make_client_token(client.id)
         return Response({
             'token': token,
@@ -2317,8 +2318,10 @@ from django.conf import settings
 import os
 import shutil
 
+from rest_framework.permissions import IsAdminUser
+
 class DatabaseBackupView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def get(self, request):
         db_path = settings.DATABASES['default']['NAME']
@@ -2330,7 +2333,7 @@ class DatabaseBackupView(APIView):
         return JsonResponse({'error': 'No se encontró la base de datos'}, status=404)
 
 class DatabaseRestoreView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         if 'file' not in request.FILES:
@@ -2347,7 +2350,7 @@ class DatabaseRestoreView(APIView):
         return JsonResponse({'success': True, 'message': 'Base de datos restaurada correctamente.'})
 
 class WhatsAppClearChatsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         from .models import WhatsAppMessage

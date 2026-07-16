@@ -123,12 +123,12 @@ const LoginScreen = ({ onLogin }) => {
         {/* Logo */}
         <div style={{
           width: 80, height: 80,
-          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-          borderRadius: '50%', margin: '0 auto 1.5rem',
+          background: 'transparent',
+          borderRadius: '50%', margin: '0 auto 0.5rem',
           display: 'flex', justifyContent: 'center', alignItems: 'center',
-          boxShadow: '0 0 40px rgba(59,130,246,0.3)',
+          boxShadow: 'none',
         }}>
-          <span style={{ fontSize: '2rem' }}>🚗</span>
+          <img src="/assets/logo.png" alt="MecanIA Logo" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
         </div>
 
         {useFastLogin ? (

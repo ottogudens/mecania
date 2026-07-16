@@ -399,6 +399,9 @@ const MechanicPortal = ({ onLogout }) => {
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--bg-primary)', width: '100vw', padding: '1rem' }}>
         <div className="glass-card" style={{ width: '100%', maxWidth: '400px', border: '1px solid var(--border-accent)' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+              <img src="/assets/logo.png" alt="MecanIA Logo" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+            </div>
             <h2 style={{ color: 'var(--primary)', fontWeight: 800 }}>MecanIA</h2>
             <p style={{ color: 'var(--text-muted)' }}>Portal de Mecánicos</p>
           </div>
@@ -406,11 +409,11 @@ const MechanicPortal = ({ onLogout }) => {
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.9rem' }}>Usuario</label>
-              <input type="text" required className="input-field" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} />
+              <input type="text" required className="glass-input" style={{width: '100%'}} value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} />
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.9rem' }}>Contraseña</label>
-              <input type="password" required className="input-field" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} />
+              <input type="password" required className="glass-input" style={{width: '100%'}} value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} />
             </div>
             <button type="submit" className="btn" style={{ width: '100%', marginTop: '0.5rem' }}>Iniciar Sesión</button>
           </form>
@@ -623,7 +626,7 @@ const MechanicPortal = ({ onLogout }) => {
               
               {/* Checklist selector */}
               <div style={{ flex: '1 1 250px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
+                <div className="mechanic-part-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.5rem' }}>
                   {VEHICLE_PARTS.map(part => {
                     const data = activeItemsData[part.id] || { status: 'OK' };
                     const isSelected = part.id === selectedPartId;
