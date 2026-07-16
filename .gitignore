@@ -30,3 +30,4 @@ Thumbs.db
 # Lockfiles (for clean npm install on deploy)
 package-lock.json
 
+backend/.venv/
