@@ -633,9 +633,10 @@ const WhatsAppCanvas = () => {
                             <div className="form-group">
                                 <label style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Acción a Ejecutar</label>
                                 <select className="input-field" value={flowForm.action_type} onChange={e => setFlowForm({...flowForm, action_type: e.target.value})}>
-                                    <option value="static">Texto Estático (Manual)</option>
-                                    <option value="ai_completion">IA: GPT Completado Inmediato</option>
-                                    <option value="escalate">Derivar a Humano Inmediatamente</option>
+                                    <option value="static">Mensaje de Texto Estático</option>
+                                    <option value="ai_assistant">Agente de IA (GPT)</option>
+                                    <option value="portal_link">Enviar Enlace de Acceso al Portal</option>
+                                    <option value="human_transfer">Derivar a Humano (Notificar / Pausar Asistente)</option>
                                 </select>
                             </div>
                             <div className="form-group">
