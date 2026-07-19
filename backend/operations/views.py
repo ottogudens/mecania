@@ -833,7 +833,7 @@ class CustomAuthToken(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
         
-        user = authenticate(username=username, password=password)
+        user = authenticate(request=request, username=username, password=password)
         
         if user is not None:
             token, created = Token.objects.get_or_create(user=user)
