@@ -393,6 +393,16 @@ async function connectToWhatsApp() {
             connectionStatus = 'disconnected';
             currentQr = null;
             currentPairingCode = null;
+
+            // Guard: lastDisconnect puede ser undefined en ciertos errores de red
+            if (!lastDisconnect) {
+                console.warn('Conexión cerrada sin información de error. Reconectando en 3 segundos...');
+                setTimeout(() => {
+                    connectToWhatsApp();
+                }, 3000);
+                return;
+            }
+
             const statusCode = lastDisconnect.error?.output?.statusCode;
             const errStr = lastDisconnect.error?.message || lastDisconnect.error?.output?.payload?.message || lastDisconnect.error?.toString() || '';
             console.log(`Connection closed: statusCode=${statusCode}, error="${errStr}"`);
@@ -486,6 +496,66 @@ async function connectToWhatsApp() {
         }
     });
 
+    // Función de procesamiento de mensajes entrantes (no-bloqueante)
+    async function processIncomingMessage(senderJid, originalSenderJid, text, timestamp) {
+        try {
+            // Consultar a Django AI Assistant para responder de manera automatizada
+            // El AI agent se encarga de guardar el mensaje entrante, así que no lo sincronizamos aquí
+            const response = await axios.post(`${BACKEND_URL}/api/ai/whatsapp-agent/`, {
+                number: senderJid,
+                text: text
+            }, {
+                headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
+                timeout: 45000
+            });
+
+            if (response.data && response.data.reply) {
+                const replyText = response.data.reply;
+                console.log(`Respuesta IA para ${senderJid} (JID de envío: ${originalSenderJid}): "${replyText}"`);
+
+                // Retry con limpieza de sesión si el primer intento falla
+                let sent = false;
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        await sock.sendMessage(originalSenderJid, { text: replyText });
+                        sent = true;
+                        break;
+                    } catch (sendErr) {
+                        console.error(`Error al enviar (intento ${attempt}/2):`, sendErr.message);
+                        if (attempt === 1) {
+                            // Limpiar sesión Signal corrupt para este contacto y reintentar
+                            try {
+                                const cleanJid = originalSenderJid.split('@')[0];
+                                const authDir = AUTH_DIR;
+                                const fs2 = require('fs');
+                                const files = fs2.readdirSync(authDir);
+                                let cleared = 0;
+                                for (const f of files) {
+                                    if (f.startsWith('session-') && f.includes(cleanJid)) {
+                                        fs2.unlinkSync(`${authDir}/${f}`);
+                                        cleared++;
+                                        console.log(`Sesión limpiada: ${f}`);
+                                    }
+                                }
+                                if (cleared > 0) {
+                                    console.log(`Limpiadas ${cleared} sesión(es) corruptas para ${originalSenderJid}. Reintentando envío...`);
+                                    await new Promise(r => setTimeout(r, 500));
+                                }
+                            } catch (cleanErr) {
+                                console.error('Error al limpiar sesión:', cleanErr.message);
+                            }
+                        }
+                    }
+                }
+                if (!sent) {
+                    console.error(`No se pudo enviar respuesta a ${originalSenderJid} tras 2 intentos.`);
+                }
+            }
+        } catch (err) {
+            console.error('Error al responder mensaje vía IA:', err.message, err.response?.data || '');
+        }
+    }
+
     // Escuchar mensajes de WhatsApp (entrantes y salientes) y sincronizarlos con Django
     currentSock.ev.on('messages.upsert', async (m) => {
         if (currentSock !== sock) return;
@@ -542,62 +612,11 @@ async function connectToWhatsApp() {
 
             console.log(`Mensaje entrante de ${senderJid}: "${text}"`);
             
-            // Sincronizar mensaje entrante del cliente al backend
-            await syncMessageToDjango(senderJid, text, 'client', timestamp);
-
-            // Consultar a Django AI Assistant para responder de manera automatizada
-            const response = await axios.post(`${BACKEND_URL}/api/ai/whatsapp-agent/`, {
-                number: senderJid,
-                text: text
-            }, {
-                headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
-                timeout: 15000
-            });
-
-            if (response.data && response.data.reply) {
-                const replyText = response.data.reply;
-                console.log(`Respuesta IA para ${senderJid} (JID de envío: ${originalSenderJid}): "${replyText}"`);
-
-                // Retry con limpieza de sesión si el primer intento falla
-                let sent = false;
-                for (let attempt = 1; attempt <= 2; attempt++) {
-                    try {
-                        await sock.sendMessage(originalSenderJid, { text: replyText });
-                        sent = true;
-                        break;
-                    } catch (sendErr) {
-                        console.error(`Error al enviar (intento ${attempt}/2):`, sendErr.message);
-                        if (attempt === 1) {
-                            // Limpiar sesión Signal corrupt para este contacto y reintentar
-                            try {
-                                const cleanJid = originalSenderJid.split('@')[0];
-                                const authDir = AUTH_DIR;
-                                const fs2 = require('fs');
-                                const files = fs2.readdirSync(authDir);
-                                let cleared = 0;
-                                for (const f of files) {
-                                    if (f.startsWith('session-') && f.includes(cleanJid)) {
-                                        fs2.unlinkSync(`${authDir}/${f}`);
-                                        cleared++;
-                                        console.log(`Sesión limpiada: ${f}`);
-                                    }
-                                }
-                                if (cleared > 0) {
-                                    console.log(`Limpiadas ${cleared} sesión(es) corruptas para ${originalSenderJid}. Reintentando envío...`);
-                                    await new Promise(r => setTimeout(r, 500));
-                                }
-                            } catch (cleanErr) {
-                                console.error('Error al limpiar sesión:', cleanErr.message);
-                            }
-                        }
-                    }
-                }
-                if (!sent) {
-                    console.error(`No se pudo enviar respuesta a ${originalSenderJid} tras 2 intentos.`);
-                }
-            }
+            // Procesar en background (fire-and-forget) para no bloquear el handler de otros mensajes
+            processIncomingMessage(senderJid, originalSenderJid, text, timestamp)
+                .catch(err => console.error('Error no capturado en processIncomingMessage:', err.message));
         } catch (err) {
-            console.error('Error al responder mensaje vía IA:', err.message, err.response?.data || err);
+            console.error('Error en handler messages.upsert:', err.message);
         }
     });
 
