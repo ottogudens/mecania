@@ -166,9 +166,10 @@ async function syncSessionFromDB() {
         return;
     }
 
-    while (true) {
+    const MAX_RETRIES = 5;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            console.log('Descargando sesión de WhatsApp desde la base de datos...');
+            console.log(`Descargando sesión de WhatsApp desde la base de datos (intento ${attempt}/${MAX_RETRIES})...`);
             const response = await axios.get(`${BACKEND_URL}/api/operations/whatsapp-session/`, {
                 headers: { 'X-Mecania-Secret-Key': INTERNAL_API_KEY },
                 timeout: 10000
@@ -188,12 +189,15 @@ async function syncSessionFromDB() {
                 count++;
             }
             console.log(`Sesión descargada de la base de datos. ${count} archivos de autenticación sincronizados.`);
-            break; // Descarga exitosa, salir del bucle
+            return; // Descarga exitosa
         } catch (err) {
-            console.error('Error al descargar sesión de WhatsApp, reintentando en 5 segundos:', err.message);
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            console.error(`Error al descargar sesión de WhatsApp (intento ${attempt}/${MAX_RETRIES}):`, err.message);
+            if (attempt < MAX_RETRIES) {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
         }
     }
+    console.warn('No se pudo descargar sesión del backend tras múltiples intentos. Iniciando como nueva conexión (se generará QR).');
 }
 
 let pendingSync = {};
@@ -803,7 +807,7 @@ app.post('/api/logout', requireInternalKey, async (req, res) => {
     }
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`WhatsApp Microservice running on http://localhost:${PORT}`);
+    console.log(`WhatsApp Microservice running on port ${PORT}`);
 });
