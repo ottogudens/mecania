@@ -969,11 +969,15 @@ class CashMovementViewSet(viewsets.ModelViewSet):
     serializer_class = CashMovementSerializer
 
     def perform_create(self, serializer):
-        # Auto-associate current active session if not explicitly provided
         current_session = CashRegisterSession.objects.filter(status='OPEN').first()
+        if not current_session:
+            raise serializers.ValidationError(
+                "No se pueden registrar movimientos de caja (ingresos o egresos) mientras la caja esté cerrada. "
+                "Debe abrir una sesión de caja para continuar."
+            )
         serializer.save(
             registered_by=self.request.user,
-            session=serializer.validated_data.get('session') or current_session
+            session=current_session
         )
 
 

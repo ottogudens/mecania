@@ -109,6 +109,17 @@ class CashMovementSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['date', 'registered_by']
 
+    def validate(self, attrs):
+        from .models import CashRegisterSession
+        current_session = CashRegisterSession.objects.filter(status='OPEN').first()
+        if not current_session:
+            raise serializers.ValidationError(
+                "No se pueden registrar movimientos de caja (ingresos o egresos) mientras la caja esté cerrada. "
+                "Debe abrir una sesión de caja para continuar."
+            )
+        attrs['session'] = current_session
+        return attrs
+
 
 class CashRegisterSessionSerializer(serializers.ModelSerializer):
     opened_by_username = serializers.CharField(source='opened_by.username', read_only=True)

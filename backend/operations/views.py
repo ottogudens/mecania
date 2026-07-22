@@ -934,8 +934,21 @@ class ClientAuthToken(APIView):
 
         client = Client.objects.filter(phone=phone).first()
 
-        if not client or not client.portal_enabled or not client.check_pin(pin):
-            cache.set(cache_key, attempts + 1, timeout=900)  # 15 min
+        if not client:
+            cache.set(cache_key, attempts + 1, timeout=900)
+            return Response(
+                {'error': 'Credenciales inválidas. Verifica tu teléfono y PIN.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not client.portal_enabled:
+            return Response(
+                {'error': 'El acceso al portal no está habilitado para este cliente.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not client.check_pin(pin):
+            cache.set(cache_key, attempts + 1, timeout=900)
             return Response(
                 {'error': 'Credenciales inválidas. Verifica tu teléfono y PIN.'},
                 status=status.HTTP_401_UNAUTHORIZED,

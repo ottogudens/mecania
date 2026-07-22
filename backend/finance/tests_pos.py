@@ -264,3 +264,33 @@ class POSWorkOrderFlowTests(TestCase):
         res3 = client.get(f"/api/finance/pos/work-order-lookup/?work_order_id={self.wo.id}")
         self.assertEqual(res3.status_code, 200)
 
+
+class CashMovementOpenSessionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="cashier_mov", password="password")
+        from rest_framework.test import APIClient
+        self.client_api = APIClient()
+        self.client_api.force_authenticate(user=self.user)
+
+    def test_cash_movement_fails_when_session_closed(self):
+        res = self.client_api.post('/api/finance/cash-movements/', {
+            'movement_type': 'IN',
+            'amount': 15000,
+            'description': 'Ingreso extra'
+        }, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("cerrada", str(res.data))
+
+    def test_cash_movement_succeeds_when_session_open(self):
+        from finance.models import CashRegisterSession
+        session = CashRegisterSession.objects.create(opened_by=self.user, status='OPEN')
+
+        res = self.client_api.post('/api/finance/cash-movements/', {
+            'movement_type': 'IN',
+            'amount': 15000,
+            'description': 'Ingreso extra'
+        }, format='json')
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data['session'], session.id)
+
+
