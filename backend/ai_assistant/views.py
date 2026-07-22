@@ -124,8 +124,8 @@ class WhatsAppAgentView(APIView):
         # Si el bot está silenciado para este cliente por intervención humana reciente, no responder
         import datetime
         dt_now = timezone.now()
-        start_dt = dt_now - datetime.timedelta(seconds=15)
-        end_dt = dt_now + datetime.timedelta(seconds=15)
+        start_dt = dt_now - datetime.timedelta(seconds=60)
+        end_dt = dt_now + datetime.timedelta(seconds=60)
 
         if not simulate and client_obj and client_obj.bot_silenced_until and client_obj.bot_silenced_until > timezone.now():
             if not WhatsAppMessage.objects.filter(phone=clean_num, text=text, sender='client', timestamp__range=(start_dt, end_dt)).exists():

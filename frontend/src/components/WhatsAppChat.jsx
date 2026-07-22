@@ -199,21 +199,26 @@ const WhatsAppChat = () => {
     }
   };
 
-  // Initial load
+  const selectedPhoneRef = useRef(selectedPhone);
+  useEffect(() => {
+    selectedPhoneRef.current = selectedPhone;
+  }, [selectedPhone]);
+
+  // Initial load y polling periódico
   useEffect(() => {
     fetchChats();
-    // Setup polling every 5 seconds for messages/chats
+    // Setup polling cada 5 segundos para mensajes y chats
     pollIntervalRef.current = setInterval(() => {
       fetchChats(true);
-      if (selectedPhone) {
-        fetchMessages(selectedPhone, true);
+      if (selectedPhoneRef.current) {
+        fetchMessages(selectedPhoneRef.current, true);
       }
     }, 5000);
 
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [selectedPhone]);
+  }, []);
 
   // Scroll to bottom on updates
   useEffect(() => {

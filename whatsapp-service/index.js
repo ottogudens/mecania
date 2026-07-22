@@ -584,7 +584,8 @@ async function connectToWhatsApp() {
                     lidCache.set(cleanPhone, originalSenderJid);
                     console.log(`[DEBUG] Cache mapeada: ${cleanPhone} -> ${originalSenderJid}`);
                 } else {
-                    console.warn(`[WARNING] No se pudo resolver la JID LID ${senderJid} a número real.`);
+                    console.warn(`[WARNING] No se pudo resolver la JID LID ${senderJid} a número real. Omitiendo procesamiento para evitar inconsistencias.`);
+                    return;
                 }
             }
             
