@@ -1282,7 +1282,7 @@ Genera el informe estructurado con el siguiente formato Markdown (mantén los en
 - Aceite de Motor: [Tipo, normas API/ACEA, viscosidad recomendada y cantidad exacta de llenado en Litros con filtro].
 - Aceite de Transmisión: [Especificación/norma para caja manual o automática/CVT/DCT y cantidad aproximada en Litros].
 - Caja Transferencia y Diferencial: [Especificación de aceite (ej. 75W-90 GL-5) y cantidad en Litros. Indicar si aplica según 4WD/AWD o si es 4x2].
-- Líquido Refrigerante: [Tipo/tecnología (Orgánico/HOAT/G12+) y capacidad total de llenado en Litros].
+- Líquido Refrigerante: [Tipo/tecnología (Orgánico/HOAT/G12+/G13), COLOR EXACTO DEL LÍQUIDO REFRIGERANTE (ej. Rosa/Rojo, Verde, Azul, Amarillo, Violeta) y capacidad total de llenado en Litros].
 
 🧩 FILTROS Y CÓDIGOS DE PARTE (OEM Y MARCAS COMERCIALES)
 - Filtro de Aceite: [Código OEM y equivalencias Mann, Tecfil, Wega, Fram].

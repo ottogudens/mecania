@@ -319,7 +319,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout, username, sidebarOpen, clo
 }
 
 /* ── Admin Layout ── */
-function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
+function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate, theme, toggleTheme }) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -368,29 +368,72 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
       />
       <div className="main-wrapper">
         {/* Mobile top bar */}
-        <div className="mobile-topbar">
+        <div className="mobile-topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(o => !o)}
+              aria-label="Abrir menú"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <span className="mobile-logo">MecanIA</span>
+          </div>
+
           <button
-            className="hamburger-btn"
-            onClick={() => setSidebarOpen(o => !o)}
-            aria-label="Abrir menú"
+            type="button"
+            onClick={toggleTheme}
+            style={{
+              padding: '0.3rem 0.6rem',
+              borderRadius: 6,
+              border: '1px solid var(--border-color)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.78rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem'
+            }}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
+            {theme === 'dark' ? '☀️ Claro' : '🌙 Oscuro'}
           </button>
-          <span className="mobile-logo">MecanIA</span>
         </div>
 
         {/* Desktop page header */}
-        <header className="page-header" style={{ display: 'none' }}
+        <header className="page-header" style={{ display: 'none', justifyContent: 'space-between', alignItems: 'center' }}
           ref={el => { if (el) el.style.display = 'flex'; }}>
           <div>
             <div className="page-title">{pageInfo.title}</div>
             <div className="page-subtitle">{pageInfo.subtitle}</div>
           </div>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            style={{
+              padding: '0.45rem 0.9rem',
+              borderRadius: 8,
+              border: '1px solid var(--border-color)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {theme === 'dark' ? '☀️ Tema Claro' : '🌙 Tema Oscuro'}
+          </button>
         </header>
 
         <main className="page-content animate-fade-in">
@@ -402,15 +445,33 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate }) {
 }
 
 /* ── Client Layout ── */
-function ClientLayout() {
+function ClientLayout({ theme, toggleTheme }) {
   return (
     <div className="main-wrapper" style={{ marginLeft: 0 }}>
-      <header className="page-header">
+      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div className="page-title">Portal de Clientes</div>
           <div className="page-subtitle">Monitorea el estado de tu vehículo</div>
         </div>
-        <Link to="/" className="btn btn-ghost btn-sm">← Volver al Taller</Link>
+        <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            style={{
+              padding: '0.45rem 0.9rem',
+              borderRadius: 8,
+              border: '1px solid var(--border-color)',
+              background: 'var(--surface-2)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.85rem'
+            }}
+          >
+            {theme === 'dark' ? '☀️ Tema Claro' : '🌙 Tema Oscuro'}
+          </button>
+          <Link to="/" className="btn btn-ghost btn-sm">← Volver al Taller</Link>
+        </div>
       </header>
       <main className="page-content">
         <ClientPortal />
@@ -427,6 +488,17 @@ function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem('token') || null);
   const [username, setUsername]   = useState(localStorage.getItem('username') || '');
   const [logoUrl, setLogoUrl]     = useState(null);
+
+  const [theme, setTheme] = useState(() => localStorage.getItem('app_theme') || 'dark');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   const fetchLogo = useCallback(async () => {
     const currentToken = localStorage.getItem('token');
@@ -480,7 +552,7 @@ function App() {
             element={
               authRole
                 ? authRole === 'admin'
-                  ? <AdminLayout onLogout={handleLogout} username={username} logoUrl={logoUrl} onSettingsUpdate={fetchLogo} />
+                  ? <AdminLayout onLogout={handleLogout} username={username} logoUrl={logoUrl} onSettingsUpdate={fetchLogo} theme={theme} toggleTheme={toggleTheme} />
                   : <Navigate to="/mechanic" replace />
                 : <Navigate to="/login" replace />
             }
@@ -495,7 +567,7 @@ function App() {
                 : <Login onLogin={handleLogin} />
             } 
           />
-          <Route path="/client" element={<ClientLayout />} />
+          <Route path="/client" element={<ClientLayout theme={theme} toggleTheme={toggleTheme} />} />
           <Route path="/mechanic" element={<MechanicPortal onLogout={() => {
             setAuthRole(localStorage.getItem('role'));
             setAuthToken(localStorage.getItem('token'));
