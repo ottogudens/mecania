@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from './Toast';
 
+const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
+
 const WorkOrderList = () => {
   const [orders, setOrders] = useState([]);
   const [vehicles, setVehicles] = useState([]);
