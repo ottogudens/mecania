@@ -453,7 +453,7 @@ const InventoryDashboard = () => {
               </button>
               <button className="btn btn-outline" style={{ borderColor: 'var(--primary-color)', color: 'var(--primary-color)' }} onClick={() => {
                 // Dispara el clic del botón de navegación en la barra lateral con data-key 'scan'
-                const scanBtn = document.querySelector('button[data-key="scan"]') || Array.from(document.querySelectorAll('.sidebar button')).find(el => el.textContent.includes('Escanear Stock'));
+                const scanBtn = document.querySelector('button[data-key="scan"]') || Array.from(document.querySelectorAll('.sidebar button')).find(el => el.textContent.includes('Toma de inventario'));
                 if (scanBtn) {
                   scanBtn.click();
                 } else {

@@ -14,6 +14,20 @@ export default function SupplierInvoicesList() {
   // Selection/Detail State
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   
+  // Products catalog for barcode scanner matching
+  const [allProducts, setAllProducts] = useState([]);
+  
+  // Manual Invoice Modal state
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualSupplierId, setManualSupplierId] = useState('');
+  const [manualSupplierRut, setManualSupplierRut] = useState('');
+  const [manualSupplierName, setManualSupplierName] = useState('');
+  const [manualInvoiceNum, setManualInvoiceNum] = useState('');
+  const [manualIssueDate, setManualIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [manualDueDate, setManualDueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [manualItems, setManualItems] = useState([]);
+  const [barcodeInput, setBarcodeInput] = useState('');
+
   // Parsing/Upload State
   const [uploading, setUploading] = useState(false);
   const [parsedData, setParsedData] = useState(null);
@@ -46,17 +60,19 @@ export default function SupplierInvoicesList() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [invRes, supRes, foreRes] = await Promise.all([
+      const [invRes, supRes, foreRes, prodRes] = await Promise.all([
         axios.get('/api/finance/supplier-invoices/'),
         axios.get('/api/finance/suppliers/'),
-        axios.get('/api/finance/supplier-payments/forecast/')
+        axios.get('/api/finance/supplier-payments/forecast/'),
+        axios.get('/api/inventory/products/')
       ]);
       setInvoices(invRes.data.results || invRes.data);
       setSuppliers(supRes.data.results || supRes.data);
       setForecast(foreRes.data.results || foreRes.data);
+      setAllProducts(prodRes.data.results || prodRes.data);
     } catch (err) {
       console.error(err);
-      showToast('Error al cargar facturas y proyecciones.', 'error');
+      showToast('Error al cargar facturas, proveedores y catálogo.', 'error');
     } finally {
       setLoading(false);
     }
@@ -126,6 +142,120 @@ export default function SupplierInvoicesList() {
     } catch (err) {
       console.error(err);
       showToast('Error al registrar la factura de compra.', 'error');
+    }
+  };
+
+  // Manual invoice calculations and handlers
+  const manualSubtotal = manualItems.reduce((acc, item) => acc + (parseFloat(item.quantity || 0) * parseFloat(item.unit_cost_price || 0)), 0);
+  const manualTax = Math.round(manualSubtotal * 0.19);
+  const manualTotal = manualSubtotal + manualTax;
+
+  const resetManualForm = () => {
+    setManualSupplierId('');
+    setManualSupplierRut('');
+    setManualSupplierName('');
+    setManualInvoiceNum('');
+    setManualIssueDate(new Date().toISOString().split('T')[0]);
+    setManualDueDate(new Date().toISOString().split('T')[0]);
+    setManualItems([]);
+    setBarcodeInput('');
+  };
+
+  const handleBarcodeScan = (e) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    const term = barcodeInput.trim().toLowerCase();
+
+    const found = allProducts.find(p => 
+      (p.barcode && p.barcode.toLowerCase() === term) ||
+      (p.sku && p.sku.toLowerCase() === term) ||
+      (p.name && p.name.toLowerCase().includes(term))
+    );
+
+    if (found) {
+      const idx = manualItems.findIndex(i => i.product_id === found.id);
+      if (idx >= 0) {
+        const updated = [...manualItems];
+        updated[idx].quantity = parseFloat(updated[idx].quantity || 0) + 1;
+        setManualItems(updated);
+      } else {
+        setManualItems([
+          ...manualItems,
+          {
+            product_id: found.id,
+            description: found.name,
+            quantity: 1,
+            unit_cost_price: parseFloat(found.cost_price || 0),
+            sku: found.sku || '',
+            barcode: found.barcode || ''
+          }
+        ]);
+      }
+      showToast(`⚡ Añadido: ${found.name} (Costo neto: ${fmt(found.cost_price)})`);
+      setBarcodeInput('');
+    } else {
+      showToast(`No se encontró producto para "${barcodeInput}".`, 'error');
+    }
+  };
+
+  const handleAddCustomItem = () => {
+    setManualItems([
+      ...manualItems,
+      {
+        product_id: null,
+        description: 'Nuevo Repuesto / Ítem',
+        quantity: 1,
+        unit_cost_price: 0,
+        sku: '',
+        barcode: ''
+      }
+    ]);
+  };
+
+  const handleRemoveItem = (index) => {
+    setManualItems(manualItems.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateItem = (index, field, value) => {
+    const updated = [...manualItems];
+    updated[index][field] = value;
+    setManualItems(updated);
+  };
+
+  const handleSaveManualInvoice = async (e) => {
+    e.preventDefault();
+    let supId = manualSupplierId;
+    if (!supId && (!manualSupplierRut || !manualSupplierName)) {
+      showToast('Ingresa los datos del proveedor o selecciona uno existente.', 'error');
+      return;
+    }
+    if (!manualInvoiceNum) {
+      showToast('Ingresa el folio o número de factura.', 'error');
+      return;
+    }
+
+    try {
+      const payload = {
+        supplier: supId || undefined,
+        supplier_rut: manualSupplierRut,
+        supplier_name: manualSupplierName,
+        invoice_number: manualInvoiceNum,
+        emission_date: manualIssueDate,
+        due_date: manualDueDate || manualIssueDate,
+        subtotal: manualSubtotal,
+        tax_amount: manualTax,
+        total_amount: manualTotal,
+        items: manualItems
+      };
+
+      await axios.post('/api/finance/supplier-invoices/', payload);
+      showToast('Factura de compra registrada exitosamente y stock actualizado.');
+      setShowManualModal(false);
+      resetManualForm();
+      loadData();
+    } catch (err) {
+      console.error(err);
+      showToast(err.response?.data?.error || 'Error al guardar factura manual.', 'error');
     }
   };
 
@@ -294,9 +424,19 @@ export default function SupplierInvoicesList() {
             
             {/* Upload parsing card */}
             <div className="glass-card">
-              <h3 style={{ margin: '0 0 8px 0', fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Inteligencia DTE / Subir Facturas</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>Inteligencia DTE / Subir Facturas</h3>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setShowManualModal(true)}
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  ➕ Ingreso Manual de Factura (Con Escáner)
+                </button>
+              </div>
               <p style={{ margin: '0 0 20px 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Arrastre o seleccione el archivo DTE corporativo (.xml) o PDF digital para realizar la extracción automática mediante IA (GPT-4o-mini).
+                Cargue archivos DTE (.xml / PDF) para extracción automatizada o utilice la opción de <strong>Ingreso Manual con Escáner de Código de Barras</strong>.
               </p>
               
               <div style={{
@@ -761,6 +901,282 @@ export default function SupplierInvoicesList() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE INGRESO MANUAL DE FACTURA DE COMPRA (CON ESCÁNER) */}
+      {showManualModal && (
+        <div className="modal-overlay" onClick={() => setShowManualModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">🧾 Ingreso Manual de Factura de Compra</h3>
+              <button className="modal-close" onClick={() => setShowManualModal(false)}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveManualInvoice} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
+              
+              {/* Sección Proveedor y Folio */}
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.95rem', color: 'var(--primary-color)' }}>1. Datos del Proveedor y Factura</h4>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                  <div className="input-group">
+                    <label className="input-label">Seleccionar Proveedor Existente</label>
+                    <select
+                      className="input-field"
+                      value={manualSupplierId}
+                      onChange={e => {
+                        const supId = e.target.value;
+                        setManualSupplierId(supId);
+                        const sup = suppliers.find(s => String(s.id) === String(supId));
+                        if (sup) {
+                          setManualSupplierRut(sup.rut);
+                          setManualSupplierName(sup.company_name);
+                        }
+                      }}
+                    >
+                      <option value="">-- O registrar proveedor nuevo abajo --</option>
+                      {suppliers.map(s => (
+                        <option key={s.id} value={s.id}>{s.company_name} ({s.rut})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label">N° / Folio de Factura *</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Ej: 124580"
+                      value={manualInvoiceNum}
+                      onChange={e => setManualInvoiceNum(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {!manualSupplierId && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div className="input-group">
+                      <label className="input-label">RUT Proveedor nuevo *</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Ej: 76.123.456-K"
+                        value={manualSupplierRut}
+                        onChange={e => setManualSupplierRut(e.target.value)}
+                        required={!manualSupplierId}
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Razón Social / Nombre Proveedor *</label>
+                      <input
+                        type="text"
+                        className="input-field"
+                        placeholder="Ej: Repuestos Central SpA"
+                        value={manualSupplierName}
+                        onChange={e => setManualSupplierName(e.target.value)}
+                        required={!manualSupplierId}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="input-group">
+                    <label className="input-label">Fecha de Emisión *</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={manualIssueDate}
+                      onChange={e => setManualIssueDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="input-group">
+                    <label className="input-label">Fecha de Vencimiento / Pago *</label>
+                    <input
+                      type="date"
+                      className="input-field"
+                      value={manualDueDate}
+                      onChange={e => setManualDueDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Escáner de Código de Barras y Selección de Productos */}
+              <div style={{ background: 'rgba(30, 60, 114, 0.05)', padding: '1rem', borderRadius: 8, border: '1px solid rgba(30, 60, 114, 0.2)' }}>
+                <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.95rem', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  📷 2. Escáner de Repuestos y Productos (Carga Rápida)
+                </h4>
+                
+                <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Escanear código de barras o SKU del repuesto y presionar Enter..."
+                    value={barcodeInput}
+                    onChange={e => setBarcodeInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        handleBarcodeScan(e);
+                      }
+                    }}
+                    style={{ flex: 1, fontWeight: 600, fontSize: '0.95rem' }}
+                    autoFocus
+                  />
+                  <button type="button" className="btn btn-primary" onClick={handleBarcodeScan}>
+                    🔍 Buscar / Añadir
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    O selecciona directamente del catálogo de inventario:
+                  </span>
+                  <button type="button" className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={handleAddCustomItem}>
+                    ➕ Añadir Ítem Personalizado
+                  </button>
+                </div>
+
+                <select
+                  className="input-field"
+                  onChange={e => {
+                    const pId = e.target.value;
+                    if (!pId) return;
+                    const found = allProducts.find(p => String(p.id) === String(pId));
+                    if (found) {
+                      const idx = manualItems.findIndex(i => i.product_id === found.id);
+                      if (idx >= 0) {
+                        const updated = [...manualItems];
+                        updated[idx].quantity = parseFloat(updated[idx].quantity || 0) + 1;
+                        setManualItems(updated);
+                      } else {
+                        setManualItems([
+                          ...manualItems,
+                          {
+                            product_id: found.id,
+                            description: found.name,
+                            quantity: 1,
+                            unit_cost_price: parseFloat(found.cost_price || 0),
+                            sku: found.sku || '',
+                            barcode: found.barcode || ''
+                          }
+                        ]);
+                      }
+                      showToast(`Añadido: ${found.name}`);
+                    }
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="">-- Seleccionar producto de la lista --</option>
+                  {allProducts.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.sku ? `(SKU: ${p.sku})` : ''} - Costo Neto actual: {fmt(p.cost_price)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tabla de Ítems de la Factura de Compra */}
+              <div>
+                <h4 style={{ marginBottom: '0.5rem', fontSize: '0.95rem' }}>🛒 Ítems de la Factura de Compra ({manualItems.length})</h4>
+                
+                {manualItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.1)', borderRadius: 8 }}>
+                    No hay productos agregados. Utiliza el escáner de código de barras o selecciona productos arriba.
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                          <th style={{ padding: '0.6rem' }}>Producto / Descripción</th>
+                          <th style={{ padding: '0.6rem', width: '90px' }}>Cantidad</th>
+                          <th style={{ padding: '0.6rem', width: '150px' }}>Costo Neto ($)</th>
+                          <th style={{ padding: '0.6rem', width: '130px', textAlign: 'right' }}>Total Neto</th>
+                          <th style={{ padding: '0.6rem', width: '50px', textAlign: 'center' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {manualItems.map((item, idx) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                            <td style={{ padding: '0.5rem' }}>
+                              <input
+                                type="text"
+                                className="input-field"
+                                value={item.description}
+                                onChange={e => handleUpdateItem(idx, 'description', e.target.value)}
+                                style={{ padding: '0.4rem', fontSize: '0.85rem' }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem' }}>
+                              <input
+                                type="number"
+                                className="input-field"
+                                value={item.quantity}
+                                min="0.1"
+                                step="any"
+                                onChange={e => handleUpdateItem(idx, 'quantity', e.target.value)}
+                                style={{ padding: '0.4rem', fontSize: '0.85rem' }}
+                              />
+                            </td>
+                            <td style={{ padding: '0.5rem' }}>
+                              <input
+                                type="number"
+                                className="input-field"
+                                value={item.unit_cost_price}
+                                min="0"
+                                onChange={e => handleUpdateItem(idx, 'unit_cost_price', e.target.value)}
+                                style={{ padding: '0.4rem', fontSize: '0.85rem' }}
+                              />
+                              <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Sin IVA</small>
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 700 }}>
+                              {fmt((parseFloat(item.quantity || 0) * parseFloat(item.unit_cost_price || 0)))}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                              <button
+                                type="button"
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--status-red)', fontSize: '1rem' }}
+                                onClick={() => handleRemoveItem(idx)}
+                              >
+                                &times;
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Resumen Totales (Neto + IVA + Total) */}
+              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>Regla tributaria:</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Precios de compra son netos (sin IVA). El IVA 19% se calcula automáticamente.</span>
+                </div>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Neto: <strong>{fmt(manualSubtotal)}</strong></div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>IVA (19%): <strong>{fmt(manualTax)}</strong></div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--status-green)' }}>Total Factura: {fmt(manualTotal)}</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setShowManualModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-success" disabled={manualItems.length === 0}>
+                  💾 Registrar Factura & Actualizar Stock
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

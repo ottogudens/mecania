@@ -24,13 +24,27 @@ const CashRegister = () => {
   const [closingCard, setClosingCard] = useState('');
   const [closingTransfer, setClosingTransfer] = useState('');
   const [closingNotes, setClosingNotes] = useState('');
+  const [waPhones, setWaPhones] = useState('');
+  const [sendingWa, setSendingWa] = useState(false);
 
   const toast = useToast();
 
   useEffect(() => {
     fetchCurrentSession();
     fetchHistory();
+    fetchWorkshopSettings();
   }, []);
+
+  const fetchWorkshopSettings = async () => {
+    try {
+      const res = await axios.get('/api/operations/settings/', { headers: authHeader() });
+      if (res.data && res.data.admin_whatsapp) {
+        setWaPhones(res.data.admin_whatsapp);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchCurrentSession = async () => {
     try {
@@ -90,7 +104,7 @@ const CashRegister = () => {
     try {
       const res = await axios.get('/api/finance/cash-register/x-report/', { headers: authHeader() });
       setXReportData(res.data);
-      setClosingCash(res.data.expected_cash);
+      setClosingCash(res.data.expected_cash_drawer);
       setClosingCard(res.data.expected_card);
       setClosingTransfer(res.data.expected_transfer);
       setClosingNotes('');
@@ -107,16 +121,36 @@ const CashRegister = () => {
         closing_cash: parseFloat(closingCash || 0),
         closing_card: parseFloat(closingCard || 0),
         closing_transfer: parseFloat(closingTransfer || 0),
-        closing_notes: closingNotes
+        closing_notes: closingNotes,
+        target_phones: waPhones ? waPhones.split(',').map(p => p.trim()).filter(Boolean) : []
       }, { headers: authHeader() });
 
-      toast({ title: 'Caja Cerrada', message: 'La sesión de caja se cerró y guardó correctamente.', type: 'success' });
+      toast({ title: 'Caja Cerrada', message: 'La sesión de caja se cerró y el Reporte Z fue notificado por WhatsApp.', type: 'success' });
       setShowCloseModal(false);
       setSession(null);
       fetchHistory();
     } catch (err) {
       const errorMsg = err.response?.data?.error || 'No se pudo cerrar la caja.';
       toast({ title: 'Error', message: errorMsg, type: 'error' });
+    }
+  };
+
+  const handleSendZReportWhatsApp = async (sessionId, phonesStr) => {
+    const phones = (phonesStr || waPhones || '').split(',').map(p => p.trim()).filter(Boolean);
+    if (phones.length === 0) {
+      toast({ title: 'Atención', message: 'Por favor ingresa un número de WhatsApp de destino.', type: 'warning' });
+      return;
+    }
+    setSendingWa(true);
+    try {
+      const res = await axios.post(`/api/finance/cash-register/${sessionId}/send_z_report/`, {
+        target_phones: phones
+      }, { headers: authHeader() });
+      toast({ title: 'Reporte Z Enviado', message: res.data.message || 'Reporte Z notificado por WhatsApp.', type: 'success' });
+    } catch (err) {
+      toast({ title: 'Error', message: err.response?.data?.error || 'Error al enviar Reporte Z.', type: 'error' });
+    } finally {
+      setSendingWa(false);
     }
   };
 
@@ -251,7 +285,7 @@ const CashRegister = () => {
       {/* MODAL REPORTE X */}
       {showXReportModal && xReportData && (
         <div className="modal-overlay" onClick={() => setShowXReportModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px' }}>
             <div className="modal-header">
               <h3 className="modal-title">📊 Reporte X (Caja Abierta)</h3>
               <button className="modal-close" onClick={() => setShowXReportModal(false)}>&times;</button>
@@ -264,24 +298,49 @@ const CashRegister = () => {
               
               <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                 <h4 style={{ marginBottom: '0.5rem', color: 'var(--primary-color)' }}>Totales Estimados por el Sistema</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <span>Efectivo Inicial:</span><strong>{fmt(xReportData.opening_amount)}</strong>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.9rem' }}>
+                  <span>Efectivo Inicial (+):</span><strong>{fmt(xReportData.opening_amount)}</strong>
                   <span>Ventas Efectivo (+):</span><strong>{fmt(xReportData.expected_cash)}</strong>
+                  <span>Ingresos Manuales (+):</span><strong style={{ color: 'var(--status-green)' }}>+{fmt(xReportData.inbound_movements)}</strong>
+                  <span>Egresos Manuales (-):</span><strong style={{ color: 'var(--status-red)' }}>-{fmt(xReportData.outbound_movements)}</strong>
                   <span>Ventas Tarjeta:</span><strong>{fmt(xReportData.expected_card)}</strong>
                   <span>Ventas Transferencia:</span><strong>{fmt(xReportData.expected_transfer)}</strong>
-                  <span style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontWeight: 600 }}>Total Estimado en Caja:</span>
+                  
+                  <span style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontWeight: 600 }}>Efectivo Esperado en Cajón:</span>
+                  <strong style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', color: 'var(--primary-color)', fontSize: '1.05rem' }}>
+                    {fmt(xReportData.expected_cash_drawer)}
+                  </strong>
+
+                  <span style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontWeight: 600 }}>Total General Estimado:</span>
                   <strong style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', color: 'var(--status-green)', fontSize: '1.1rem' }}>
                     {fmt(xReportData.expected_total)}
                   </strong>
                 </div>
               </div>
 
+              {/* Movimientos de Caja (Ingresos / Egresos) */}
+              {xReportData.movements && xReportData.movements.length > 0 && (
+                <div>
+                  <h4 style={{ marginBottom: '0.5rem' }}>💸 Movimientos de Caja en Turno</h4>
+                  <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '0.85rem' }}>
+                    {xReportData.movements.map(m => (
+                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span>{new Date(m.date).toLocaleTimeString('es-CL')} - {m.description}</span>
+                        <strong style={{ color: m.movement_type === 'IN' ? 'var(--status-green)' : 'var(--status-red)' }}>
+                          {m.movement_type === 'IN' ? '+' : '-'}{fmt(m.amount)}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 style={{ marginBottom: '0.5rem' }}>Últimos Pagos Recibidos</h4>
                 {xReportData.payments?.length === 0 ? (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay ventas registradas aún en este turno.</p>
                 ) : (
-                  <div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '0.85rem' }}>
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', fontSize: '0.85rem' }}>
                     {xReportData.payments?.map(p => (
                       <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <span>{new Date(p.date).toLocaleTimeString('es-CL')} - Invoice #{p.invoice} ({METHOD_LABELS[p.payment_method] || p.payment_method})</span>
@@ -309,8 +368,9 @@ const CashRegister = () => {
             </div>
             <form onSubmit={handleCloseSession} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
               
-              <div style={{ background: 'rgba(241,196,15,0.04)', border: '1px solid rgba(241,196,15,0.15)', padding: '1rem', borderRadius: 8, fontSize: '0.9rem' }}>
-                <strong>Resumen Esperado:</strong> Fondo inicial {fmt(xReportData.opening_amount)} + Efectivo {fmt(xReportData.expected_cash)} + Tarjetas {fmt(xReportData.expected_card)} + Transferencias {fmt(xReportData.expected_transfer)}.
+              <div style={{ background: 'rgba(241,196,15,0.04)', border: '1px solid rgba(241,196,15,0.15)', padding: '1rem', borderRadius: 8, fontSize: '0.85rem', lineHeight: 1.5 }}>
+                <strong>Resumen de Cuadre Esperado:</strong><br />
+                Fondo inicial ({fmt(xReportData.opening_amount)}) + Ventas Efectivo ({fmt(xReportData.expected_cash)}) + Ingresos Caja (+{fmt(xReportData.inbound_movements)}) - Egresos Caja (-{fmt(xReportData.outbound_movements)}) = <strong>Esperado en Cajón: {fmt(xReportData.expected_cash_drawer)}</strong>.
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -323,7 +383,7 @@ const CashRegister = () => {
                     onChange={e => setClosingCash(e.target.value)}
                     required
                   />
-                  <small style={{ color: 'var(--text-muted)' }}>Esperado: {fmt(xReportData.expected_cash)} + Fondo inicial</small>
+                  <small style={{ color: 'var(--text-muted)' }}>Esperado en Cajón: {fmt(xReportData.expected_cash_drawer)}</small>
                 </div>
 
                 <div className="input-group">
@@ -360,11 +420,29 @@ const CashRegister = () => {
                     borderRadius: 8, 
                     border: '1px solid var(--border-color)',
                     fontWeight: 600,
-                    color: (parseFloat(closingCash || 0) + parseFloat(closingCard || 0) + parseFloat(closingTransfer || 0)) - (xReportData.expected_cash + xReportData.expected_card + xReportData.expected_transfer) === 0 ? 'var(--status-green)' : 'var(--status-red)'
+                    color: ((parseFloat(closingCash || 0) + parseFloat(closingCard || 0) + parseFloat(closingTransfer || 0)) - (xReportData.expected_cash_drawer + xReportData.expected_card + xReportData.expected_transfer)) === 0 ? 'var(--status-green)' : 'var(--status-red)'
                   }}>
-                    Diferencia: {fmt((parseFloat(closingCash || 0) + parseFloat(closingCard || 0) + parseFloat(closingTransfer || 0)) - (xReportData.expected_cash + xReportData.expected_card + xReportData.expected_transfer))}
+                    Diferencia: {fmt((parseFloat(closingCash || 0) + parseFloat(closingCard || 0) + parseFloat(closingTransfer || 0)) - (xReportData.expected_cash_drawer + xReportData.expected_card + xReportData.expected_transfer))}
                   </div>
                 </div>
+              </div>
+
+              {/* Notificación de Reporte Z por WhatsApp a Administradores */}
+              <div style={{ background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', padding: '1rem', borderRadius: 8 }}>
+                <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#25D366' }}>
+                  💬 Enviar Reporte Z por WhatsApp a Administradores
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={waPhones}
+                  onChange={e => setWaPhones(e.target.value)}
+                  placeholder="+56912345678, +56987654321"
+                  style={{ marginTop: '0.4rem' }}
+                />
+                <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.3rem' }}>
+                  Ingresa uno o varios números de WhatsApp separados por coma para notificar el reporte del turno.
+                </small>
               </div>
 
               <div className="input-group">
@@ -380,7 +458,9 @@ const CashRegister = () => {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" className="btn btn-ghost" onClick={() => setShowCloseModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-success">🔒 Confirmar Cierre y Arqueo</button>
+                <button type="submit" className="btn btn-success">
+                  🔒 Confirmar Cierre de Caja & Generar Reporte Z
+                </button>
               </div>
             </form>
           </div>
@@ -406,20 +486,22 @@ const CashRegister = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <h4 style={{ marginBottom: '0.5rem', color: 'var(--primary-color)' }}>Estimado en Sistema</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.9rem' }}>
-                    <span>Efectivo Inicial: <strong>{fmt(zReportData.session.opening_amount)}</strong></span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem' }}>
+                    <span>Fondo Inicial: <strong>{fmt(zReportData.session.opening_amount)}</strong></span>
                     <span>Ventas Efectivo: <strong>{fmt(zReportData.expected_cash)}</strong></span>
+                    <span style={{ color: 'var(--status-green)' }}>Ingresos Caja: <strong>+{fmt(zReportData.inbound_movements)}</strong></span>
+                    <span style={{ color: 'var(--status-red)' }}>Egresos Caja: <strong>-{fmt(zReportData.outbound_movements)}</strong></span>
                     <span>Ventas Tarjeta: <strong>{fmt(zReportData.expected_card)}</strong></span>
                     <span>Ventas Transf.: <strong>{fmt(zReportData.expected_transfer)}</strong></span>
-                    <span style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem', fontWeight: 600 }}>
-                      Total: {fmt(zReportData.expected_total)}
+                    <span style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.4rem', fontWeight: 600, color: 'var(--status-green)' }}>
+                      Total Esperado en Cajón: {fmt(zReportData.expected_cash_drawer)}
                     </span>
                   </div>
                 </div>
 
                 <div style={{ background: 'rgba(255,255,255,0.01)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <h4 style={{ marginBottom: '0.5rem', color: 'var(--status-green)' }}>Declarado en Arqueo</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.9rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.85rem' }}>
                     <span>Efectivo Declarado: <strong>{fmt(zReportData.session.closing_cash)}</strong></span>
                     <span>Tarjeta Declarado: <strong>{fmt(zReportData.session.closing_card)}</strong></span>
                     <span>Transf. Declarado: <strong>{fmt(zReportData.session.closing_transfer)}</strong></span>
@@ -430,6 +512,45 @@ const CashRegister = () => {
                 </div>
               </div>
 
+              {/* Controles para re-enviar Reporte Z por WhatsApp */}
+              <div style={{ background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', padding: '1rem', borderRadius: 8 }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#25D366', fontSize: '0.9rem' }}>💬 Reenviar Reporte Z por WhatsApp</h4>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={waPhones}
+                    onChange={e => setWaPhones(e.target.value)}
+                    placeholder="+56912345678"
+                    style={{ flex: 1 }}
+                  />
+                  <button 
+                    className="btn btn-whatsapp"
+                    disabled={sendingWa}
+                    onClick={() => handleSendZReportWhatsApp(selectedCloseSession.id, waPhones)}
+                  >
+                    {sendingWa ? 'Enviando...' : '💬 Enviar WA'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Movimientos en Turno */}
+              {zReportData.movements && zReportData.movements.length > 0 && (
+                <div>
+                  <h4 style={{ marginBottom: '0.5rem' }}>💸 Movimientos de Caja en Turno</h4>
+                  <div style={{ maxHeight: '130px', overflowY: 'auto', fontSize: '0.85rem' }}>
+                    {zReportData.movements.map(m => (
+                      <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span>{new Date(m.date).toLocaleTimeString('es-CL')} - {m.description}</span>
+                        <strong style={{ color: m.movement_type === 'IN' ? 'var(--status-green)' : 'var(--status-red)' }}>
+                          {m.movement_type === 'IN' ? '+' : '-'}{fmt(m.amount)}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {zReportData.session.closing_notes && (
                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                   <strong>Notas del Cierre:</strong>
@@ -438,7 +559,7 @@ const CashRegister = () => {
               )}
 
               <div>
-                <h4 style={{ marginBottom: '0.5rem' }}>Movimientos en Turno</h4>
+                <h4 style={{ marginBottom: '0.5rem' }}>Ventas / Pagos en Turno</h4>
                 {zReportData.payments?.length === 0 ? (
                   <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>No hay ventas registradas en esta sesión.</p>
                 ) : (

@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from .models import (
     Invoice, InvoiceLineItem, Payment, Estimate, EstimateLineItem, CashRegisterSession,
-    Supplier, SupplierInvoice, SupplierPaymentDocument, CashMovement
+    Supplier, SupplierInvoice, SupplierInvoiceItem, SupplierPaymentDocument, CashMovement
 )
 
 class EstimateLineItemSerializer(serializers.ModelSerializer):
@@ -157,9 +157,20 @@ class SupplierPaymentDocumentSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class SupplierInvoiceItemSerializer(serializers.ModelSerializer):
+    product_sku = serializers.CharField(source='product.sku', read_only=True, default=None)
+    product_barcode = serializers.CharField(source='product.barcode', read_only=True, default=None)
+
+    class Meta:
+        model = SupplierInvoiceItem
+        fields = '__all__'
+
+
 class SupplierInvoiceSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source='supplier.company_name', read_only=True, default=None)
+    supplier_rut = serializers.CharField(source='supplier.rut', read_only=True, default=None)
     payment_documents = SupplierPaymentDocumentSerializer(many=True, read_only=True)
+    items = SupplierInvoiceItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = SupplierInvoice

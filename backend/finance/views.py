@@ -185,9 +185,11 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
             return Response({'error': 'No hay ninguna sesión de caja abierta para generar reporte X.'}, status=status.HTTP_400_BAD_REQUEST)
         
         stats = self.get_session_stats(session)
-        # Traer listado de transacciones/pagos detallados
+        # Traer listado de transacciones/pagos y movimientos manuales detallados
         payments = Payment.objects.filter(date__gte=session.opened_at).order_by('-date')
+        movements = CashMovement.objects.filter(session=session).order_by('-date')
         stats['payments'] = PaymentSerializer(payments, many=True).data
+        stats['movements'] = CashMovementSerializer(movements, many=True).data
         stats['session'] = CashRegisterSessionSerializer(session).data
         return Response(stats)
 
@@ -202,6 +204,9 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
         closing_card = request.data.get('closing_card', 0)
         closing_transfer = request.data.get('closing_transfer', 0)
         closing_notes = request.data.get('closing_notes', '')
+        target_phones = request.data.get('target_phones', [])
+        if isinstance(target_phones, str):
+            target_phones = [p.strip() for p in target_phones.split(',') if p.strip()]
 
         try:
             session.closing_cash = Decimal(str(closing_cash))
@@ -216,33 +221,38 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
         session.status = 'CLOSED'
         session.save()
 
-        # Generar notificación de Reporte Z a WhatsApp del Administrador
+        # Generar notificación de Reporte Z a WhatsApp del/los Administrador(es)
         try:
             from operations.models import WorkshopSettings
-            import os
-            import requests
-
             ws_settings = WorkshopSettings.objects.first()
-            if ws_settings and ws_settings.admin_whatsapp:
-                phone = ws_settings.admin_whatsapp
+
+            phones_to_send = set()
+            for p in target_phones:
+                if p and str(p).strip():
+                    phones_to_send.add(str(p).strip())
+
+            if not phones_to_send and ws_settings and ws_settings.admin_whatsapp:
+                phones_to_send.add(ws_settings.admin_whatsapp.strip())
+
+            if phones_to_send:
                 stats = self.get_session_stats(session)
                 
-                # Calcular diferencias
                 diff_cash = session.closing_cash - Decimal(str(stats['expected_cash_drawer']))
                 diff_card = session.closing_card - Decimal(str(stats['expected_card']))
                 diff_transfer = session.closing_transfer - Decimal(str(stats['expected_transfer']))
                 
                 def fmt(val):
-                    # Formato chileno simple: separador de miles con coma o punto, sin decimales
                     return f"${val:,.0f}".replace(",", ".") if val >= 0 else f"-${abs(val):,.0f}".replace(",", ".")
 
                 message = (
-                    f"⭐ *REPORTE Z - CIERRE DE CAJA* ⭐\n\n"
+                    f"⭐ *REPORTE Z - CIERRE DE CAJA #{session.id}* ⭐\n\n"
                     f"📅 *Fecha cierre:* {session.closed_at.strftime('%d-%m-%Y %H:%M')}\n"
                     f"👤 *Cerrado por:* {request.user.first_name or request.user.username}\n\n"
-                    f"💵 *Monto Inicial:* {fmt(session.opening_amount)}\n\n"
+                    f"💵 *Monto Inicial:* {fmt(session.opening_amount)}\n"
+                    f"📥 *Ingresos Manuales:* {fmt(Decimal(str(stats['inbound_movements'])))}\n"
+                    f"📤 *Egresos Manuales:* {fmt(Decimal(str(stats['outbound_movements'])))}\n\n"
                     f"📊 *Resumen Efectivo (Caja):*\n"
-                    f"  - Esperado en caja: {fmt(Decimal(str(stats['expected_cash_drawer'])))}\n"
+                    f"  - Esperado en cajón: {fmt(Decimal(str(stats['expected_cash_drawer'])))}\n"
                     f"  - Físico declarado: {fmt(session.closing_cash)}\n"
                     f"  - Diferencia: {fmt(diff_cash)}\n\n"
                     f"💳 *Resumen Transbank (Tarjeta):*\n"
@@ -257,9 +267,9 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
                 )
 
                 from operations.services import send_whatsapp_message
-                send_whatsapp_message(number=phone, text=message)
+                for phone in phones_to_send:
+                    send_whatsapp_message(number=phone, text=message)
         except Exception as e:
-            # Capturar errores de red/configuración sin romper la respuesta del cierre de caja
             import logging
             logging.getLogger(__name__).error(f"Error al enviar Reporte Z por WhatsApp: {str(e)}")
 
@@ -273,9 +283,80 @@ class CashRegisterViewSet(viewsets.ModelViewSet):
         payments = Payment.objects.filter(date__gte=session.opened_at)
         if session.closed_at:
             payments = payments.filter(date__lte=session.closed_at)
+        movements = CashMovement.objects.filter(session=session).order_by('-date')
         stats['payments'] = PaymentSerializer(payments.order_by('-date'), many=True).data
+        stats['movements'] = CashMovementSerializer(movements, many=True).data
         stats['session'] = CashRegisterSessionSerializer(session).data
         return Response(stats)
+
+    @action(detail=True, methods=['post'])
+    def send_z_report(self, request, pk=None):
+        """Envía el Reporte Z de una sesión específica por WhatsApp a los números indicados."""
+        session = self.get_object()
+        target_phones = request.data.get('target_phones', [])
+        if isinstance(target_phones, str):
+            target_phones = [p.strip() for p in target_phones.split(',') if p.strip()]
+
+        from operations.models import WorkshopSettings
+        ws_settings = WorkshopSettings.objects.first()
+
+        phones_to_send = set()
+        for p in target_phones:
+            if p and str(p).strip():
+                phones_to_send.add(str(p).strip())
+
+        if not phones_to_send and ws_settings and ws_settings.admin_whatsapp:
+            phones_to_send.add(ws_settings.admin_whatsapp.strip())
+
+        if not phones_to_send:
+            return Response({'error': 'No se especificaron números de WhatsApp destino.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        stats = self.get_session_stats(session)
+        closing_cash = session.closing_cash or Decimal('0.00')
+        closing_card = session.closing_card or Decimal('0.00')
+        closing_transfer = session.closing_transfer or Decimal('0.00')
+
+        diff_cash = closing_cash - Decimal(str(stats['expected_cash_drawer']))
+        diff_card = closing_card - Decimal(str(stats['expected_card']))
+        diff_transfer = closing_transfer - Decimal(str(stats['expected_transfer']))
+
+        def fmt(val):
+            return f"${val:,.0f}".replace(",", ".") if val >= 0 else f"-${abs(val):,.0f}".replace(",", ".")
+
+        closed_str = session.closed_at.strftime('%d-%m-%Y %H:%M') if session.closed_at else 'En curso'
+
+        message = (
+            f"⭐ *REPORTE Z - CIERRE DE CAJA #{session.id}* ⭐\n\n"
+            f"📅 *Fecha cierre:* {closed_str}\n"
+            f"👤 *Apertura por:* {session.opened_by.first_name or session.opened_by.username}\n\n"
+            f"💵 *Monto Inicial:* {fmt(session.opening_amount)}\n"
+            f"📥 *Ingresos Manuales:* {fmt(Decimal(str(stats['inbound_movements'])))}\n"
+            f"📤 *Egresos Manuales:* {fmt(Decimal(str(stats['outbound_movements'])))}\n\n"
+            f"📊 *Resumen Efectivo (Caja):*\n"
+            f"  - Esperado en cajón: {fmt(Decimal(str(stats['expected_cash_drawer'])))}\n"
+            f"  - Físico declarado: {fmt(closing_cash)}\n"
+            f"  - Diferencia: {fmt(diff_cash)}\n\n"
+            f"💳 *Resumen Transbank (Tarjeta):*\n"
+            f"  - Esperado tarjeta: {fmt(Decimal(str(stats['expected_card'])))}\n"
+            f"  - Físico declarado: {fmt(closing_card)}\n"
+            f"  - Diferencia: {fmt(diff_card)}\n\n"
+            f"🏦 *Resumen Transferencias:*\n"
+            f"  - Esperado transf: {fmt(Decimal(str(stats['expected_transfer'])))}\n"
+            f"  - Físico declarado: {fmt(closing_transfer)}\n"
+            f"  - Diferencia: {fmt(diff_transfer)}\n\n"
+            f"📝 *Notas de Cierre:* {session.closing_notes or 'Sin comentarios.'}"
+        )
+
+        from operations.services import send_whatsapp_message
+        sent_count = 0
+        for phone in phones_to_send:
+            if send_whatsapp_message(number=phone, text=message):
+                sent_count += 1
+
+        if sent_count > 0:
+            return Response({'success': True, 'message': f'Reporte Z enviado exitosamente a {sent_count} destinatario(s).'})
+        else:
+            return Response({'error': 'Error al enviar el reporte Z por WhatsApp.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -915,11 +996,9 @@ class SupplierInvoiceViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        # We handle creation including possible payment documents
-        data = request.data
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
         supplier_id = data.get('supplier')
         if not supplier_id:
-            # Maybe we received supplier RUT? We find or create supplier!
             supplier_rut = data.get('supplier_rut')
             supplier_name = data.get('supplier_name', 'Nuevo Proveedor')
             if supplier_rut:
@@ -930,10 +1009,57 @@ class SupplierInvoiceViewSet(viewsets.ModelViewSet):
                 data['supplier'] = supplier.id
             else:
                 return Response({'error': 'Proveedor requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        items_data = data.get('items', [])
         
+        # Calculate subtotal, tax and total if items are provided and totals are zero/empty
+        calculated_subtotal = Decimal('0')
+        for item in items_data:
+            qty = Decimal(str(item.get('quantity', 1)))
+            cost = Decimal(str(item.get('unit_cost_price', 0)))
+            calculated_subtotal += qty * cost
+
+        if calculated_subtotal > Decimal('0'):
+            if not data.get('subtotal') or Decimal(str(data.get('subtotal'))) == 0:
+                data['subtotal'] = calculated_subtotal
+                data['tax_amount'] = calculated_subtotal * Decimal('0.19')
+                data['total_amount'] = data['subtotal'] + data['tax_amount']
+
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         invoice = serializer.save()
+
+        # Create Invoice Line Items and Update Inventory Stock
+        from inventory.models import Product
+        from finance.models import SupplierInvoiceItem
+
+        for item in items_data:
+            prod_id = item.get('product') or item.get('product_id')
+            qty = Decimal(str(item.get('quantity', 1)))
+            unit_cost = Decimal(str(item.get('unit_cost_price', 0)))
+            description = item.get('description', '')
+
+            product = None
+            if prod_id:
+                try:
+                    product = Product.objects.get(id=prod_id)
+                    if not description:
+                        description = product.name
+                    # Increment stock
+                    product.stock_quantity = Decimal(str(product.stock_quantity)) + qty
+                    if unit_cost > Decimal('0'):
+                        product.cost_price = unit_cost
+                    product.save(update_fields=['stock_quantity', 'cost_price', 'updated_at'])
+                except Product.DoesNotExist:
+                    pass
+
+            SupplierInvoiceItem.objects.create(
+                invoice=invoice,
+                product=product,
+                description=description or 'Producto',
+                quantity=qty,
+                unit_cost_price=unit_cost
+            )
 
         # Handle split payments / documents
         payment_docs_data = data.get('payment_documents', [])
@@ -948,7 +1074,7 @@ class SupplierInvoiceViewSet(viewsets.ModelViewSet):
                 status=doc_data.get('status', 'PENDING')
             )
         
-        # update status if paid
+        # Update status if paid
         invoice_status = data.get('status')
         if invoice_status:
             invoice.status = invoice_status

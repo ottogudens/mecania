@@ -77,7 +77,7 @@ const NAV_ITEMS = [
 
   // Logística y Productos
   { id: 'inventory',  label: 'Inventario',          icon: 'inventory', group: 'Logística' },
-  { id: 'scan',       label: 'Escanear Stock',      icon: 'scan',      group: 'Logística' },
+  { id: 'scan',       label: 'Toma de inventario',  icon: 'scan',      group: 'Logística' },
 
   // Finanzas y Ventas (Submenú)
   { id: 'finance_billing',           label: 'Clientes y Facturación',  icon: 'finance', group: 'Finanzas' },
@@ -102,7 +102,7 @@ const PAGE_TITLES = {
   orders:     { title: 'Órdenes de Trabajo',  subtitle: 'Gestión digital de OTs en tiempo real' },
   inspection: { title: 'Inspección Visual',   subtitle: 'Registro fotográfico de hallazgos' },
   inventory:  { title: 'Inventario',          subtitle: 'Control de stock y productos' },
-  scan:       { title: 'Escanear Stock',      subtitle: 'Busca, edita o actualiza el stock con tu cámara móvil' },
+  scan:       { title: 'Toma de inventario',  subtitle: 'Busca, edita o actualiza el stock con tu cámara móvil o escáner' },
   clients:    { title: 'Clientes',            subtitle: 'Directorio y contacto de clientes' },
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
   whatsapp_chat: { title: 'Chat de WhatsApp', subtitle: 'Atención al cliente y control del asistente de IA' },

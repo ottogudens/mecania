@@ -262,6 +262,21 @@ class SupplierInvoice(models.Model):
         return f"FACT-PROV-{self.invoice_number} - {self.supplier.company_name}"
 
 
+class SupplierInvoiceItem(models.Model):
+    invoice = models.ForeignKey(SupplierInvoice, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey('inventory.Product', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    description = models.CharField(max_length=255)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=1)
+    unit_cost_price = models.DecimalField(max_digits=12, decimal_places=2, help_text="Precio de costo unitario neto sin impuesto")
+
+    @property
+    def total_cost(self):
+        return self.quantity * self.unit_cost_price
+
+    def __str__(self):
+        return f"{self.quantity}x {self.description} (${self.unit_cost_price})"
+
+
 class SupplierPaymentDocument(models.Model):
     TYPE_CHOICES = [
         ('CHECK', 'Cheque'),
