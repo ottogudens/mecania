@@ -123,10 +123,26 @@ class POSCounterSaleTests(TestCase):
         self.assertEqual(invoice.source, "COUNTER_SALE")
         self.assertIsNone(invoice.work_order_id)
         self.assertEqual(invoice.line_items.count(), 2)
-        # 2 * 12000 + 1 * 15000 = 39000, + 19% iva
-        self.assertEqual(invoice.subtotal, Decimal("39000"))
+        # 2 * 12000 + 1 * 15000 = 39000 (total con IVA)
+        self.assertEqual(invoice.total_amount, Decimal("39000"))
+        self.assertEqual(invoice.subtotal, Decimal("32773.11"))
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 18)  # descontó 2
+
+    def test_venta_mostrador_con_descuento_y_cliente(self):
+        client = Client.objects.create(first_name="Juan", last_name="Pérez")
+        invoice = create_counter_sale(
+            client_id=client.id,
+            discount_amount=Decimal("4000"),
+            items=[
+                {"product_id": self.product.id, "quantity": 2},
+            ],
+        )
+        self.assertEqual(invoice.client_id, client.id)
+        # 2 * 12000 = 24000 - 4000 = 20000 final
+        self.assertEqual(invoice.discount_amount, Decimal("4000"))
+        self.assertEqual(invoice.total_amount, Decimal("20000"))
+        self.assertEqual(invoice.subtotal, Decimal("16806.72"))
 
     def test_venta_mostrador_falla_si_no_hay_stock(self):
         self.product.stock_quantity = 1
@@ -201,7 +217,8 @@ class POSWorkOrderFlowTests(TestCase):
     def test_buscar_ot_por_patente_crea_factura(self):
         invoice = get_or_create_invoice_for_work_order(self.wo)
         self.assertEqual(invoice.source, "WORK_ORDER")
-        self.assertEqual(invoice.total_amount, Decimal("10000") * Decimal("1.19"))
+        self.assertEqual(invoice.total_amount, Decimal("10000"))
+        self.assertEqual(invoice.subtotal, Decimal("8403.36"))
 
     def test_cobrar_ot_existente(self):
         invoice = get_or_create_invoice_for_work_order(self.wo)
