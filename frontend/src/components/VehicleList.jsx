@@ -47,6 +47,10 @@ const VehicleList = () => {
   const [fullRecord, setFullRecord] = useState(null);
   const [fullRecordLoading, setFullRecordLoading] = useState(false);
 
+  // AI Tech Spec state
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+
   // Forms for adding data
   const [showPartForm, setShowPartForm] = useState(false);
   const [showMaintenanceForm, setShowMaintenanceForm] = useState(false);
@@ -169,12 +173,85 @@ const VehicleList = () => {
   const openMedicalModal = (vehicle) => {
     setSelectedMedicalVehicle(vehicle);
     setFullRecord(null);
+    setAiSummary('');
     setMedicalTab('info');
     setShowPartForm(false);
     setShowMaintenanceForm(false);
     setShowScheduledForm(false);
     fetchFullRecord(vehicle.id);
     setShowMedicalModal(true);
+  };
+
+  const handleFetchAiSummary = async (vehicleId) => {
+    setAiSummaryLoading(true);
+    try {
+      const res = await axios.post('/api/operations/vehicles/ai-summary/', { vehicle_id: vehicleId }, { headers });
+      setAiSummary(res.data.summary);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo generar la Ficha Técnica IA.');
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
+  const handleSendAiSummaryWhatsApp = async (vehicle, summaryText) => {
+    if (!vehicle.client || !vehicle.client.phone) {
+      alert('El propietario no tiene número de WhatsApp registrado.');
+      return;
+    }
+    const text = (
+      `¡Hola ${vehicle.client.first_name}! 📋 *FICHA TÉCNICA Y PAUTA DE MANTENCIÓN EN MECANIA*\n\n` +
+      `🚘 *Vehículo:* ${vehicle.make} ${vehicle.model} (${vehicle.year})\n` +
+      `🚗 *Patente:* ${vehicle.license_plate}\n\n` +
+      `${summaryText}\n\n` +
+      `¡En MecanIA cuidamos tu vehículo con repuestos y fluidos según especificación de fábrica!`
+    );
+    try {
+      await axios.post('/api/operations/whatsapp-messages/send-manual/', {
+        phone: vehicle.client.phone,
+        text: text
+      }, { headers });
+      alert(`Ficha técnica enviada por WhatsApp a ${vehicle.client.phone}`);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo enviar la ficha técnica por WhatsApp.');
+    }
+  };
+
+  const printAiSummary = (vehicle, summaryText) => {
+    const printWin = window.open('', '_blank', 'width=800,height=900');
+    if (!printWin) return;
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Ficha Técnica IA - ${vehicle.make} ${vehicle.model} (${vehicle.license_plate})</title>
+        <style>
+          body { font-family: sans-serif; padding: 25px; line-height: 1.5; color: #1e293b; }
+          h2 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 5px; text-align: center; }
+          .header { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; font-size: 13px; }
+          .content { white-space: pre-wrap; font-size: 13px; font-family: monospace; background: #fff; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; }
+        </style>
+      </head>
+      <body>
+        <h2>MECANIA - FICHA TÉCNICA & PAUTA DE MANTENCIÓN</h2>
+        <div class="header">
+          <strong>Vehículo:</strong> ${vehicle.make} ${vehicle.model} (${vehicle.year})<br/>
+          <strong>Patente:</strong> ${vehicle.license_plate} | <strong>VIN:</strong> ${vehicle.vin || 'N/A'}<br/>
+          <strong>Motor:</strong> ${vehicle.engine_displacement || 'N/A'} | <strong>Transmisión:</strong> ${vehicle.transmission_type}
+        </div>
+        <div class="content">${summaryText}</div>
+        <br/><br/>
+        <div style="text-align:center; font-size:11px; color:#64748b;">MecanIA - Sistema Inteligente para Talleres Automotrices</div>
+      </body>
+      </html>
+    `;
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); }, 300);
   };
 
   // ── CRUD for Parts ──
@@ -597,7 +674,7 @@ const VehicleList = () => {
                 {/* ── TAB: Ficha Técnica ── */}
                 {medicalTab === 'info' && (
                   <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)' }}>
                       <div><span style={{ color: 'var(--text-muted)' }}>Patente:</span> <strong style={{ textTransform: 'uppercase' }}>{selectedMedicalVehicle.license_plate}</strong></div>
                       <div><span style={{ color: 'var(--text-muted)' }}>Marca/Modelo:</span> <strong>{selectedMedicalVehicle.make} {selectedMedicalVehicle.model}</strong></div>
                       <div><span style={{ color: 'var(--text-muted)' }}>Año:</span> <strong>{selectedMedicalVehicle.year}</strong></div>
@@ -608,6 +685,83 @@ const VehicleList = () => {
                       <div><span style={{ color: 'var(--text-muted)' }}>Número de Motor:</span> <strong>{selectedMedicalVehicle.engine_number || 'No registrado'}</strong></div>
                       <div><span style={{ color: 'var(--text-muted)' }}>Cilindrada:</span> <strong>{selectedMedicalVehicle.engine_displacement || 'No especificado'}</strong></div>
                       <div><span style={{ color: 'var(--text-muted)' }}>Kilometraje Inicial:</span> <strong>{selectedMedicalVehicle.mileage ? `${selectedMedicalVehicle.mileage.toLocaleString()} km` : 'No especificado'}</strong></div>
+                    </div>
+
+                    {/* ── Integración IA: Fluidos, Filtros y Pauta por Kilometraje ── */}
+                    <div style={{ marginTop: '1.5rem', background: 'linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.95))', padding: '1.25rem', borderRadius: 12, border: '1px solid rgba(59,130,246,0.3)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '1rem' }}>
+                        <div>
+                          <h4 style={{ margin: 0, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                            🤖 MecanIA - Especificaciones de Fluidos, Filtros y Pauta de Mantención
+                          </h4>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            Información técnica detallada (Viscosidades, litros, números OEM Mann/Tecfil/Wega y pauta por km)
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn"
+                          disabled={aiSummaryLoading}
+                          onClick={() => handleFetchAiSummary(selectedMedicalVehicle.id)}
+                          style={{
+                            background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)',
+                            border: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 650,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem'
+                          }}
+                        >
+                          {aiSummaryLoading ? '⏳ Generando Ficha Técnica...' : (aiSummary ? '🔄 Actualizar Ficha IA' : '🤖 Generar Ficha Técnica IA')}
+                        </button>
+                      </div>
+
+                      {aiSummaryLoading && (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: '#60a5fa' }}>
+                          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚙️</div>
+                          <div>Consultando especificaciones de fluidos (aceites motor, transmisión, refrigerante), códigos OEM de filtros y pauta por kilometraje...</div>
+                        </div>
+                      )}
+
+                      {!aiSummaryLoading && aiSummary && (
+                        <div style={{ marginTop: '1rem' }}>
+                          <div style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            padding: '1.2rem',
+                            borderRadius: 8,
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            color: '#fff',
+                            fontSize: '0.9rem',
+                            lineHeight: 1.6,
+                            whiteSpace: 'pre-wrap',
+                            fontFamily: 'Outfit, sans-serif'
+                          }}>
+                            {aiSummary}
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => printAiSummary(selectedMedicalVehicle, aiSummary)}
+                              style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                            >
+                              🖨️ Imprimir Ficha Técnica
+                            </button>
+                            {selectedMedicalVehicle.client?.phone && (
+                              <button
+                                type="button"
+                                className="btn btn-whatsapp"
+                                onClick={() => handleSendAiSummaryWhatsApp(selectedMedicalVehicle, aiSummary)}
+                                style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                              >
+                                💬 Enviar por WhatsApp
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Work order history */}

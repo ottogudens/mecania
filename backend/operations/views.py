@@ -1264,55 +1264,53 @@ class AIVehicleSummaryView(APIView):
                 transmission_display = getattr(vehicle, 'transmission_type', 'No especificado') or 'No especificado'
 
             prompt = f"""
-Eres un experto automotriz enciclopédico. Genera un informe técnico detallado y profesional sobre el siguiente vehículo, basándote en su marca, modelo y año.
+Eres un ingeniero mecánico automotriz y especialista de taller. Genera una FICHA TÉCNICA Y PAUTA DE MANTENCIÓN COMPLETA Y DETALLADA para el siguiente vehículo:
 
-Datos del vehículo:
+DATOS DEL VEHÍCULO:
 - Marca: {vehicle.make}
 - Modelo: {vehicle.model}
 - Año: {vehicle.year}
-- VIN: {vehicle.vin or 'No especificado'}
-- Número de motor: {vehicle.engine_number or 'No especificado'}
-- Tipo de transmisión: {transmission_display}
+- VIN / Chasis: {vehicle.vin or 'No registrado'}
+- Número de Motor: {vehicle.engine_number or 'No registrado'}
+- Cilindrada / Motor: {vehicle.engine_displacement or 'No especificada'}
+- Transmisión: {transmission_display}
+- Tipo Combustible: {vehicle.get_fuel_type_display()}
 
-Genera el informe con EXACTAMENTE este formato estructurado (usa estos encabezados sin modificarlos):
+Genera el informe estructurado con el siguiente formato Markdown (mantén los encabezados exactos):
 
-🔧 MECÁNICA
-Tipo de motor: [gasolina/diésel/eléctrico/híbrido], cilindrada y número de cilindros.
-Potencia: [HP / kW aproximados para este modelo y año].
-Torque: [Nm aproximados].
-Transmisión: [manual/automática/CVT — describir brevemente sus características para este modelo].
-Curiosidad mecánica: [dato técnico interesante o peculiaridad conocida del motor/mecánica de este modelo].
+💧 FLUIDOS, NORMAS Y CAPACIDADES
+- Aceite de Motor: [Tipo, normas API/ACEA, viscosidad recomendada y cantidad exacta de llenado en Litros con filtro].
+- Aceite de Transmisión: [Especificación/norma para caja manual o automática/CVT/DCT y cantidad aproximada en Litros].
+- Caja Transferencia y Diferencial: [Especificación de aceite (ej. 75W-90 GL-5) y cantidad en Litros. Indicar si aplica según 4WD/AWD o si es 4x2].
+- Líquido Refrigerante: [Tipo/tecnología (Orgánico/HOAT/G12+) y capacidad total de llenado en Litros].
 
-🛡️ SEGURIDAD
-Frenos: [sistema ABS, EBD, frenado de emergencia si aplica].
-Control de estabilidad: [ESP/VSC — indicar si trae en este año y nivel de equipamiento].
-Airbags: [cantidad estándar y ubicación].
-Asistencias activas: [frenado autónomo, control crucero adaptativo, asistente de carril — según año y versión].
+🧩 FILTROS Y CÓDIGOS DE PARTE (OEM Y MARCAS COMERCIALES)
+- Filtro de Aceite: [Código OEM y equivalencias Mann, Tecfil, Wega, Fram].
+- Filtro de Aire Motor: [Código OEM y equivalencias Mann, Tecfil, Wega, Fram].
+- Filtro de Combustible: [Código OEM y equivalencias Mann, Tecfil, Wega, o ubicación].
+- Filtro de Cabina / Polen: [Código OEM y equivalencias Mann, Tecfil, Wega].
 
-🪑 CONFORT Y DISEÑO
-Interior: [descripción del espacio, materiales predominantes, cantidad de pasajeros].
-Maletero: [capacidad en litros aproximada].
-Climatización: [tipo — aire acondicionado manual, automático, bizona].
-Asientos: [ergonomía, ajustes eléctricos/manuales, tapizado].
-Diseño exterior: [estilo de carrocería, rasgo visual distintivo del modelo].
+📅 PAUTA DE MANTENCIONES SEGÚN KILOMETRAJE
+- 10.000 km / 15.000 km: [Mantenciones básicas, sustituciones e inspecciones clave].
+- 30.000 km / 45.000 km: [Mantenciones intermedias, sustituciones de fluidos y filtros].
+- 60.000 km / 75.000 km: [Mantención mayor, sustitución de bujías, fluidos auxiliares y frenos].
+- 90.000 km / 100.000+ km: [Mantención preventiva completa, correa/cadena distribución, bomba de agua, refrigerante y revisión general].
 
-📱 TECNOLOGÍA
-Infoentretenimiento: [tamaño de pantalla táctil, sistema operativo si aplica].
-Conectividad: [Apple CarPlay, Android Auto, Bluetooth, USB].
-Instrumentación: [cuadro de instrumentos analógico/digital, head-up display si aplica].
-Extras tecnológicos: [cámara de retroceso, sensores de estacionamiento, carga inalámbrica, u otros según año/versión].
+⚙️ ESPECIFICACIONES TÉCNICAS Y RECOMENDACIÓN DEL FABRICANTE
+- Motor & Rendimiento: [Potencia HP, torque Nm, inyección/turbo].
+- Recomendaciones Técnicas de Taller: [Recomendaciones mecánicas preventivas y observaciones clave para este modelo].
 
-Usa información técnica precisa para el {vehicle.year} {vehicle.make} {vehicle.model}. Si algún dato varía según versión, indícalo. Tono profesional, claro y directo.
+Usa datos técnicos verificables para el {vehicle.year} {vehicle.make} {vehicle.model}. Tono profesional y estructurado.
 """
             
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Eres un asistente técnico automotriz experto. Tu especialidad es generar informes precisos, estructurados y profesionales sobre vehículos. Siempre organizas la información en las secciones exactas que te piden, con datos técnicos verificables."},
+                    {"role": "system", "content": "Eres un ingeniero automotriz experto en especificaciones técnicas de vehículos, fluidos, filtros OEM y pautas de mantención por kilometraje."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=900,
-                temperature=0.5
+                max_tokens=1200,
+                temperature=0.4
             )
             
             ai_message = response.choices[0].message.content
