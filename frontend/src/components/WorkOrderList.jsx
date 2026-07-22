@@ -18,6 +18,8 @@ const WorkOrderList = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAiModal, setShowAiModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('work_order_view_mode') || 'grid');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Quick Vehicle Form State
   const [showQuickVehicle, setShowQuickVehicle] = useState(false);
@@ -576,24 +578,147 @@ const WorkOrderList = () => {
     CANCELLED:   'CANCELLED',
   };
 
+  const filteredOrders = orders.filter(o => 
+    (o.vehicle?.license_plate || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (o.vehicle?.make || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (o.vehicle?.model || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (o.vehicle?.client?.first_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (o.vehicle?.client?.last_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(o.id).includes(searchQuery)
+  );
+
   return (
     <div>
-      <div className="section-header">
+      <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
         <div>
-          <div className="section-title">Gestión de OTs</div>
+          <div className="section-title">Gestión de Órdenes de Trabajo</div>
         </div>
-        <button className="btn" onClick={() => setShowNewModal(true)}>+ Nueva OT</button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* View selector */}
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+            <button 
+              type="button"
+              onClick={() => { setViewMode('grid'); localStorage.setItem('work_order_view_mode', 'grid'); }}
+              style={{
+                padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer',
+                background: viewMode === 'grid' ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                color: viewMode === 'grid' ? '#000' : 'var(--text-muted)',
+                fontWeight: viewMode === 'grid' ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+              }}
+            >
+              🎴 Tarjetas (Por Estado)
+            </button>
+            <button 
+              type="button"
+              onClick={() => { setViewMode('list'); localStorage.setItem('work_order_view_mode', 'list'); }}
+              style={{
+                padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer',
+                background: viewMode === 'list' ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                color: viewMode === 'list' ? '#000' : 'var(--text-muted)',
+                fontWeight: viewMode === 'list' ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+              }}
+            >
+              📄 Lista Detallada
+            </button>
+          </div>
+
+          <input 
+            type="text" 
+            className="glass-input" 
+            placeholder="Buscar por OT, patente, cliente..." 
+            value={searchQuery} 
+            onChange={e => setSearchQuery(e.target.value)} 
+            style={{ width: '240px' }}
+          />
+
+          <button className="btn" onClick={() => setShowNewModal(true)}>+ Nueva OT</button>
+        </div>
       </div>
 
-      {orders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <div className="glass-card">
           <div className="empty-state">
             <div className="empty-state-icon">📋</div>
             <div className="empty-state-title">Sin órdenes de trabajo</div>
-            <p className="empty-state-text">Crea la primera OT para comenzar.</p>
+            <p className="empty-state-text">No hay órdenes coincidentes.</p>
+          </div>
+        </div>
+      ) : viewMode === 'list' ? (
+        /* ── Vista de Lista Detallada ── */
+        <div className="glass-card" style={{ padding: '1rem' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.8rem' }}>OT</th>
+                  <th style={{ padding: '0.8rem' }}>Vehículo / Patente</th>
+                  <th style={{ padding: '0.8rem' }}>Cliente</th>
+                  <th style={{ padding: '0.8rem' }}>Motivo / Ingreso</th>
+                  <th style={{ padding: '0.8rem', textAlign: 'center' }}>Estado</th>
+                  <th style={{ padding: '0.8rem', textAlign: 'right' }}>Total</th>
+                  <th style={{ padding: '0.8rem', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOrders.map(order => (
+                  <tr key={order.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.85rem 0.8rem', fontWeight: 'bold' }}>OT-{order.id}</td>
+                    <td style={{ padding: '0.85rem 0.8rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span className="badge" style={{ backgroundColor: 'var(--bg-card)', color: '#fff', fontSize: '0.85rem', fontFamily: 'monospace' }}>
+                          {order.vehicle?.license_plate || 'N/A'}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{order.vehicle?.make} {order.vehicle?.model}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{order.mileage?.toLocaleString('es-CL')} km</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '0.85rem 0.8rem' }}>
+                      {order.vehicle?.client ? (
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{order.vehicle.client.first_name} {order.vehicle.client.last_name}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>📞 {order.vehicle.client.phone}</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Sin cliente</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.8rem', fontSize: '0.85rem' }}>
+                      <div style={{ fontWeight: 500 }}>{order.visit_reason ? order.visit_reason.substring(0, 45) + '...' : 'Servicio general'}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{new Date(order.created_at).toLocaleDateString()}</div>
+                    </td>
+                    <td style={{ padding: '0.85rem 0.8rem', textAlign: 'center' }}>
+                      <span className={`badge ${STATUS_BADGE_CLASS[order.status] || 'PENDING'}`}>
+                        {order.status?.replace('_', ' ') || 'PENDIENTE'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                      {order.total_amount ? `$${parseInt(order.total_amount).toLocaleString('es-CL')}` : '-'}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.8rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openDetails(order)}>
+                          👁️ Detalles
+                        </button>
+                        <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }} onClick={() => openAiModal(order)}>
+                          🤖 IA
+                        </button>
+                        {order.status !== 'DELIVERED' && (
+                          <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { setEditOrderData(order); setShowEditModal(true); }}>
+                            ✏️
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       ) : (
+        /* ── Vista de Tarjetas agrupadas ── */
         <div>
           {[
             { key: 'PENDING', label: 'Pendientes (Nuevas)' },

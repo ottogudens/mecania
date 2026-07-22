@@ -313,6 +313,39 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(active_invoices, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def send_whatsapp(self, request, pk=None):
+        invoice = self.get_object()
+        phone = request.data.get('phone')
+        if not phone and invoice.client and invoice.client.phone:
+            phone = invoice.client.phone
+        
+        if not phone:
+            return Response({'error': 'No se proporcionó número de teléfono'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        client_id = request.data.get('client_id')
+        if client_id:
+            invoice.client_id = client_id
+            invoice.save(update_fields=['client'])
+            
+        client_name = f"{invoice.client.first_name} {invoice.client.last_name}" if invoice.client else "Estimado Cliente"
+        items_list = list(invoice.get_line_items())
+        items_summary = ", ".join([f"{getattr(i, 'quantity', 1)}x {getattr(i, 'description', '')}" for i in items_list[:3]])
+        
+        text = (
+            f"¡Hola {client_name}! 📄 Comprobante de Venta Factura #{invoice.id}\n"
+            f"💰 Total: ${int(invoice.total_amount):,}\n"
+            f"🛒 Detalle: {items_summary}\n"
+            f"¡Gracias por su compra en MecanIA!"
+        )
+        
+        from operations.services import send_whatsapp_message
+        success = send_whatsapp_message(number=phone, text=text)
+        if success:
+            return Response({'success': True, 'message': 'Comprobante enviado por WhatsApp.'})
+        else:
+            return Response({'error': 'Error al enviar el comprobante por WhatsApp.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     """Solo lectura — los pagos se crean vía POSChargeView."""

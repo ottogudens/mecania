@@ -21,6 +21,105 @@ const STATUS_LABELS = {
   VOID:           { label: 'Anulado',     cls: 'red'     },
 };
 
+// ─── Impresión Térmica 80mm x 80mm ──────────────────────────────────────────
+export const printThermalReceipt = (inv) => {
+  if (!inv) return;
+  const items = inv.line_items || inv.items || [];
+  const clientName = (inv.client_name || inv.client) 
+    ? `${inv.client_name || inv.client?.first_name || ''} ${inv.client_last_name || inv.client?.last_name || ''}`
+    : 'Venta Anónima / Mostrador';
+  const dateStr = new Date(inv.created_at || Date.now()).toLocaleString('es-CL');
+  const totalAmt = parseFloat(inv.total_amount || 0);
+  const discountAmt = parseFloat(inv.discount_amount || 0);
+  const netoAmt = parseFloat(inv.subtotal || Math.round(totalAmt / 1.19));
+  const taxAmt = parseFloat(inv.tax_amount || (totalAmt - netoAmt));
+  const pMethod = inv.payment_method === 'CASH' ? 'EFECTIVO' : inv.payment_method === 'CARD' ? 'TARJETA' : inv.payment_method === 'TRANSFER' ? 'TRANSFERENCIA' : (inv.payment_method || 'EFECTIVO');
+
+  const content = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Recibo Térmico 80mm</title>
+        <style>
+          @media print {
+            @page { size: 80mm auto; margin: 0; }
+            body { width: 76mm; margin: 0 auto; padding: 4mm 2mm; font-family: 'Courier New', Courier, monospace; font-size: 11px; line-height: 1.25; color: #000; background: #fff; }
+          }
+          body {
+            width: 76mm;
+            margin: 0 auto;
+            padding: 4mm 2mm;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            line-height: 1.25;
+            color: #000;
+            background: #fff;
+          }
+          .text-center { text-align: center; }
+          .bold { font-weight: bold; }
+          .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
+          .flex-row { display: flex; justify-content: space-between; }
+          .items-table { width: 100%; font-size: 10px; border-collapse: collapse; margin: 5px 0; }
+          .items-table th, .items-table td { padding: 2px 0; text-align: left; }
+          .items-table .num { text-align: right; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center bold" style="font-size: 14px;">MECANIA TALLER MECANICO</div>
+        <div class="text-center">Servicio Técnico Automotriz</div>
+        <div class="text-center">RUT: 76.543.210-K</div>
+        <div class="text-center">Tel: +56 9 1234 5678</div>
+        <div class="divider"></div>
+        <div><strong>COMPROBANTE VENTA MOSTRADOR</strong></div>
+        <div>Folio: <strong>FACT-${inv.id}</strong></div>
+        <div>Fecha: ${dateStr}</div>
+        <div>Cliente: ${clientName}</div>
+        <div class="divider"></div>
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>CANT/DESCRIPCION</th>
+              <th class="num">UNIT.</th>
+              <th class="num">TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td colspan="3" class="bold">${item.description || item.name || 'Ítem'}</td>
+              </tr>
+              <tr>
+                <td>${item.quantity || 1} x</td>
+                <td class="num">$${Math.round(parseFloat(item.unit_price || item.price || 0)).toLocaleString('es-CL')}</td>
+                <td class="num bold">$${Math.round(parseFloat(item.total_price || ((item.unit_price || item.price || 0) * (item.quantity || 1)))).toLocaleString('es-CL')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="divider"></div>
+        <div class="flex-row"><span>Subtotal Neto:</span><span>$${Math.round(netoAmt).toLocaleString('es-CL')}</span></div>
+        <div class="flex-row"><span>IVA (19%):</span><span>$${Math.round(taxAmt).toLocaleString('es-CL')}</span></div>
+        ${discountAmt > 0 ? `<div class="flex-row"><span>Descuento:</span><span>-$${Math.round(discountAmt).toLocaleString('es-CL')}</span></div>` : ''}
+        <div class="divider"></div>
+        <div class="flex-row bold" style="font-size: 13px;"><span>TOTAL A PAGAR:</span><span>$${Math.round(totalAmt).toLocaleString('es-CL')}</span></div>
+        <div class="flex-row" style="margin-top: 3px;"><span>Forma de Pago:</span><span>${pMethod}</span></div>
+        <div class="divider"></div>
+        <div class="text-center" style="margin-top: 10px;">*** ¡Gracias por su compra! ***</div>
+        <div class="text-center">www.mecania.cl</div>
+      </body>
+    </html>
+  `;
+
+  const win = window.open('', '_blank', 'width=380,height=600');
+  if (win) {
+    win.document.write(content);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 300);
+  }
+};
+
 // ─── sub-component: resumen de factura ────────────────────────────────────────
 const InvoiceSummary = ({ invoice }) => {
   if (!invoice) return null;
@@ -735,6 +834,256 @@ const ChargeWorkOrder = () => {
   );
 };
 
+// ─── Modal Post-Venta: Comprobante 80mm, WhatsApp & Fidelización ───────────────
+const PostSaleModal = ({ invoice, onClose, onClientCreated }) => {
+  if (!invoice) return null;
+  const [phoneInput, setPhoneInput] = useState('');
+  const [sendingWa, setSendingWa] = useState(false);
+  const [waSent, setWaSent] = useState(false);
+  const [showFidelization, setShowFidelization] = useState(false);
+  const [newClientData, setNewClientData] = useState({ first_name: '', last_name: '', email: '' });
+  const [savingClient, setSavingClient] = useState(false);
+
+  const isAnonymous = !invoice.client && !invoice.client_id;
+  const targetPhone = isAnonymous ? phoneInput : (invoice.client?.phone || '');
+
+  const handleSendWhatsApp = async (e) => {
+    if (e) e.preventDefault();
+    if (!targetPhone.trim()) {
+      alert("Por favor ingrese un número de teléfono para enviar por WhatsApp.");
+      return;
+    }
+    setSendingWa(true);
+    try {
+      await axios.post(`/api/finance/invoices/${invoice.id}/send_whatsapp/`, { phone: targetPhone }, { headers: authHeader() });
+      setWaSent(true);
+      if (isAnonymous) {
+        setShowFidelization(true);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Error al enviar WhatsApp. Verifique el número.");
+    } finally {
+      setSendingWa(false);
+    }
+  };
+
+  const handleCreateFidelizedClient = async (e) => {
+    e.preventDefault();
+    setSavingClient(true);
+    try {
+      const { data: newClient } = await axios.post('/api/operations/clients/', {
+        ...newClientData,
+        phone: targetPhone
+      }, { headers: authHeader() });
+
+      // Link invoice to client
+      await axios.post(`/api/finance/invoices/${invoice.id}/send_whatsapp/`, { client_id: newClient.id, phone: targetPhone }, { headers: authHeader() });
+      
+      alert(`¡Cliente ${newClient.first_name} ${newClient.last_name} registrado y fidelizado exitosamente!`);
+      if (onClientCreated) onClientCreated(newClient);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Error al crear cliente.");
+    } finally {
+      setSavingClient(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex',
+      justifyContent: 'center', alignItems: 'center', zIndex: 1000
+    }}>
+      <div className="glass-card" style={{ width: '100%', maxWidth: '520px', padding: '1.75rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: '2.5rem' }}>🎉</div>
+          <h3 style={{ margin: '0.5rem 0', color: 'var(--primary-color)' }}>¡Venta Completada con Éxito!</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+            Factura #{invoice.id} — Total: {fmt(invoice.total_amount)}
+          </p>
+        </div>
+
+        {/* 1. Imprimir Térmica 80mm */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>🖨️ Impresión de Comprobante</h4>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => printThermalReceipt(invoice)}>
+            🖨️ Imprimir Recibo Térmico (80mm x 80mm)
+          </button>
+        </div>
+
+        {/* 2. WhatsApp */}
+        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>💬 Enviar Comprobante por WhatsApp</h4>
+          {!isAnonymous ? (
+            <button className="btn btn-whatsapp" style={{ width: '100%' }} onClick={handleSendWhatsApp} disabled={sendingWa}>
+              {sendingWa ? 'Enviando...' : `💬 Enviar a ${invoice.client?.first_name || 'Cliente'} (${invoice.client?.phone})`}
+            </button>
+          ) : (
+            <form onSubmit={handleSendWhatsApp} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Ingresa el número de WhatsApp del cliente:</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  className="glass-input" 
+                  placeholder="+56912345678" 
+                  value={phoneInput} 
+                  onChange={e => setPhoneInput(e.target.value)} 
+                  required 
+                  style={{ flex: 1 }}
+                />
+                <button type="submit" className="btn btn-whatsapp" disabled={sendingWa}>
+                  {sendingWa ? 'Enviando...' : '💬 Enviar'}
+                </button>
+              </div>
+            </form>
+          )}
+          {waSent && <div style={{ color: 'var(--status-green)', fontSize: '0.85rem', marginTop: '0.4rem', textAlign: 'center' }}>✓ Comprobante enviado por WhatsApp</div>}
+        </div>
+
+        {/* 3. Fidelización Rápida de Cliente */}
+        {showFidelization && (
+          <div style={{ background: 'rgba(59,130,246,0.1)', padding: '1rem', borderRadius: '10px', marginBottom: '1rem', border: '1px solid rgba(59,130,246,0.3)' }}>
+            <h4 style={{ margin: '0 0 0.4rem 0', color: '#60a5fa', fontSize: '0.95rem' }}>🌟 Fidelizar Nuevo Cliente</h4>
+            <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Registra los datos del cliente para guardarlo en la base de datos y asociarle esta compra.
+            </p>
+            <form onSubmit={handleCreateFidelizedClient} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input type="text" placeholder="Nombre *" required className="glass-input" style={{ flex: 1 }} value={newClientData.first_name} onChange={e => setNewClientData({...newClientData, first_name: e.target.value})} />
+                <input type="text" placeholder="Apellido *" required className="glass-input" style={{ flex: 1 }} value={newClientData.last_name} onChange={e => setNewClientData({...newClientData, last_name: e.target.value})} />
+              </div>
+              <input type="email" placeholder="Correo electrónico (opcional)" className="glass-input" value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} />
+              <button type="submit" className="btn btn-primary" disabled={savingClient}>
+                {savingClient ? 'Guardando...' : '💾 Registrar Cliente & Fidelizar'}
+              </button>
+            </form>
+          </div>
+        )}
+
+        <div style={{ marginTop: '1.25rem', textAlign: 'right' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Historial de Ventas Emitidas (Mostrador) ───────────────────────────────────
+const CounterSalesHistory = () => {
+  const [sales, setSales] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  useEffect(() => {
+    fetchSales();
+  }, []);
+
+  const fetchSales = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get('/api/finance/invoices/?source=COUNTER_SALE', { headers: authHeader() });
+      setSales(res.data.results || res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredSales = sales.filter(s =>
+    String(s.id).includes(searchQuery) ||
+    (s.client_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.client_last_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h3 style={{ margin: 0, color: 'var(--primary-color)' }}>📜 Ventas de Mostrador Emitidas</h3>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Revisa, reimprime o reenvía comprobantes de ventas anteriores</span>
+          </div>
+          <input 
+            type="text" 
+            className="glass-input" 
+            placeholder="Buscar por Folio o Cliente..." 
+            value={searchQuery} 
+            onChange={e => setSearchQuery(e.target.value)} 
+            style={{ width: '250px' }}
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Cargando ventas...</div>
+      ) : (
+        <div className="glass-card" style={{ padding: '1.25rem' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Folio</th>
+                  <th style={{ padding: '0.75rem' }}>Fecha</th>
+                  <th style={{ padding: '0.75rem' }}>Cliente</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSales.map(inv => (
+                  <tr key={inv.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>FACT-{inv.id}</td>
+                    <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>{new Date(inv.created_at).toLocaleString()}</td>
+                    <td style={{ padding: '0.75rem' }}>
+                      {inv.client_name ? `${inv.client_name} ${inv.client_last_name || ''}` : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Venta Anónima</span>}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                      {fmt(inv.total_amount)}
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                      <span className={`badge ${STATUS_LABELS[inv.status]?.cls || 'green'}`}>
+                        {STATUS_LABELS[inv.status]?.label || inv.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => printThermalReceipt(inv)} title="Imprimir Recibo Térmico (80mm)">
+                          🖨️ 80mm
+                        </button>
+                        <button className="btn btn-whatsapp" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => { setSelectedInvoice(inv); setShowDetailModal(true); }} title="Enviar WhatsApp / Ver Detalle">
+                          💬 WA / 👁️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredSales.length === 0 && (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                      No hay ventas de mostrador emitidas coincidentes.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {showDetailModal && selectedInvoice && (
+        <PostSaleModal invoice={selectedInvoice} onClose={() => { setShowDetailModal(false); fetchSales(); }} />
+      )}
+    </div>
+  );
+};
+
 // ─── pantalla 2: venta de mostrador ──────────────────────────────────────────
 const CounterSale = () => {
   const [products, setProducts] = useState([]);
@@ -752,8 +1101,14 @@ const CounterSale = () => {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('products');
   const [searchFilter, setSearchFilter] = useState('');
+  const [completedInvoice, setCompletedInvoice] = useState(null);
+  const [showPostSaleModal, setShowPostSaleModal] = useState(false);
 
   useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = () => {
     const h = { headers: authHeader() };
     Promise.all([
       axios.get('/api/inventory/products/?popular=true', h),
@@ -766,7 +1121,7 @@ const CounterSale = () => {
       setCategories(c.data.results || c.data);
       setClients(cli.data.results || cli.data);
     }).catch(console.error);
-  }, []);
+  };
 
   const addProduct = (p) => {
     setCart(prev => {
@@ -844,6 +1199,8 @@ const CounterSale = () => {
         payment_method: method,
       }, { headers: authHeader() });
       setInvoice(charged.invoice);
+      setCompletedInvoice(charged.invoice);
+      setShowPostSaleModal(true);
       setCart([]);
       setDiscountVal('');
       setSelectedClientId('');
@@ -1112,6 +1469,14 @@ const CounterSale = () => {
           </>
         )}
       </div>
+
+      {showPostSaleModal && (
+        <PostSaleModal 
+          invoice={completedInvoice} 
+          onClose={() => setShowPostSaleModal(false)} 
+          onClientCreated={() => fetchClients()} 
+        />
+      )}
     </div>
   );
 };
@@ -1343,9 +1708,10 @@ const POSDashboard = ({ onNavigate }) => {
   }, []);
 
   const tabs = [
-    { id: 'charge',   label: '📋 Cobrar OT'         },
-    { id: 'counter',  label: '🛒 Venta Mostrador'    },
-    { id: 'catalog',  label: '🔧 Catálogo Servicios' },
+    { id: 'charge',   label: '📋 Cobrar OT'                  },
+    { id: 'counter',  label: '🛒 Venta Mostrador'            },
+    { id: 'history',  label: '📜 Ventas Emitidas (Mostrador)' },
+    { id: 'catalog',  label: '🔧 Catálogo Servicios'         },
   ];
 
   return (
@@ -1412,6 +1778,7 @@ const POSDashboard = ({ onNavigate }) => {
 
           {activeTab === 'charge'  && <ChargeWorkOrder />}
           {activeTab === 'counter' && <CounterSale />}
+          {activeTab === 'history' && <CounterSalesHistory />}
           {activeTab === 'catalog' && <ServiceCatalog />}
         </>
       )}
