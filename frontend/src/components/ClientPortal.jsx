@@ -115,6 +115,44 @@ const LoginScreen = ({ onLogin }) => {
     setError('');
   };
 
+  const [clients, setClients] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [showAdminBypass, setShowAdminBypass] = useState(false);
+  const [bypassLoading, setBypassLoading] = useState(false);
+
+  useEffect(() => {
+    const staffToken = localStorage.getItem('token');
+    if (staffToken) {
+      axios.get(`${API}/api/operations/clients/`, {
+        headers: { Authorization: `Token ${staffToken}` }
+      }).then(res => {
+        const list = res.data.results || res.data || [];
+        setClients(list);
+      }).catch(err => console.log('Staff clients list not available'));
+    }
+  }, []);
+
+  const handleBypassSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedClientId) return;
+    setBypassLoading(true);
+    setError('');
+    try {
+      const { data } = await axios.post(`${API}/api/operations/client/auth/`, {
+        client_id: selectedClientId,
+        bypass_pin: true
+      });
+      localStorage.setItem('clientToken', data.token);
+      localStorage.setItem('clientName', data.client_name);
+      localStorage.setItem('clientPhone', data.phone || '');
+      onLogin(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'No se pudo ingresar sin PIN.');
+    } finally {
+      setBypassLoading(false);
+    }
+  };
+
   return (
     <div style={{
       display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', padding: '1rem',
@@ -243,6 +281,83 @@ const LoginScreen = ({ onLogin }) => {
             >
               ¿No eres {savedName}? Ingresar con otro teléfono
             </button>
+          </div>
+        )}
+
+        {/* Sección de Selección de Cliente sin PIN para Administradores / Staff */}
+        {clients.length > 0 && (
+          <div style={{
+            marginTop: '1.5rem',
+            paddingTop: '1.2rem',
+            borderTop: '1px dashed rgba(59,130,246,0.3)',
+            textAlign: 'center'
+          }}>
+            {!showAdminBypass ? (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowAdminBypass(true)}
+                style={{
+                  width: '100%',
+                  borderColor: 'rgba(59,130,246,0.4)',
+                  color: '#60a5fa',
+                  fontSize: '0.85rem',
+                  padding: '0.6rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                ⚡ Entrar como Administrador eligiendo Cliente (Sin PIN)
+              </button>
+            ) : (
+              <form onSubmit={handleBypassSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', textAlign: 'left' }}>
+                <div style={{ fontSize: '0.85rem', color: '#60a5fa', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>⚡ Acceso Rápido sin PIN (Vista Previa)</span>
+                  <button type="button" onClick={() => setShowAdminBypass(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}>✕ Ocultar</button>
+                </div>
+                
+                <select
+                  className="input-field"
+                  value={selectedClientId}
+                  onChange={e => setSelectedClientId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 10,
+                    border: '1px solid rgba(59,130,246,0.5)',
+                    background: 'rgba(15,23,42,0.8)',
+                    color: '#fff',
+                    fontSize: '0.9rem'
+                  }}
+                  required
+                >
+                  <option value="">-- Selecciona un Cliente --</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.first_name} {c.last_name} ({c.phone || 'Sin Teléfono'})
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="submit"
+                  className="btn"
+                  disabled={bypassLoading || !selectedClientId}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(45deg, #10b981, #3b82f6)',
+                    border: 'none',
+                    padding: '0.75rem',
+                    fontWeight: 600,
+                    fontSize: '0.95rem'
+                  }}
+                >
+                  {bypassLoading ? 'Ingresando...' : '🚀 Abrir Portal del Cliente'}
+                </button>
+              </form>
+            )}
           </div>
         )}
 

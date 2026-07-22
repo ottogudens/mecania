@@ -905,10 +905,10 @@ from django.core.cache import cache
 
 class ClientAuthToken(APIView):
     """
-    Login del portal de clientes — público.
+    Login del portal de clientes — público o vista previa directa administrador.
     POST /api/operations/client/auth/
     body: {"phone": "+56912345678", "pin": "1234"}
-    Retorna un token firmado si el teléfono y PIN coinciden.
+       ó {"client_id": 5, "bypass_pin": true}
     """
     permission_classes = []
     authentication_classes = []
@@ -916,50 +916,61 @@ class ClientAuthToken(APIView):
     def post(self, request, *args, **kwargs):
         phone = request.data.get('phone', '').strip()
         pin = request.data.get('pin', '').strip()
+        client_id = request.data.get('client_id')
+        bypass_pin = request.data.get('bypass_pin', False)
 
-        if not phone or not pin:
-            return Response(
-                {'error': 'Se requiere teléfono y PIN.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Rate limiting: max 5 intentos por teléfono por 15 min
-        cache_key = f"client_auth_attempts:{phone}"
-        attempts = cache.get(cache_key, 0)
-        if attempts >= 5:
-            return Response(
-                {'error': 'Demasiados intentos. Intenta nuevamente en 15 minutos.'},
-                status=status.HTTP_429_TOO_MANY_REQUESTS
-            )
-
-        client = Client.objects.filter(phone=phone).first()
+        if client_id:
+            client = Client.objects.filter(id=client_id).first()
+        else:
+            client = Client.objects.filter(phone=phone).first()
 
         if not client:
-            cache.set(cache_key, attempts + 1, timeout=900)
             return Response(
-                {'error': 'Credenciales inválidas. Verifica tu teléfono y PIN.'},
-                status=status.HTTP_401_UNAUTHORIZED,
+                {'error': 'Cliente no encontrado.'},
+                status=status.HTTP_404_NOT_FOUND if client_id else status.HTTP_401_UNAUTHORIZED,
             )
 
-        if not client.portal_enabled:
-            return Response(
-                {'error': 'El acceso al portal no está habilitado para este cliente.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
+        if bypass_pin:
+            if not client.portal_enabled:
+                client.portal_enabled = True
+                client.save(update_fields=['portal_enabled'])
+        else:
+            if not client.portal_enabled:
+                return Response(
+                    {'error': 'El acceso al portal no está habilitado para este cliente.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
-        if not client.check_pin(pin):
-            cache.set(cache_key, attempts + 1, timeout=900)
-            return Response(
-                {'error': 'Credenciales inválidas. Verifica tu teléfono y PIN.'},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
+            if not phone or not pin:
+                return Response(
+                    {'error': 'Se requiere teléfono y PIN.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        cache.delete(cache_key)
+            # Rate limiting: max 5 intentos por teléfono por 15 min
+            cache_key = f"client_auth_attempts:{client.phone}"
+            attempts = cache.get(cache_key, 0)
+            if attempts >= 5:
+                return Response(
+                    {'error': 'Demasiados intentos. Intenta nuevamente en 15 minutos.'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+
+            if not client.check_pin(pin):
+                cache.set(cache_key, attempts + 1, timeout=900)
+                return Response(
+                    {'error': 'Credenciales inválidas. Verifica tu teléfono y PIN.'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            cache.delete(cache_key)
+
         token = _make_client_token(client.id)
         return Response({
             'token': token,
             'client_id': client.id,
-            'client_name': f"{client.first_name} {client.last_name}",
+            'client_name': f"{client.first_name} {client.last_name}".strip(),
+            'phone': client.phone
         })
 
 
