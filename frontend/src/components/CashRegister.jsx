@@ -164,6 +164,145 @@ const CashRegister = () => {
     }
   };
 
+  const printThermalZReport = (zData) => {
+    if (!zData || !zData.session) return;
+    const { session, expected_cash, expected_card, expected_transfer, expected_cash_drawer, inbound_movements, outbound_movements, movements } = zData;
+
+    const printWin = window.open('', '_blank', 'width=400,height=600');
+    if (!printWin) {
+      toast({ title: 'Atención', message: 'Permite ventanas emergentes en tu navegador para imprimir el ticket.', type: 'warning' });
+      return;
+    }
+
+    const fmtNum = (n) => `$${Math.round(parseFloat(n || 0)).toLocaleString('es-CL')}`;
+    const openedStr = session.opened_at ? new Date(session.opened_at).toLocaleString('es-CL') : '–';
+    const closedStr = session.closed_at ? new Date(session.closed_at).toLocaleString('es-CL') : '–';
+    
+    const closingCash = parseFloat(session.closing_cash || 0);
+    const closingCard = parseFloat(session.closing_card || 0);
+    const closingTransfer = parseFloat(session.closing_transfer || 0);
+
+    const diffCash = closingCash - parseFloat(expected_cash_drawer || 0);
+    const diffCard = closingCard - parseFloat(expected_card || 0);
+    const diffTransfer = closingTransfer - parseFloat(expected_transfer || 0);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Reporte Z - Caja #${session.id}</title>
+        <style>
+          @page {
+            size: 80mm auto;
+            margin: 0;
+          }
+          body {
+            width: 76mm;
+            margin: 2mm auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            color: #000;
+            line-height: 1.2;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 5px 0; }
+          .double-divider { border-top: 2px double #000; margin: 6px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+          td, th { font-size: 10px; padding: 2px 0; vertical-align: top; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center">
+          <div style="font-size: 14px;" class="bold">MECANIA TALLER</div>
+          <div style="font-size: 12px;" class="bold">REPORTE Z - TURNO #${session.id}</div>
+        </div>
+        <div class="divider"></div>
+        
+        <div><strong>Apertura:</strong> ${openedStr}</div>
+        <div><strong>Cierre:</strong> ${closedStr}</div>
+        <div><strong>Cajero Apertura:</strong> ${session.opened_by_username || '–'}</div>
+        <div><strong>Cajero Cierre:</strong> ${session.closed_by_username || '–'}</div>
+
+        <div class="double-divider"></div>
+        <div class="bold text-center">CUADRE ESTIMADO EN SISTEMA</div>
+        <div class="divider"></div>
+        
+        <table>
+          <tr><td>Fondo Inicial (+):</td><td class="text-right">${fmtNum(session.opening_amount)}</td></tr>
+          <tr><td>Ventas Efectivo (+):</td><td class="text-right">${fmtNum(expected_cash)}</td></tr>
+          <tr><td>Ingresos Manuales (+):</td><td class="text-right">${fmtNum(inbound_movements)}</td></tr>
+          <tr><td>Egresos Manuales (-):</td><td class="text-right">-${fmtNum(outbound_movements)}</td></tr>
+          <tr class="bold"><td>Esperado en Cajón:</td><td class="text-right">${fmtNum(expected_cash_drawer)}</td></tr>
+        </table>
+        
+        <table>
+          <tr><td>Ventas Tarjetas:</td><td class="text-right">${fmtNum(expected_card)}</td></tr>
+          <tr><td>Ventas Transferencia:</td><td class="text-right">${fmtNum(expected_transfer)}</td></tr>
+        </table>
+
+        <div class="double-divider"></div>
+        <div class="bold text-center">ARQUEO DECLARADO Y DIFERENCIAS</div>
+        <div class="divider"></div>
+
+        <table>
+          <tr class="bold"><td>EFECTIVO:</td><td></td></tr>
+          <tr><td>  Declarado:</td><td class="text-right">${fmtNum(closingCash)}</td></tr>
+          <tr><td>  Esperado:</td><td class="text-right">${fmtNum(expected_cash_drawer)}</td></tr>
+          <tr class="bold"><td>  Diferencia:</td><td class="text-right">${diffCash >= 0 ? '+' : ''}${fmtNum(diffCash)}</td></tr>
+
+          <tr class="bold"><td>TARJETAS:</td><td></td></tr>
+          <tr><td>  Declarado:</td><td class="text-right">${fmtNum(closingCard)}</td></tr>
+          <tr><td>  Esperado:</td><td class="text-right">${fmtNum(expected_card)}</td></tr>
+          <tr class="bold"><td>  Diferencia:</td><td class="text-right">${diffCard >= 0 ? '+' : ''}${fmtNum(diffCard)}</td></tr>
+
+          <tr class="bold"><td>TRANSFERENCIAS:</td><td></td></tr>
+          <tr><td>  Declarado:</td><td class="text-right">${fmtNum(closingTransfer)}</td></tr>
+          <tr><td>  Esperado:</td><td class="text-right">${fmtNum(expected_transfer)}</td></tr>
+          <tr class="bold"><td>  Diferencia:</td><td class="text-right">${diffTransfer >= 0 ? '+' : ''}${fmtNum(diffTransfer)}</td></tr>
+        </table>
+
+        ${movements && movements.length > 0 ? `
+          <div class="divider"></div>
+          <div class="bold text-center">MOVIMIENTOS EN TURNO</div>
+          <table>
+            ${movements.map(m => `
+              <tr>
+                <td>${m.movement_type === 'IN' ? '[ING]' : '[EGR]'} ${m.description}</td>
+                <td class="text-right">${m.movement_type === 'IN' ? '+' : '-'}${fmtNum(m.amount)}</td>
+              </tr>
+            `).join('')}
+          </table>
+        ` : ''}
+
+        ${session.closing_notes ? `
+          <div class="divider"></div>
+          <div><strong>Notas de Cierre:</strong> ${session.closing_notes}</div>
+        ` : ''}
+
+        <div class="double-divider"></div>
+        <br/><br/>
+        <div class="text-center">
+          ___________________________<br/>
+          Firma Cajero Responsable
+        </div>
+        <br/>
+        <div class="text-center" style="font-size: 9px;">MecanIA POS 80mm</div>
+      </body>
+      </html>
+    `;
+
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+      printWin.close();
+    }, 250);
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       
@@ -574,7 +713,15 @@ const CashRegister = () => {
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem' }}>
+              <button 
+                type="button"
+                className="btn btn-primary"
+                onClick={() => printThermalZReport(zReportData)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 650 }}
+              >
+                🖨️ Imprimir Ticket Z (80mm)
+              </button>
               <button className="btn" onClick={() => setSelectedCloseSession(null)}>Cerrar Detalle</button>
             </div>
           </div>

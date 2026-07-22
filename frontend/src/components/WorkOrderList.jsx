@@ -73,6 +73,16 @@ const WorkOrderList = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [detailFiles, setDetailFiles] = useState([]);
 
+  // Abonos (Partial Advance Payments) State
+  const [showAbonoModal, setShowAbonoModal] = useState(false);
+  const [abonoOrder, setAbonoOrder] = useState(null);
+  const [abonoAmount, setAbonoAmount] = useState('');
+  const [abonoMethod, setAbonoMethod] = useState('CASH');
+  const [abonoRef, setAbonoRef] = useState('');
+  const [abonoInvoiceData, setAbonoInvoiceData] = useState(null);
+  const [abonoLoading, setAbonoLoading] = useState(false);
+  const [abonoReceiptData, setAbonoReceiptData] = useState(null);
+
   useEffect(() => {
     fetchData();
 
@@ -350,6 +360,213 @@ const WorkOrderList = () => {
     } catch (err) {
       console.error(err);
       alert("Error al registrar vehículo rápido.");
+    }
+  };
+
+  const openAbonoModal = async (order) => {
+    setAbonoOrder(order);
+    setAbonoAmount('');
+    setAbonoMethod('CASH');
+    setAbonoRef('');
+    setAbonoReceiptData(null);
+    setAbonoLoading(true);
+    setShowAbonoModal(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`/api/finance/pos/work-order-lookup/?work_order_id=${order.id}`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      setAbonoInvoiceData(res.data);
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Atención', message: err.response?.data?.error || 'No se pudo sincronizar la caja para el abono. Verifica que la caja esté abierta.', type: 'warning' });
+    } finally {
+      setAbonoLoading(false);
+    }
+  };
+
+  const handleRegisterAbono = async (e) => {
+    e.preventDefault();
+    if (!abonoInvoiceData || !abonoInvoiceData.id) {
+      toast({ title: 'Error', message: 'No hay factura válida asignada a esta OT.', type: 'error' });
+      return;
+    }
+    const amt = parseFloat(abonoAmount);
+    if (!amt || amt <= 0) {
+      toast({ title: 'Error', message: 'Ingresa un monto válido para el abono.', type: 'error' });
+      return;
+    }
+
+    const totalOT = parseFloat(abonoInvoiceData.total_amount || 0);
+    const paidSoFar = parseFloat(abonoInvoiceData.amount_paid || 0);
+    const pending = totalOT > 0 ? (totalOT - paidSoFar) : 99999999;
+    
+    if (totalOT > 0 && amt > pending) {
+      toast({ title: 'Error', message: `El abono de ${fmt(amt)} excede el saldo pendiente de ${fmt(pending)}.`, type: 'error' });
+      return;
+    }
+
+    try {
+      setAbonoLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await axios.post('/api/finance/pos/charge/', {
+        invoice_id: abonoInvoiceData.id,
+        amount: amt,
+        payment_method: abonoMethod,
+        reference_number: abonoRef
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+
+      const updatedInv = res.data;
+      setAbonoInvoiceData(updatedInv);
+      const receiptInfo = {
+        work_order: abonoOrder,
+        invoice: updatedInv,
+        abono_amount: amt,
+        payment_method: abonoMethod,
+        reference: abonoRef,
+        date: new Date().toLocaleString('es-CL')
+      };
+
+      setAbonoReceiptData(receiptInfo);
+      toast({ title: 'Abono Registrado', message: `Abono de ${fmt(amt)} registrado exitosamente en el turno activo de caja.`, type: 'success' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error al registrar abono', message: err.response?.data?.error || 'No se pudo registrar el abono. Verifica que la caja esté abierta.', type: 'error' });
+    } finally {
+      setAbonoLoading(false);
+    }
+  };
+
+  const printThermalAbonoReceipt = (receipt) => {
+    if (!receipt) return;
+    const printWin = window.open('', '_blank', 'width=400,height=600');
+    if (!printWin) {
+      toast({ title: 'Atención', message: 'Permite ventanas emergentes para imprimir el comprobante.', type: 'warning' });
+      return;
+    }
+
+    const fmtNum = (n) => `$${Math.round(parseFloat(n || 0)).toLocaleString('es-CL')}`;
+    const { work_order, invoice, abono_amount, payment_method, date } = receipt;
+    const clientName = work_order.vehicle?.client ? `${work_order.vehicle.client.first_name} ${work_order.vehicle.client.last_name}` : 'Cliente MecanIA';
+    const plate = work_order.vehicle?.license_plate || 'N/A';
+    const methodLabel = payment_method === 'CASH' ? 'EFECTIVO' : payment_method === 'CARD' ? 'TARJETA' : 'TRANSFERENCIA';
+
+    const totalOT = parseFloat(invoice.total_amount || 0);
+    const paidSoFar = parseFloat(invoice.amount_paid || 0);
+    const pending = totalOT - paidSoFar;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Comprobante de Abono - OT #${work_order.id}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body {
+            width: 76mm;
+            margin: 2mm auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            color: #000;
+            line-height: 1.2;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 5px 0; }
+          .double-divider { border-top: 2px double #000; margin: 6px 0; }
+          table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+          td, th { font-size: 10px; padding: 2px 0; vertical-align: top; }
+        </style>
+      </head>
+      <body>
+        <div class="text-center bold" style="font-size: 14px;">MECANIA TALLER</div>
+        <div class="text-center">COMPROBANTE DE ABONO A TRABAJO</div>
+        <div class="divider"></div>
+
+        <div><strong>OT #:</strong> ${work_order.id}</div>
+        <div><strong>Patente:</strong> ${plate} (${work_order.vehicle?.make || ''} ${work_order.vehicle?.model || ''})</div>
+        <div><strong>Cliente:</strong> ${clientName}</div>
+        <div><strong>Fecha:</strong> ${date}</div>
+        <div class="divider"></div>
+
+        <div class="bold text-center" style="font-size: 12px; margin: 5px 0;">
+          MONTO ABONADO: ${fmtNum(abono_amount)}
+        </div>
+        <div><strong>Medio de Pago:</strong> ${methodLabel}</div>
+        <div class="divider"></div>
+
+        <table>
+          <tr><td>Total Trabajo (OT):</td><td class="text-right">${fmtNum(totalOT)}</td></tr>
+          <tr><td>Abonos Acumulados:</td><td class="text-right">${fmtNum(paidSoFar)}</td></tr>
+          <tr class="bold"><td>SALDO PENDIENTE:</td><td class="text-right">${fmtNum(pending)}</td></tr>
+        </table>
+
+        <div class="double-divider"></div>
+        <br/><br/>
+        <div class="text-center">
+          ___________________________<br/>
+          Firma Cliente / Conforme
+        </div>
+        <br/>
+        <div class="text-center" style="font-size: 9px;">MecanIA Taller Inteligente</div>
+      </body>
+      </html>
+    `;
+
+    printWin.document.write(htmlContent);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => {
+      printWin.print();
+      printWin.close();
+    }, 250);
+  };
+
+  const handleSendAbonoWhatsApp = async () => {
+    if (!abonoReceiptData || !abonoReceiptData.work_order) return;
+    const wo = abonoReceiptData.work_order;
+    const client = wo.vehicle?.client;
+    const phone = client?.phone;
+    if (!phone) {
+      toast({ title: 'Atención', message: 'El cliente no tiene un teléfono registrado.', type: 'warning' });
+      return;
+    }
+
+    const fmtNum = (n) => `$${Math.round(parseFloat(n || 0)).toLocaleString('es-CL')}`;
+    const totalOT = parseFloat(abonoReceiptData.invoice.total_amount || 0);
+    const paidSoFar = parseFloat(abonoReceiptData.invoice.amount_paid || 0);
+    const pending = totalOT - paidSoFar;
+
+    const text = (
+      `¡Hola ${client.first_name}! 💵 *COMPROBANTE DE ABONO EN MECANIA*\n\n` +
+      `📋 *OT N°:* ${wo.id}\n` +
+      `🚘 *Vehículo:* ${wo.vehicle?.license_plate} (${wo.vehicle?.make} ${wo.vehicle?.model})\n\n` +
+      `✅ *Monto Abonado:* ${fmtNum(abonoReceiptData.abono_amount)}\n` +
+      `💳 *Medio de Pago:* ${abonoReceiptData.payment_method === 'CASH' ? 'Efectivo' : abonoReceiptData.payment_method === 'CARD' ? 'Tarjeta' : 'Transferencia'}\n` +
+      `💰 *Total Trabajo:* ${fmtNum(totalOT)}\n` +
+      `📊 *Abonos Acumulados:* ${fmtNum(paidSoFar)}\n` +
+      `🟡 *Saldo Pendiente:* ${fmtNum(pending)}\n\n` +
+      `¡Gracias por confiar en MecanIA!`
+    );
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post('/api/operations/whatsapp-messages/send-manual/', {
+        phone: phone,
+        text: text
+      }, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'WhatsApp Enviado', message: `Comprobante de abono enviado a ${phone}`, type: 'success' });
+    } catch (err) {
+      console.error(err);
+      toast({ title: 'Error', message: 'No se pudo enviar el mensaje de WhatsApp.', type: 'error' });
     }
   };
 
@@ -701,6 +918,11 @@ const WorkOrderList = () => {
                         <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openDetails(order)}>
                           👁️ Detalles
                         </button>
+                        {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                          <button className="btn btn-success" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openAbonoModal(order)}>
+                            💵 Abono
+                          </button>
+                        )}
                         <button className="btn" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem', background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }} onClick={() => openAiModal(order)}>
                           🤖 IA
                         </button>
@@ -760,13 +982,18 @@ const WorkOrderList = () => {
 
                       <div className="ot-actions">
                         <div className="ot-actions-row">
-                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles / Estado</button>
+                          <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => openDetails(order)}>Detalles</button>
+                          {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
+                            <button className="btn btn-success" style={{ flex: 1, fontSize: '0.85rem', padding: '0.4rem' }} onClick={() => openAbonoModal(order)}>
+                              💵 Abono
+                            </button>
+                          )}
                           <button
                             className="btn"
                             style={{ flex: 1, background: 'linear-gradient(45deg, #3b82f6, #8b5cf6)' }}
                             onClick={() => openAiModal(order)}
                           >
-                            🤖 MecanIA
+                            🤖 IA
                           </button>
                         </div>
                         {order.status !== 'DELIVERED' && order.invoice?.status !== 'PAID' && (
@@ -1049,9 +1276,14 @@ const WorkOrderList = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                 <h3 style={{ margin: 0 }}>OT #{selectedOrder.id} - {selectedOrder.vehicle?.license_plate}</h3>
-                <button className="btn btn-outline" style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem', borderColor: '#3b82f6', color: '#3b82f6' }} onClick={handleDownloadPDF}>
+                <button className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }} onClick={handleDownloadPDF}>
                   Descargar PDF
                 </button>
+                {selectedOrder.status !== 'DELIVERED' && selectedOrder.status !== 'CANCELLED' && (
+                  <button className="btn btn-success" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }} onClick={() => openAbonoModal(selectedOrder)}>
+                    💵 Registrar Abono
+                  </button>
+                )}
               </div>
               <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer', fontSize: '1.5rem' }}>&times;</button>
             </div>
@@ -1507,6 +1739,150 @@ const WorkOrderList = () => {
           </div>
         </div>
       )}
+      {/* Modal Registrar Abono */}
+      {showAbonoModal && abonoOrder && (
+        <div className="modal-overlay" onClick={() => setShowAbonoModal(false)} style={{ zIndex: 1100 }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">💵 Registrar Abono (OT #{abonoOrder.id})</h3>
+              <button className="modal-close" onClick={() => setShowAbonoModal(false)}>&times;</button>
+            </div>
+
+            {abonoReceiptData ? (
+              /* Muestra Comprobante Exitoso de Abono */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginTop: '1rem' }}>
+                <div style={{ background: 'rgba(46,204,113,0.1)', border: '1px solid rgba(46,204,113,0.3)', padding: '1.2rem', borderRadius: 12, textAlign: 'center' }}>
+                  <div style={{ fontSize: '2.5rem', marginBottom: '0.3rem' }}>🎉</div>
+                  <h4 style={{ color: 'var(--status-green)', margin: '0 0 0.5rem 0' }}>¡Abono Registrado Correctamente!</h4>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    El abono de <strong>{fmt(abonoReceiptData.abono_amount)}</strong> fue procesado e ingresado al turno activo de caja.
+                  </p>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Total Orden de Trabajo:</span>
+                    <strong>{fmt(abonoReceiptData.invoice?.total_amount)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--status-green)' }}>
+                    <span>Total Abonos Acumulados:</span>
+                    <strong>-{fmt(abonoReceiptData.invoice?.amount_paid)}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.4rem', color: 'var(--status-yellow)', fontSize: '1.05rem', fontWeight: 700 }}>
+                    <span>Saldo Pendiente Trabajo:</span>
+                    <span>{fmt(parseFloat(abonoReceiptData.invoice?.total_amount || 0) - parseFloat(abonoReceiptData.invoice?.amount_paid || 0))}</span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => printThermalAbonoReceipt(abonoReceiptData)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontWeight: 650 }}
+                  >
+                    🖨️ Imprimir Comprobante Térmico (80mm)
+                  </button>
+                  {abonoOrder.vehicle?.client?.phone && (
+                    <button
+                      className="btn btn-whatsapp"
+                      onClick={handleSendAbonoWhatsApp}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    >
+                      💬 Enviar Comprobante por WhatsApp ({abonoOrder.vehicle?.client?.phone})
+                    </button>
+                  )}
+                  <button className="btn btn-ghost" onClick={() => setShowAbonoModal(false)}>
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Formulario para ingresar abono */
+              <form onSubmit={handleRegisterAbono} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: 8, border: '1px solid var(--border-color)', fontSize: '0.9rem' }}>
+                  <div><strong>Vehículo:</strong> {abonoOrder.vehicle?.license_plate} ({abonoOrder.vehicle?.make} {abonoOrder.vehicle?.model})</div>
+                  <div><strong>Cliente:</strong> {abonoOrder.vehicle?.client ? `${abonoOrder.vehicle.client.first_name} ${abonoOrder.vehicle.client.last_name}` : 'Cliente General'}</div>
+                  
+                  {abonoInvoiceData && (
+                    <div style={{ marginTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '0.8rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', textAlign: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Trabajo</span>
+                        <div style={{ fontWeight: 700, fontSize: '1rem' }}>{fmt(abonoInvoiceData.total_amount)}</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Abonos Previos</span>
+                        <div style={{ fontWeight: 700, color: 'var(--status-green)', fontSize: '1rem' }}>{fmt(abonoInvoiceData.amount_paid)}</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Saldo Pendiente</span>
+                        <div style={{ fontWeight: 700, color: 'var(--status-yellow)', fontSize: '1rem' }}>
+                          {fmt(parseFloat(abonoInvoiceData.total_amount || 0) - parseFloat(abonoInvoiceData.amount_paid || 0))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Monto del Abono ($) *</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    placeholder="Ej: 50000"
+                    value={abonoAmount}
+                    onChange={e => setAbonoAmount(e.target.value)}
+                    required
+                    min="1"
+                    step="any"
+                  />
+                  {abonoInvoiceData && parseFloat(abonoInvoiceData.total_amount || 0) > 0 && (
+                    <small style={{ color: 'var(--text-muted)' }}>
+                      Saldo pendiente actual: {fmt(parseFloat(abonoInvoiceData.total_amount || 0) - parseFloat(abonoInvoiceData.amount_paid || 0))}
+                    </small>
+                  )}
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Medio de Pago *</label>
+                  <select
+                    className="input-field"
+                    value={abonoMethod}
+                    onChange={e => setAbonoMethod(e.target.value)}
+                    required
+                  >
+                    <option value="CASH">💵 Efectivo (Registra en cajón)</option>
+                    <option value="CARD">💳 Tarjeta (Transbank)</option>
+                    <option value="TRANSFER">🏦 Transferencia Bancaria</option>
+                  </select>
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">N° Operación / Referencia (Opcional)</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="Ej: Voucher Transbank #4892"
+                    value={abonoRef}
+                    onChange={e => setAbonoRef(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ background: 'rgba(241,196,15,0.05)', border: '1px dashed rgba(241,196,15,0.2)', padding: '0.8rem', borderRadius: 8, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  💡 <strong>Información Financiera:</strong> Este abono se registrará inmediatamente dentro de la sesión activa de caja para mantener el cuadre por turno de dinero.
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-ghost" onClick={() => setShowAbonoModal(false)}>Cancelar</button>
+                  <button type="submit" className="btn btn-success" disabled={abonoLoading}>
+                    {abonoLoading ? 'Procesando...' : '💵 Confirmar Abono'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
