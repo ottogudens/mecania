@@ -1104,6 +1104,34 @@ const CounterSale = () => {
   const [completedInvoice, setCompletedInvoice] = useState(null);
   const [showPostSaleModal, setShowPostSaleModal] = useState(false);
 
+  // New Client Modal State
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [newClientData, setNewClientData] = useState({ first_name: '', last_name: '', rut: '', phone: '', email: '' });
+  const [creatingClient, setCreatingClient] = useState(false);
+
+  const handleCreateClient = async (e) => {
+    e.preventDefault();
+    if (!newClientData.first_name.trim()) {
+      alert('El nombre del cliente es obligatorio.');
+      return;
+    }
+    setCreatingClient(true);
+    try {
+      const res = await axios.post('/api/operations/clients/', newClientData, { headers: authHeader() });
+      const newClient = res.data;
+      setClients(prev => [newClient, ...prev]);
+      setSelectedClientId(String(newClient.id));
+      setShowNewClientModal(false);
+      setNewClientData({ first_name: '', last_name: '', rut: '', phone: '', email: '' });
+      alert(`✅ Cliente "${newClient.first_name} ${newClient.last_name || ''}" creado y seleccionado.`);
+    } catch (err) {
+      console.error(err);
+      alert('Error al crear el cliente: ' + (err.response?.data?.error || err.response?.data?.first_name || 'Revisa los campos e intenta de nuevo.'));
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
   useEffect(() => {
     fetchClients();
   }, []);
@@ -1320,9 +1348,28 @@ const CounterSale = () => {
 
         {/* Selección de Cliente */}
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 1 }}>
-            👤 Cliente (Opcional)
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <label style={{ color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 1 }}>
+              👤 Cliente (Opcional)
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowNewClientModal(true)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--primary-color)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.2rem'
+              }}
+            >
+              ➕ Nuevo Cliente
+            </button>
+          </div>
           <select 
             value={selectedClientId} 
             onChange={e => setSelectedClientId(e.target.value)}
@@ -1476,6 +1523,105 @@ const CounterSale = () => {
           onClose={() => setShowPostSaleModal(false)} 
           onClientCreated={() => fetchClients()} 
         />
+      )}
+
+      {showNewClientModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.75)', zIndex: 9999, display: 'flex',
+          justifyContent: 'center', alignItems: 'center', padding: '1rem'
+        }}>
+          <div className="glass-card" style={{ maxWidth: '480px', width: '100%', padding: '1.5rem', background: '#0b0f19' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--primary-color)' }}>👤 Registrar Nuevo Cliente</h3>
+              <button 
+                type="button" 
+                onClick={() => setShowNewClientModal(false)}
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem' }}
+              >✕</button>
+            </div>
+
+            <form onSubmit={handleCreateClient} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>Nombre (*)</label>
+                <input
+                  type="text"
+                  required
+                  className="glass-input"
+                  placeholder="Ej: Juan"
+                  value={newClientData.first_name}
+                  onChange={e => setNewClientData({ ...newClientData, first_name: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>Apellido</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  placeholder="Ej: Pérez"
+                  value={newClientData.last_name}
+                  onChange={e => setNewClientData({ ...newClientData, last_name: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>RUT / DNI</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  placeholder="Ej: 12.345.678-9"
+                  value={newClientData.rut}
+                  onChange={e => setNewClientData({ ...newClientData, rut: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>Teléfono WhatsApp</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  placeholder="Ej: +56912345678"
+                  value={newClientData.phone}
+                  onChange={e => setNewClientData({ ...newClientData, phone: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>Correo Electrónico</label>
+                <input
+                  type="email"
+                  className="glass-input"
+                  placeholder="Ej: cliente@correo.com"
+                  value={newClientData.email}
+                  onChange={e => setNewClientData({ ...newClientData, email: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  onClick={() => setShowNewClientModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn" 
+                  disabled={creatingClient}
+                >
+                  {creatingClient ? 'Guardando...' : '💾 Guardar Cliente'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

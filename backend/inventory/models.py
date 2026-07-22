@@ -6,7 +6,7 @@ class Product(models.Model):
     name = models.CharField(max_length=200)
     sku = models.CharField(max_length=50, unique=True, blank=True)
     category = models.CharField(max_length=100, blank=True, default='', verbose_name="Categoría")
-    stock_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)])
+    stock_quantity = models.IntegerField(default=0)
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio de Venta (IVA incluido)")
     net_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Precio Neto")
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Costo Neto")
@@ -15,6 +15,7 @@ class Product(models.Model):
     low_stock_threshold = models.IntegerField(default=5, validators=[MinValueValidator(0)])
     image = models.ImageField(upload_to='products/', null=True, blank=True, verbose_name="Imagen del producto")
     sales_count = models.IntegerField(default=0, help_text="Cantidad de veces que se ha vendido este producto")
+    block_sale_without_stock = models.BooleanField(default=False, verbose_name="Bloquear venta sin stock")
 
     def __str__(self):
         return f"{self.name} ({self.sku})"

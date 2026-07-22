@@ -15,7 +15,7 @@ const InventoryDashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
-  const [newProduct, setNewProduct] = useState({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5 });
+  const [newProduct, setNewProduct] = useState({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5, block_sale_without_stock: false });
   const [imageFile, setImageFile] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -148,6 +148,7 @@ const InventoryDashboard = () => {
       category: product.category || '',
       stock_quantity: product.stock_quantity,
       low_stock_threshold: product.low_stock_threshold || 5,
+      block_sale_without_stock: product.block_sale_without_stock || false,
     });
     setImageFile(null);
     setShowModal(true);
@@ -156,7 +157,7 @@ const InventoryDashboard = () => {
   const openNewProductModal = () => {
     setIsEditing(false);
     setEditingProductId(null);
-    setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5 });
+    setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5, block_sale_without_stock: false });
     setImageFile(null);
     setShowModal(true);
   };
@@ -190,7 +191,7 @@ const InventoryDashboard = () => {
       }
       
       setShowModal(false);
-      setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5 });
+      setNewProduct({ name: '', sku: '', barcode: '', price: '', cost_price: '', supplier: '', category: '', stock_quantity: 0, low_stock_threshold: 5, block_sale_without_stock: false });
       setImageFile(null);
       setIsEditing(false);
       setEditingProductId(null);
@@ -750,6 +751,19 @@ const InventoryDashboard = () => {
                   onChange={e => setNewProduct({...newProduct, low_stock_threshold: e.target.value})} 
                   min="0"
                 />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0' }}>
+                <input 
+                  type="checkbox" 
+                  id="block_sale_without_stock"
+                  checked={newProduct.block_sale_without_stock} 
+                  onChange={e => setNewProduct({...newProduct, block_sale_without_stock: e.target.checked})} 
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="block_sale_without_stock" style={{ fontWeight: '500', cursor: 'pointer', userSelect: 'none' }}>
+                  🚫 No vender si no hay stock (Bloquear venta)
+                </label>
               </div>
               
               <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>

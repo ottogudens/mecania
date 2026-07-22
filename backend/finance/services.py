@@ -94,7 +94,7 @@ def create_counter_sale(*, client_id=None, items, discount_amount=0, registered_
             product = locked_products.get(product_id)
             if product is None:
                 raise POSError(f"Producto {product_id} no encontrado.")
-            if product.stock_quantity < quantity:
+            if product.block_sale_without_stock and product.stock_quantity < quantity:
                 raise POSError(
                     f"Stock insuficiente para '{product.name}': "
                     f"disponible {product.stock_quantity}, solicitado {quantity}."

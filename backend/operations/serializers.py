@@ -25,7 +25,11 @@ class ClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = '__all__'
-        extra_kwargs = {'pin_hash': {'write_only': True, 'required': False}}
+        extra_kwargs = {
+            'pin_hash': {'write_only': True, 'required': False},
+            'email': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'last_name': {'required': False, 'allow_blank': True},
+        }
 
     def get_vehicle_count(self, obj):
         return obj.vehicles.count()
@@ -45,6 +49,9 @@ class VehicleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vehicle
         fields = '__all__'
+        extra_kwargs = {
+            'mileage': {'required': False, 'allow_null': True},
+        }
 
     def get_parts_count(self, obj):
         return obj.parts.count()

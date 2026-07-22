@@ -622,8 +622,8 @@ const VehicleList = () => {
                   <input type="text" name="engine_displacement" value={currentVehicle.engine_displacement} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} placeholder="1.6L" />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-muted)' }}>Kilometraje Inicial</label>
-                  <input type="number" name="mileage" value={currentVehicle.mileage} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} placeholder="100000" />
+                  <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-muted)' }}>Kilometraje Inicial (Opcional)</label>
+                  <input type="number" name="mileage" value={currentVehicle.mileage} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} placeholder="Ej: 100000" />
                 </div>
               </div>
               <div>

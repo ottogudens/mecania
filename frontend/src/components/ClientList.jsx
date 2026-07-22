@@ -431,22 +431,22 @@ const ClientList = () => {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre</label>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Nombre *</label>
                   <input type="text" name="first_name" required value={newClient.first_name} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Apellido</label>
-                  <input type="text" name="last_name" required value={newClient.last_name} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} />
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Apellido (Opcional)</label>
+                  <input type="text" name="last_name" value={newClient.last_name} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} />
                 </div>
               </div>
               
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Teléfono (WhatsApp)</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Teléfono WhatsApp *</label>
                 <input type="text" name="phone" required placeholder="+56912345678" value={newClient.phone} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} />
               </div>
               
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Correo Electrónico</label>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Correo Electrónico (Opcional)</label>
                 <input type="email" name="email" value={newClient.email} onChange={handleInputChange} className="input-field" style={{ width: '100%' }} />
               </div>
               
@@ -549,8 +549,8 @@ const ClientList = () => {
                   <input type="text" value={newVehicle.engine_displacement} onChange={e => setNewVehicle({...newVehicle, engine_displacement: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="2.0L" />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Kilometraje Inicial</label>
-                  <input type="number" value={newVehicle.mileage} onChange={e => setNewVehicle({...newVehicle, mileage: e.target.value})} className="input-field" style={{ width: '100%' }} />
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Kilometraje Inicial (Opcional)</label>
+                  <input type="number" value={newVehicle.mileage} onChange={e => setNewVehicle({...newVehicle, mileage: e.target.value})} className="input-field" style={{ width: '100%' }} placeholder="Ej: 100000" />
                 </div>
               </div>
               

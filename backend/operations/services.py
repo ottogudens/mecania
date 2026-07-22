@@ -103,7 +103,7 @@ def _discount_inventory_for_work_order(work_order: WorkOrder):
 
     for item in items_with_product:
         product = locked_products[item.product_id]
-        if product.stock_quantity < item.quantity:
+        if product.block_sale_without_stock and product.stock_quantity < item.quantity:
             raise WorkOrderTransitionError(
                 f"Stock insuficiente para cerrar la OT: '{product.name}' tiene "
                 f"{product.stock_quantity} disponibles pero la OT usa {item.quantity}."
