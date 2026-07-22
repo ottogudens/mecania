@@ -40,6 +40,7 @@ const VehicleList = () => {
   const [selectedMedicalVehicle, setSelectedMedicalVehicle] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('vehicle_view_mode') || 'grid');
 
   // Medical modal tabs and data
   const [medicalTab, setMedicalTab] = useState('info');
@@ -315,17 +316,123 @@ const VehicleList = () => {
 
   return (
     <div className="vehicle-list">
-      <div className="header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <h2>Directorio de Vehículos</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <input type="text" className="glass-input" placeholder="Buscar por placa, marca o modelo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-          <button className="btn" onClick={openNewModal}>Nuevo Vehículo</button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* View Selector */}
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+            <button 
+              type="button"
+              onClick={() => { setViewMode('grid'); localStorage.setItem('vehicle_view_mode', 'grid'); }}
+              style={{
+                padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer',
+                background: viewMode === 'grid' ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                color: viewMode === 'grid' ? '#000' : 'var(--text-muted)',
+                fontWeight: viewMode === 'grid' ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+              }}
+            >
+              🎴 Tarjetas
+            </button>
+            <button 
+              type="button"
+              onClick={() => { setViewMode('list'); localStorage.setItem('vehicle_view_mode', 'list'); }}
+              style={{
+                padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer',
+                background: viewMode === 'list' ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                color: viewMode === 'list' ? '#000' : 'var(--text-muted)',
+                fontWeight: viewMode === 'list' ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+              }}
+            >
+              📄 Lista Detallada
+            </button>
+          </div>
+
+          <input type="text" className="glass-input" placeholder="Buscar por placa, marca o modelo..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ width: '250px' }} />
+          <button className="btn" onClick={openNewModal}>+ Nuevo Vehículo</button>
         </div>
       </div>
 
       {filteredVehicles.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center' }}><p>No hay vehículos registrados.</p></div>
+        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: 'var(--text-muted)' }}>No hay vehículos registrados o coincidentes.</p>
+        </div>
+      ) : viewMode === 'list' ? (
+        /* ── Vista de Lista Detallada ── */
+        <div className="glass-card" style={{ padding: '1rem' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.8rem 1rem' }}>Patente / Vehículo</th>
+                  <th style={{ padding: '0.8rem 1rem' }}>Especificaciones</th>
+                  <th style={{ padding: '0.8rem 1rem' }}>Propietario / Cliente</th>
+                  <th style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>Ficha & Registro</th>
+                  <th style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVehicles.map(vehicle => (
+                  <tr key={vehicle.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span className="badge" style={{ backgroundColor: 'var(--bg-card)', color: '#fff', fontSize: '0.9rem', padding: '0.3rem 0.6rem', border: '1px solid var(--border-color)', letterSpacing: 1, fontFamily: 'monospace' }}>
+                          🚗 {vehicle.license_plate}
+                        </span>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{vehicle.make} {vehicle.model}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Año {vehicle.year} {vehicle.color ? `• ${vehicle.color}` : ''}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: '0.82rem' }}>
+                        <span>⚙️ Transmisión: <strong>{getTransmissionLabel(vehicle.transmission_type)}</strong></span>
+                        <span>⛽ Combustible: <strong>{getFuelLabel(vehicle.fuel_type)}</strong></span>
+                        {vehicle.mileage && <span style={{ color: 'var(--text-muted)' }}>🛣️ Km: {vehicle.mileage.toLocaleString()} km</span>}
+                        {vehicle.vin && <span style={{ color: 'var(--text-muted)' }}>VIN: {vehicle.vin}</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      {vehicle.client ? (
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{vehicle.client.first_name} {vehicle.client.last_name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>📞 {vehicle.client.phone}</div>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--status-yellow)', fontSize: '0.82rem' }}>⚠️ Sin propietario</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        {vehicle.parts_count > 0 && <span className="badge blue" style={{ fontSize: '0.72rem' }}>⚙️ {vehicle.parts_count}</span>}
+                        {vehicle.maintenance_count > 0 && <span className="badge green" style={{ fontSize: '0.72rem' }}>🛠️ {vehicle.maintenance_count}</span>}
+                        {vehicle.pending_maintenance_count > 0 && <span className="badge red" style={{ fontSize: '0.72rem' }}>📅 {vehicle.pending_maintenance_count}</span>}
+                        {(!vehicle.parts_count && !vehicle.maintenance_count && !vehicle.pending_maintenance_count) && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Sin registros</span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openMedicalModal(vehicle)} title="Ficha Clínica">
+                          📋 Ficha Clínica
+                        </button>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openEditModal(vehicle)} title="Editar">
+                          ✏️
+                        </button>
+                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleDelete(vehicle.id)} title="Eliminar">
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
+        /* ── Vista de Tarjetas ── */
         <div className="grid-container">
           {filteredVehicles.map(vehicle => (
             <div key={vehicle.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>

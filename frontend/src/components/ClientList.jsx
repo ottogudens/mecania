@@ -13,6 +13,11 @@ const ClientList = () => {
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('client_view_mode') || 'grid');
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
 
   const [newClient, setNewClient] = useState({
     first_name: '',
@@ -172,25 +177,155 @@ const ClientList = () => {
 
   return (
     <div className="client-list">
-      <div className="header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="header" style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <h2>Directorio de Clientes</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* View selector */}
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+            <button 
+              type="button"
+              onClick={() => { setViewMode('grid'); localStorage.setItem('client_view_mode', 'grid'); }}
+              style={{
+                padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer',
+                background: viewMode === 'grid' ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                color: viewMode === 'grid' ? '#000' : 'var(--text-muted)',
+                fontWeight: viewMode === 'grid' ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+              }}
+            >
+              🎴 Tarjetas
+            </button>
+            <button 
+              type="button"
+              onClick={() => { setViewMode('list'); localStorage.setItem('client_view_mode', 'list'); }}
+              style={{
+                padding: '0.5rem 0.9rem', border: 'none', cursor: 'pointer',
+                background: viewMode === 'list' ? 'linear-gradient(135deg, var(--secondary-color), var(--primary-color))' : 'transparent',
+                color: viewMode === 'list' ? '#000' : 'var(--text-muted)',
+                fontWeight: viewMode === 'list' ? 700 : 400, fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+              }}
+            >
+              📄 Lista Detallada
+            </button>
+          </div>
+
           <input 
             type="text" 
             className="glass-input" 
             placeholder="Buscar por nombre o teléfono..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ width: '240px' }}
           />
-          <button className="btn" onClick={openNewClientModal}>Nuevo Cliente</button>
+          <button className="btn" onClick={openNewClientModal}>+ Nuevo Cliente</button>
         </div>
       </div>
 
       {filteredClients.length === 0 ? (
-        <div className="glass-card" style={{ textAlign: 'center' }}>
-          <p>No hay clientes registrados.</p>
+        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: 'var(--text-muted)' }}>No hay clientes registrados o coincidentes.</p>
+        </div>
+      ) : viewMode === 'list' ? (
+        /* ── Vista de Lista Detallada ── */
+        <div className="glass-card" style={{ padding: '1rem' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.8rem 1rem' }}>Cliente</th>
+                  <th style={{ padding: '0.8rem 1rem' }}>Contacto & Dirección</th>
+                  <th style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>Vehículos</th>
+                  <th style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>Portal Cliente</th>
+                  <th style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.map(client => (
+                  <tr key={client.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
+                        {client.first_name} {client.last_name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID #{client.id} {client.rut ? `• ${client.rut}` : ''}</div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span>📞 {client.phone}</span>
+                        {client.email && <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>✉️ {client.email}</span>}
+                        {client.address && <span style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>📍 {client.address}</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      <span className="badge blue" style={{ fontSize: '0.85rem' }}>
+                        🚗 {client.vehicle_count || 0}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'center' }}>
+                      {client.portal_enabled ? (
+                        <span className="badge green" style={{ fontSize: '0.75rem' }}>Activo (PIN)</span>
+                      ) : (
+                        <span className="badge pending" style={{ fontSize: '0.75rem' }}>Inactivo</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openVehicleModal(client.id)} title="Añadir Vehículo">
+                          + Vehículo
+                        </button>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => openEditClientModal(client)} title="Editar">
+                          ✏️
+                        </button>
+                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleDeleteClient(client.id)} title="Eliminar">
+                          🗑️
+                        </button>
+                        {client.portal_enabled ? (
+                          <button 
+                            className="btn btn-outline" 
+                            style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} 
+                            onClick={async () => {
+                              try {
+                                const token = localStorage.getItem('token');
+                                const res = await axios.post(`/api/operations/clients/${client.id}/resend_pin/`, {}, {
+                                  headers: { Authorization: `Token ${token}` }
+                                });
+                                alert(`PIN regenerado y enviado. Nuevo PIN: ${res.data.pin}`);
+                                fetchClients();
+                              } catch (err) {
+                                alert(err.response?.data?.error || "Error al reenviar credenciales.");
+                              }
+                            }}
+                          >
+                            🔄 PIN
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn" 
+                            style={{ fontSize: '0.8rem', padding: '0.3rem 0.6rem', backgroundColor: '#25D366', color: '#fff', border: 'none' }}
+                            onClick={async () => {
+                              try {
+                                const token = localStorage.getItem('token');
+                                const res = await axios.post(`/api/operations/clients/${client.id}/send_credentials/`, {}, {
+                                  headers: { Authorization: `Token ${token}` }
+                                });
+                                alert(`Portal habilitado con éxito. PIN generado: ${res.data.pin}. Mensaje de WhatsApp enviado.`);
+                                fetchClients();
+                              } catch (err) {
+                                alert(err.response?.data?.error || "Error al habilitar portal.");
+                              }
+                            }}
+                          >
+                            📲 Portal WA
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
+        /* ── Vista de Tarjetas ── */
         <div className="grid-container">
           {filteredClients.map(client => (
             <div key={client.id} className="glass-card" style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
