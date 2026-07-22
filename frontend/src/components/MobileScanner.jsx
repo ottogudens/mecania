@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useToast } from './Toast';
 
 const authHeader = () => ({ Authorization: `Token ${localStorage.getItem('token')}` });
@@ -45,14 +45,36 @@ const MobileScanner = () => {
     // Evitar duplicaciones
     if (scannerInstanceRef.current) return;
 
-    // Crear instancia del scanner
+    // Crear instancia del scanner con soporte optimizado para iOS (Safari WebKit) y códigos de barra 1D
     const scanner = new Html5QrcodeScanner(
       "qr-reader", 
       { 
-        fps: 10, 
-        qrbox: { width: 280, height: 180 },
+        fps: 15, 
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          // Adaptación dinámica de caja para códigos de barra horizontales en pantallas móviles (especialmente iOS)
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const width = Math.floor(minEdge * 0.85);
+          const height = Math.floor(width * 0.5); // Proporción más apta para 1D Barcodes
+          return { width: Math.max(width, 220), height: Math.max(height, 120) };
+        },
+        aspectRatio: 1.333333,
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.DATA_MATRIX
+        ],
         videoConstraints: {
-          facingMode: { ideal: "environment" }
+          facingMode: { ideal: "environment" },
+          focusMode: { ideal: "continuous" }
+        },
+        showTorchButtonIfSupported: true,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
         }
       },
       /* verbose= */ false
