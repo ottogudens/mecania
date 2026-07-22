@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from './Toast';
 
+const fmt = (n) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(n || 0);
+
 export default function EstimatesDashboard() {
   const [estimates, setEstimates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +34,7 @@ export default function EstimatesDashboard() {
     setLoading(true);
     axios.get('/api/finance/estimates/')
       .then(res => setEstimates(res.data.results || res.data))
-      .catch(err => toast({ title: "Error al cargar presupuestos", type: "error" }))
+      .catch(() => toast({ title: "Error al cargar presupuestos", type: "error" }))
       .finally(() => setLoading(false));
   };
 
@@ -143,7 +145,7 @@ export default function EstimatesDashboard() {
 
     if (editingId) {
       axios.put(`/api/finance/estimates/${editingId}/`, payload)
-        .then(res => {
+        .then(() => {
           toast({ title: "Presupuesto actualizado exitosamente", type: "success" });
           setViewState('list');
           setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] });
@@ -156,7 +158,7 @@ export default function EstimatesDashboard() {
         });
     } else {
       axios.post('/api/finance/estimates/', payload)
-        .then(res => {
+        .then(() => {
           toast({ title: "Presupuesto creado exitosamente", type: "success" });
           setViewState('list');
           setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] });
@@ -184,13 +186,13 @@ export default function EstimatesDashboard() {
   const sendWhatsApp = (id) => {
     toast({ title: "Enviando por WhatsApp...", type: "info" });
     axios.post(`/api/finance/estimates/${id}/share_whatsapp/`)
-      .then(res => {
+      .then(() => {
         toast({ title: "Mensaje enviado exitosamente", type: "success" });
         fetchEstimates();
       })
       .catch(err => {
         console.error(err);
-        toast({ title: "Error al enviar WhatsApp. Asegúrese de que el cliente tiene teléfono y el servicio WA está activo.", type: "error" });
+        toast({ title: "Error al enviar WhatsApp. Asegúrese de que el cliente tiene teléfono.", type: "error" });
       });
   };
   
@@ -208,169 +210,299 @@ export default function EstimatesDashboard() {
 
   const getStatusBadge = (status) => {
     const map = {
-      'DRAFT': { bg: '#e2e8f0', color: '#475569', label: 'Borrador' },
-      'SENT': { bg: '#dbeafe', color: '#2563eb', label: 'Enviado' },
-      'ACCEPTED': { bg: '#dcfce3', color: '#16a34a', label: 'Aceptado' },
-      'REJECTED': { bg: '#fee2e2', color: '#dc2626', label: 'Rechazado' }
+      'DRAFT': { cls: 'DRAFT', label: 'Borrador' },
+      'SENT': { cls: 'SENT', label: 'Enviado' },
+      'ACCEPTED': { cls: 'PAID', label: 'Aceptado' },
+      'REJECTED': { cls: 'CANCELLED', label: 'Rechazado' }
     };
     const style = map[status] || map['DRAFT'];
     return (
-      <span style={{ backgroundColor: style.bg, color: style.color, padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '500' }}>
+      <span className={`badge ${style.cls}`}>
         {style.label}
       </span>
     );
   };
 
   if (viewState === 'new') {
-    const total = newEstimate.items.reduce((acc, i) => acc + (i.price * i.qty), 0);
-    const tax = total * 0.19;
-    const grandTotal = total + tax;
+    const grossTotal = newEstimate.items.reduce((acc, i) => acc + (i.price * i.qty), 0);
+    const neto = Math.round(grossTotal / 1.19);
+    const tax = grossTotal - neto;
 
     return (
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h2>{editingId ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</h2>
-          <button className="btn btn-secondary" onClick={() => { setViewState('list'); setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] }); setEditingId(null); }}>Volver</button>
-        </div>
-        <form onSubmit={handleSaveEstimate} className="form-grid">
-          <div className="form-group">
-            <label>Cliente</label>
-            <select value={newEstimate.client_id} onChange={e => setNewEstimate({...newEstimate, client_id: e.target.value})} required>
-              <option value="">Seleccione un cliente...</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Vehículo (Opcional)</label>
-            <select value={newEstimate.vehicle_id} onChange={e => setNewEstimate({...newEstimate, vehicle_id: e.target.value})} disabled={!newEstimate.client_id}>
-              <option value="">Ninguno o Seleccione...</option>
-              {filteredVehicles.map(v => <option key={v.id} value={v.id}>{v.license_plate} - {v.make} {v.model}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Válido Hasta (Opcional)</label>
-            <input type="date" value={newEstimate.valid_until} onChange={e => setNewEstimate({...newEstimate, valid_until: e.target.value})} />
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        <div className="glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+            <h2 style={{ color: 'var(--primary-color)', margin: 0 }}>
+              {editingId ? '✏️ Editar Presupuesto' : '📋 Nuevo Presupuesto'}
+            </h2>
+            <button className="btn btn-ghost" onClick={() => { setViewState('list'); setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] }); setEditingId(null); }}>
+              ← Volver
+            </button>
           </div>
 
-          <div style={{ gridColumn: '1 / -1', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-            <h3>Ítems del Presupuesto</h3>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', marginBottom: '1rem' }}>
-              <div style={{ flex: 1 }}>
-                <label>Tipo</label>
-                <select value={cartItem.type} onChange={e => setCartItem({...cartItem, type: e.target.value, id: ''})}>
-                  <option value="product">Producto</option>
-                  <option value="service">Servicio</option>
-                </select>
-              </div>
-              <div style={{ flex: 2 }}>
-                <label>Ítem</label>
-                <select value={cartItem.id} onChange={e => setCartItem({...cartItem, id: e.target.value})}>
-                  <option value="">Seleccione...</option>
-                  {(cartItem.type === 'product' ? inventory.products : inventory.services).map(item => (
-                    <option key={item.id} value={item.id}>{item.name} (${item.price})</option>
+          <form onSubmit={handleSaveEstimate}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                  Cliente *
+                </label>
+                <select 
+                  className="glass-input" 
+                  value={newEstimate.client_id} 
+                  onChange={e => setNewEstimate({...newEstimate, client_id: e.target.value, vehicle_id: ''})} 
+                  required
+                >
+                  <option value="">Seleccione un cliente...</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.first_name} {c.last_name} ({c.rut || 'Sin RUT'})</option>
                   ))}
                 </select>
               </div>
-              <div style={{ width: '80px' }}>
-                <label>Cant.</label>
-                <input type="number" min="1" value={cartItem.qty} onChange={e => setCartItem({...cartItem, qty: e.target.value})} />
+
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                  Vehículo (Opcional)
+                </label>
+                <select 
+                  className="glass-input" 
+                  value={newEstimate.vehicle_id} 
+                  onChange={e => setNewEstimate({...newEstimate, vehicle_id: e.target.value})} 
+                  disabled={!newEstimate.client_id}
+                >
+                  <option value="">Ninguno / Sin vehículo asignado</option>
+                  {filteredVehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.license_plate} - {v.make} {v.model}</option>
+                  ))}
+                </select>
               </div>
-              <button type="button" className="btn btn-primary" onClick={handleAddItem}>Agregar</button>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 500 }}>
+                  Válido Hasta (Opcional)
+                </label>
+                <input 
+                  type="date" 
+                  className="glass-input" 
+                  value={newEstimate.valid_until} 
+                  onChange={e => setNewEstimate({...newEstimate, valid_until: e.target.value})} 
+                />
+              </div>
             </div>
 
-            <table className="data-table" style={{ marginBottom: '1rem' }}>
-              <thead>
-                <tr>
-                  <th>Descripción</th>
-                  <th>Cant.</th>
-                  <th>Precio Unit.</th>
-                  <th>Subtotal</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {newEstimate.items.length === 0 ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No hay ítems en el presupuesto.</td></tr>
-                ) : newEstimate.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td>{item.name}</td>
-                    <td>{item.qty}</td>
-                    <td>${item.price}</td>
-                    <td>${item.price * item.qty}</td>
-                    <td><button type="button" className="btn" style={{ color: 'red' }} onClick={() => handleRemoveItem(idx)}>Quitar</button></td>
-                  </tr>
-                ))}
-              </tbody>
+            {/* Ítems Section */}
+            <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+              <h3 style={{ color: 'var(--primary-color)', marginBottom: '1rem', fontSize: '1.1rem' }}>
+                🛒 Ítems del Presupuesto
+              </h3>
+
+              {/* Agregar item bar */}
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 100px 120px', gap: '0.75rem', alignItems: 'end', marginBottom: '1.25rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.8rem' }}>Tipo</label>
+                  <select className="glass-input" style={{ padding: '0.4rem 0.6rem' }} value={cartItem.type} onChange={e => setCartItem({...cartItem, type: e.target.value, id: ''})}>
+                    <option value="product">📦 Producto</option>
+                    <option value="service">🔧 Servicio</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.8rem' }}>Ítem Catálogo</label>
+                  <select className="glass-input" style={{ padding: '0.4rem 0.6rem' }} value={cartItem.id} onChange={e => setCartItem({...cartItem, id: e.target.value})}>
+                    <option value="">Seleccionar ítem...</option>
+                    {(cartItem.type === 'product' ? inventory.products : inventory.services).map(item => (
+                      <option key={item.id} value={item.id}>{item.name} ({fmt(item.price)})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.8rem' }}>Cant.</label>
+                  <input type="number" min="1" className="glass-input" style={{ padding: '0.4rem 0.6rem' }} value={cartItem.qty} onChange={e => setCartItem({...cartItem, qty: e.target.value})} />
+                </div>
+
+                <button type="button" className="btn btn-primary" style={{ padding: '0.45rem 1rem' }} onClick={handleAddItem}>
+                  + Agregar
+                </button>
+              </div>
+
+              {/* Tabla de Ítems */}
+              <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.75rem' }}>Descripción</th>
+                      <th style={{ padding: '0.75rem', width: '80px', textAlign: 'center' }}>Cant.</th>
+                      <th style={{ padding: '0.75rem', width: '120px', textAlign: 'right' }}>Precio Unit.</th>
+                      <th style={{ padding: '0.75rem', width: '120px', textAlign: 'right' }}>Subtotal</th>
+                      <th style={{ padding: '0.75rem', width: '80px', textAlign: 'center' }}>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {newEstimate.items.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          No hay ítems agregados al presupuesto. Usa el selector superior para añadir repuestos o servicios.
+                        </td>
+                      </tr>
+                    ) : newEstimate.items.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '0.75rem', fontWeight: 500 }}>{item.name}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>{item.qty}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right' }}>{fmt(item.price)}</td>
+                        <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 600, color: 'var(--primary-color)' }}>
+                          {fmt(item.price * item.qty)}
+                        </td>
+                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                          <button 
+                            type="button" 
+                            style={{ background: 'none', border: 'none', color: 'var(--status-red)', cursor: 'pointer', fontSize: '1rem' }} 
+                            onClick={() => handleRemoveItem(idx)}
+                            title="Quitar ítem"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals Summary */}
               {newEstimate.items.length > 0 && (
-                <tfoot>
-                  <tr><td colSpan="3" style={{ textAlign: 'right' }}><strong>Neto:</strong></td><td>${total.toFixed(2)}</td><td></td></tr>
-                  <tr><td colSpan="3" style={{ textAlign: 'right' }}><strong>IVA (19%):</strong></td><td>${tax.toFixed(2)}</td><td></td></tr>
-                  <tr><td colSpan="3" style={{ textAlign: 'right' }}><strong>Total:</strong></td><td><strong>${grandTotal.toFixed(2)}</strong></td><td></td></tr>
-                </tfoot>
+                <div style={{
+                  maxWidth: '320px', marginLeft: 'auto', background: 'rgba(0,0,0,0.3)',
+                  padding: '1rem 1.25rem', borderRadius: '10px', border: '1px solid var(--border-color)',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <span>Monto Neto:</span>
+                    <span>{fmt(neto)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <span>IVA (19%):</span>
+                    <span>{fmt(tax)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-color)', fontWeight: 700, fontSize: '1.15rem' }}>
+                    <span>TOTAL:</span>
+                    <span style={{ color: 'var(--primary-color)' }}>{fmt(grossTotal)}</span>
+                  </div>
+                </div>
               )}
-            </table>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '1rem' }}>
-                {editingId ? 'Actualizar Presupuesto' : 'Guardar Presupuesto'}
-              </button>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-ghost" 
+                  onClick={() => { setViewState('list'); setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] }); setEditingId(null); }}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem 2rem' }}>
+                  {editingId ? '💾 Actualizar Presupuesto' : '✅ Guardar Presupuesto'}
+                </button>
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2>Presupuestos</h2>
-        <button className="btn btn-primary" onClick={() => setViewState('new')}>+ Nuevo Presupuesto</button>
+    <div>
+      <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'var(--primary-color)' }}>📄 Presupuestos y Cotizaciones</h2>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Crea, envía e imprime cotizaciones para tus clientes
+            </span>
+          </div>
+          <button className="btn btn-primary" onClick={() => { setEditingId(null); setNewEstimate({ client_id: '', vehicle_id: '', valid_until: '', items: [] }); setViewState('new'); }}>
+            + Nuevo Presupuesto
+          </button>
+        </div>
       </div>
       
       {loading ? (
-        <div>Cargando presupuestos...</div>
+        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+          Cargando presupuestos...
+        </div>
       ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Cliente</th>
-              <th>Vehículo</th>
-              <th>Fecha</th>
-              <th>Total</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {estimates.map(e => (
-              <tr key={e.id}>
-                <td>PRE-{e.id}</td>
-                <td>{e.client_name} {e.client_last_name}</td>
-                <td>{e.vehicle_license_plate || '-'}</td>
-                <td>{new Date(e.created_at).toLocaleDateString()}</td>
-                <td>${parseFloat(e.total_amount).toFixed(0)}</td>
-                <td>{getStatusBadge(e.status)}</td>
-                <td style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn" onClick={() => downloadPDF(e.id)} title="Descargar PDF">📄</button>
-                  <button className="btn" onClick={() => sendWhatsApp(e.id)} style={{ color: '#16a34a' }} title="Enviar por WhatsApp">💬</button>
-                  {e.status !== 'ACCEPTED' && (
-                    <button className="btn" onClick={() => handleEditEstimate(e)} title="Editar Presupuesto">✏️</button>
-                  )}
-                  {e.status !== 'ACCEPTED' && (
-                    <button className="btn" onClick={() => handleDeleteEstimate(e.id)} style={{ color: 'red' }} title="Eliminar Presupuesto">🗑️</button>
-                  )}
-                  {e.status !== 'ACCEPTED' && e.vehicle && (
-                    <button className="btn btn-secondary" onClick={() => convertToWorkOrder(e.id)} title="Convertir a Orden de Trabajo">➡️ OT</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {estimates.length === 0 && (
-              <tr><td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>No hay presupuestos registrados.</td></tr>
-            )}
-          </tbody>
-        </table>
+        <div className="glass-card" style={{ padding: '1.25rem' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.75rem' }}>Folio</th>
+                  <th style={{ padding: '0.75rem' }}>Cliente</th>
+                  <th style={{ padding: '0.75rem' }}>Vehículo</th>
+                  <th style={{ padding: '0.75rem' }}>Fecha</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Estado</th>
+                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estimates.map(e => (
+                  <tr key={e.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '0.85rem 0.75rem', fontWeight: 'bold' }}>PRE-{e.id}</td>
+                    <td style={{ padding: '0.85rem 0.75rem' }}>{e.client_name} {e.client_last_name}</td>
+                    <td style={{ padding: '0.85rem 0.75rem' }}>
+                      {e.vehicle_license_plate ? (
+                        <span className="badge" style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                          {e.vehicle_license_plate}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.75rem', color: 'var(--text-muted)' }}>
+                      {new Date(e.created_at).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.75rem', textAlign: 'right', fontWeight: 'bold', color: 'var(--primary-color)' }}>
+                      {fmt(parseFloat(e.total_amount))}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.75rem', textAlign: 'center' }}>
+                      {getStatusBadge(e.status)}
+                    </td>
+                    <td style={{ padding: '0.85rem 0.75rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => downloadPDF(e.id)} title="Descargar PDF">
+                          📄 PDF
+                        </button>
+                        <button className="btn btn-whatsapp" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => sendWhatsApp(e.id)} title="Enviar por WhatsApp">
+                          💬 WA
+                        </button>
+                        {e.status !== 'ACCEPTED' && (
+                          <button className="btn btn-outline" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleEditEstimate(e)} title="Editar Presupuesto">
+                            ✏️
+                          </button>
+                        )}
+                        {e.status !== 'ACCEPTED' && (
+                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleDeleteEstimate(e.id)} title="Eliminar Presupuesto">
+                            🗑️
+                          </button>
+                        )}
+                        {e.status !== 'ACCEPTED' && e.vehicle && (
+                          <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => convertToWorkOrder(e.id)} title="Convertir a Orden de Trabajo">
+                            ➡️ OT
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {estimates.length === 0 && (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                      No hay presupuestos registrados. Haz clic en "+ Nuevo Presupuesto" para crear la primera cotización.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );

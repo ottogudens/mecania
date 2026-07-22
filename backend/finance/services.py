@@ -50,7 +50,7 @@ def require_open_cash_register():
 # ---------------------------------------------------------------------------
 
 @transaction.atomic
-def create_counter_sale(*, client_id, items, registered_by=None):
+def create_counter_sale(*, client_id=None, items, discount_amount=0, registered_by=None):
     """
     Crea una venta de mostrador completa: factura + líneas + descuento de
     inventario, todo en una sola transacción atómica.
@@ -71,6 +71,7 @@ def create_counter_sale(*, client_id, items, registered_by=None):
     invoice = Invoice.objects.create(
         client_id=client_id,
         source='COUNTER_SALE',
+        discount_amount=Decimal(str(discount_amount or 0)),
         status='DRAFT',
     )
 

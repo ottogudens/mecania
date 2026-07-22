@@ -43,6 +43,7 @@ class Invoice(models.Model):
         help_text="Suma de los pagos/abonos registrados contra esta factura.",
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Descuento global aplicado a la factura.")
     cancelled_reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -63,16 +64,21 @@ class Invoice(models.Model):
 
     def recalculate_totals(self, tax_rate=Decimal('0.19')):
         """
-        Recalcula subtotal/impuesto/total a partir de las líneas reales,
-        sea OT o venta de mostrador. No toca amount_paid ni status: eso lo
-        maneja la capa de servicio (ver finance/services.py) para mantener
-        la actualización de stock y de pagos coordinada en una transacción.
+        Recalcula subtotal (neto), impuesto (IVA 19%) y total_amount a partir de las líneas reales,
+        considerando los precios de los ítems con IVA incluido y descontando discount_amount.
         """
         items = self.get_line_items()
-        subtotal = sum((item.total_price for item in items), Decimal('0'))
-        self.subtotal = subtotal
-        self.tax_amount = subtotal * tax_rate
-        self.total_amount = self.subtotal + self.tax_amount
+        gross_items_total = sum((item.total_price for item in items), Decimal('0'))
+        
+        discount = self.discount_amount or Decimal('0')
+        final_total = max(Decimal('0'), gross_items_total - discount)
+        
+        net_subtotal = round(final_total / (Decimal('1') + tax_rate), 2)
+        tax = final_total - net_subtotal
+        
+        self.subtotal = net_subtotal
+        self.tax_amount = tax
+        self.total_amount = final_total
         self.save(update_fields=['subtotal', 'tax_amount', 'total_amount', 'updated_at'])
 
     def __str__(self):

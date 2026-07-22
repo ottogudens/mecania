@@ -700,25 +700,33 @@ const InventoryDashboard = () => {
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div className="input-group">
-                  <label className="input-label">Costo Neto ($)</label>
+                  <label className="input-label">Costo Neto Compra ($)</label>
                   <input 
                     type="number" 
                     className="input-field" 
                     value={newProduct.cost_price} 
                     onChange={e => setNewProduct({...newProduct, cost_price: e.target.value})} 
+                    placeholder="Sin IVA (Factura)"
                     min="0"
                   />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Monto directo de la factura</span>
                 </div>
                 <div className="input-group">
-                  <label className="input-label">Precio Venta (IVA 19%)</label>
+                  <label className="input-label">Precio Venta (Con IVA 19%)</label>
                   <input 
                     type="number" 
                     className="input-field" 
                     value={newProduct.price} 
                     onChange={e => setNewProduct({...newProduct, price: e.target.value})} 
                     required 
+                    placeholder="IVA Incluido"
                     min="0"
                   />
+                  {newProduct.price > 0 && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', display: 'block', marginTop: 2 }}>
+                      Neto calculado: {formatCLP(Math.round(parseFloat(newProduct.price) / 1.19))}
+                    </span>
+                  )}
                 </div>
                 <div className="input-group">
                   <label className="input-label">Stock Actual</label>
@@ -830,7 +838,7 @@ const InventoryDashboard = () => {
               {/* Price field - disabled for bundles */}
               <div className="input-group">
                 <label className="input-label">
-                  Precio {newService.is_bundle ? '(Calculado automáticamente)' : '*'}
+                  Precio Venta (Con IVA 19%) {newService.is_bundle ? '(Calculado automáticamente)' : '*'}
                 </label>
                 <input 
                   type="number" 
@@ -839,12 +847,18 @@ const InventoryDashboard = () => {
                   onChange={e => setNewService({...newService, price: e.target.value})} 
                   required={!newService.is_bundle}
                   disabled={newService.is_bundle}
+                  placeholder="IVA Incluido"
                   min="0"
                   style={{ 
                     backgroundColor: newService.is_bundle ? 'rgba(255,255,255,0.02)' : undefined,
                     opacity: newService.is_bundle ? 0.7 : 1,
                   }}
                 />
+                {!newService.is_bundle && newService.price > 0 && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', display: 'block', marginTop: 2 }}>
+                    Neto calculado: {formatCLP(Math.round(parseFloat(newService.price) / 1.19))}
+                  </span>
+                )}
               </div>
 
               {/* Bundle items */}

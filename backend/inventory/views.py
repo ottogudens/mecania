@@ -31,12 +31,12 @@ class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = [
-            'id', 'name', 'category', 'category_name', 'price',
+            'id', 'name', 'category', 'category_name', 'price', 'net_price',
             'description', 'is_active', 'is_bundle', 'sales_count',
             'bundle_items', 'bundle_items_data', 'computed_bundle_price',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['sales_count']
+        read_only_fields = ['sales_count', 'net_price']
 
     def get_computed_bundle_price(self, obj):
         """For bundle services, calculate the total price from bundle items."""

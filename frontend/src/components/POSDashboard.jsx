@@ -740,6 +740,10 @@ const CounterSale = () => {
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [discountType, setDiscountType] = useState('amount'); // 'amount' | 'percent'
+  const [discountVal, setDiscountVal] = useState('');
   const [cartItems, setCart] = useState([]);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [method, setMethod] = useState('CASH');
@@ -755,11 +759,13 @@ const CounterSale = () => {
       axios.get('/api/inventory/products/?popular=true', h),
       axios.get('/api/inventory/services/?popular=true', h),
       axios.get('/api/inventory/service-categories/', h),
-    ]).then(([p, s, c]) => {
+      axios.get('/api/operations/clients/', h),
+    ]).then(([p, s, c, cli]) => {
       setProducts(p.data.results || p.data);
       setServices(s.data.results || s.data);
       setCategories(c.data.results || c.data);
-    });
+      setClients(cli.data.results || cli.data);
+    }).catch(console.error);
   }, []);
 
   const addProduct = (p) => {
@@ -806,9 +812,16 @@ const CounterSale = () => {
 
   const removeItem = (idx) => setCart(prev => prev.filter((_, i) => i !== idx));
 
-  const subtotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const iva = subtotal * 0.19;
-  const total = subtotal + iva;
+  // Cart calculations (Prices in cart include 19% IVA)
+  const grossTotal = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const rawDiscount = parseFloat(discountVal) || 0;
+  const discountAmount = Math.min(
+    grossTotal,
+    discountType === 'percent' ? Math.round((grossTotal * rawDiscount) / 100) : rawDiscount
+  );
+  const finalTotal = Math.max(0, grossTotal - discountAmount);
+  const neto = Math.round(finalTotal / 1.19);
+  const iva = finalTotal - neto;
 
   const checkout = async () => {
     if (!cartItems.length) return;
@@ -819,7 +832,12 @@ const CounterSale = () => {
         : { service_id: i.id, quantity: i.qty, unit_price: i.price }
     );
     try {
-      const { data: inv } = await axios.post('/api/finance/pos/counter-sale/', { items }, { headers: authHeader() });
+      const payload = {
+        client_id: selectedClientId ? parseInt(selectedClientId) : null,
+        discount_amount: discountAmount,
+        items
+      };
+      const { data: inv } = await axios.post('/api/finance/pos/counter-sale/', payload, { headers: authHeader() });
       const { data: charged } = await axios.post('/api/finance/pos/charge/', {
         invoice_id: inv.id,
         amount: parseFloat(inv.total_amount),
@@ -827,6 +845,8 @@ const CounterSale = () => {
       }, { headers: authHeader() });
       setInvoice(charged.invoice);
       setCart([]);
+      setDiscountVal('');
+      setSelectedClientId('');
       setMsg({ type: 'ok', text: `✅ Venta registrada — Factura #${charged.invoice.id} pagada con ${method === 'CASH' ? 'efectivo' : method === 'CARD' ? 'tarjeta' : 'transferencia'}.` });
     } catch (e) {
       setMsg({ type: 'error', text: e.response?.data?.error || 'Error al procesar la venta.' });
@@ -888,7 +908,10 @@ const CounterSale = () => {
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>{p.name}</div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 8 }}>SKU: {p.sku}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>{fmt(p.price)}</span>
+                  <div>
+                    <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>{fmt(p.price)}</span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>IVA incl.</span>
+                  </div>
                   <span style={{
                     fontSize: '0.75rem', padding: '2px 8px', borderRadius: 12,
                     background: p.stock_quantity > 0 ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)',
@@ -921,7 +944,10 @@ const CounterSale = () => {
                       onClick={() => addService(s)}>
                       <div style={{ fontWeight: 600, marginBottom: 4 }}>{s.name}</div>
                       {s.description && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 8 }}>{s.description}</div>}
-                      <div style={{ color: 'var(--primary-color)', fontWeight: 700 }}>{fmt(s.price)}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--primary-color)', fontWeight: 700 }}>{fmt(s.price)}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>IVA incl.</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -933,7 +959,27 @@ const CounterSale = () => {
 
       {/* carrito */}
       <div className="glass-card" style={{ position: 'sticky', top: 0 }}>
-        <h3 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>🛒 Carrito</h3>
+        <h3 style={{ color: 'var(--primary-color)', marginBottom: '1rem' }}>🛒 Carrito de Venta</h3>
+
+        {/* Selección de Cliente */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 1 }}>
+            👤 Cliente (Opcional)
+          </label>
+          <select 
+            value={selectedClientId} 
+            onChange={e => setSelectedClientId(e.target.value)}
+            style={{
+              width: '100%', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)',
+              borderRadius: 8, padding: '0.5rem', color: '#fff', fontFamily: 'Outfit, sans-serif', fontSize: '0.85rem'
+            }}
+          >
+            <option value="">Venta Anónima / Sin Cliente</option>
+            {clients.map(c => (
+              <option key={c.id} value={c.id}>{c.first_name} {c.last_name} ({c.rut || 'Sin RUT'})</option>
+            ))}
+          </select>
+        </div>
 
         {cartItems.length === 0 ? (
           <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem 0' }}>
@@ -948,7 +994,7 @@ const CounterSale = () => {
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 500, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{fmt(item.price)} c/u</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{fmt(item.price)} (IVA incl.)</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: '0.5rem' }}>
                   <button onClick={() => updateQty(idx, -1)} style={{
@@ -971,14 +1017,64 @@ const CounterSale = () => {
               </div>
             ))}
 
-            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-              {[['Subtotal', fmt(subtotal)], ['IVA 19%', fmt(iva)]].map(([lbl, val]) => (
-                <div key={lbl} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                  <span>{lbl}</span><span>{val}</span>
+            {/* Opción de Descuento */}
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <label style={{ display: 'block', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: 1 }}>
+                🏷️ Aplicar Descuento
+              </label>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDiscountType('amount')}
+                    style={{
+                      padding: '0.3rem 0.6rem', border: 'none', cursor: 'pointer', fontSize: '0.75rem',
+                      background: discountType === 'amount' ? 'var(--secondary-color)' : 'transparent',
+                      color: discountType === 'amount' ? '#000' : 'var(--text-muted)', fontWeight: 700
+                    }}
+                  >$</button>
+                  <button
+                    type="button"
+                    onClick={() => setDiscountType('percent')}
+                    style={{
+                      padding: '0.3rem 0.6rem', border: 'none', cursor: 'pointer', fontSize: '0.75rem',
+                      background: discountType === 'percent' ? 'var(--secondary-color)' : 'transparent',
+                      color: discountType === 'percent' ? '#000' : 'var(--text-muted)', fontWeight: 700
+                    }}
+                  >%</button>
                 </div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 700, fontSize: '1.15rem' }}>
-                <span>TOTAL</span><span style={{ color: 'var(--primary-color)' }}>{fmt(total)}</span>
+                <input 
+                  type="number"
+                  min="0"
+                  placeholder={discountType === 'percent' ? 'Ej: 10 (%)' : 'Ej: 5000 ($)'}
+                  value={discountVal}
+                  onChange={e => setDiscountVal(e.target.value)}
+                  style={{
+                    flex: 1, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)',
+                    borderRadius: 6, padding: '0.3rem 0.6rem', color: '#fff', fontSize: '0.85rem', fontFamily: 'Outfit, sans-serif'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Desglose de Totales */}
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <span>Subtotal (IVA incl.)</span><span>{fmt(grossTotal)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--status-green)', fontSize: '0.85rem', fontWeight: 600 }}>
+                  <span>Descuento aplicado</span><span>-{fmt(discountAmount)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <span>Monto Neto (sin IVA)</span><span>{fmt(neto)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <span>IVA (19%)</span><span>{fmt(iva)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontWeight: 700, fontSize: '1.2rem', borderTop: '1px dashed var(--border-color)', paddingTop: '0.5rem' }}>
+                <span>TOTAL A PAGAR</span><span style={{ color: 'var(--primary-color)' }}>{fmt(finalTotal)}</span>
               </div>
             </div>
 
@@ -1011,7 +1107,7 @@ const CounterSale = () => {
 
             <button className="btn" style={{ width: '100%', marginTop: '1rem', padding: '0.85rem' }}
               onClick={checkout} disabled={loading}>
-              {loading ? 'Procesando...' : `✅ Cobrar ${fmt(total)}`}
+              {loading ? 'Procesando...' : `✅ Cobrar ${fmt(finalTotal)}`}
             </button>
           </>
         )}

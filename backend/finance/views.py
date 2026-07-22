@@ -457,6 +457,7 @@ class POSCounterSaleView(APIView):
             invoice = create_counter_sale(
                 client_id=request.data.get('client_id'),
                 items=items,
+                discount_amount=request.data.get('discount_amount', 0),
             )
         except POSError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)

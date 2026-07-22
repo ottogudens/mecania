@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
@@ -7,6 +8,7 @@ class Product(models.Model):
     category = models.CharField(max_length=100, blank=True, default='', verbose_name="Categoría")
     stock_quantity = models.IntegerField(default=0, validators=[MinValueValidator(0)])
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio de Venta (IVA incluido)")
+    net_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Precio Neto")
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Costo Neto")
     barcode = models.CharField(max_length=100, blank=True, null=True, unique=True)
     supplier = models.CharField(max_length=200, blank=True)
@@ -27,6 +29,8 @@ class Product(models.Model):
             while Product.objects.filter(sku=new_sku).exists():
                 new_sku = generate_sku()
             self.sku = new_sku
+        if self.price is not None:
+            self.net_price = round(Decimal(str(self.price)) / Decimal('1.19'), 2)
         super().save(*args, **kwargs)
 
 
@@ -62,7 +66,8 @@ class Service(models.Model):
     category = models.ForeignKey(
         ServiceCategory, on_delete=models.PROTECT, related_name="services"
     )
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Precio (IVA incluido)")
+    net_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Precio Neto")
     description = models.TextField(blank=True)
     is_active = models.BooleanField(
         default=True,
@@ -83,6 +88,11 @@ class Service(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.category.name}) - ${self.price}"
+
+    def save(self, *args, **kwargs):
+        if self.price is not None:
+            self.net_price = round(Decimal(str(self.price)) / Decimal('1.19'), 2)
+        super().save(*args, **kwargs)
 
 
 class ServiceBundleItem(models.Model):
