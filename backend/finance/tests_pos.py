@@ -92,6 +92,7 @@ class InventoryDiscountOnCloseTests(TestCase):
 
     def test_falla_si_stock_insuficiente_y_no_descuenta_nada(self):
         self.product.stock_quantity = 1
+        self.product.block_sale_without_stock = True
         self.product.save()
         with self.assertRaises(WorkOrderTransitionError):
             transition_work_order_status(work_order=self.wo, new_status="COMPLETED")
@@ -99,6 +100,17 @@ class InventoryDiscountOnCloseTests(TestCase):
         self.assertEqual(self.product.stock_quantity, 1)  # transacción revertida, nada se descontó
         self.wo.refresh_from_db()
         self.assertEqual(self.wo.status, "PENDING")  # tampoco cambió el estado
+
+    def test_permite_venta_sin_stock_si_bloqueo_desactivado(self):
+        self.product.stock_quantity = 1
+        self.product.block_sale_without_stock = False
+        self.product.save()
+        # No debe lanzar excepción
+        transition_work_order_status(work_order=self.wo, new_status="COMPLETED")
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, -1)  # 1 - 2 = -1
+        self.wo.refresh_from_db()
+        self.assertEqual(self.wo.status, "COMPLETED")
 
 
 class POSCounterSaleTests(TestCase):
@@ -146,12 +158,23 @@ class POSCounterSaleTests(TestCase):
 
     def test_venta_mostrador_falla_si_no_hay_stock(self):
         self.product.stock_quantity = 1
+        self.product.block_sale_without_stock = True
         self.product.save()
         with self.assertRaises(POSError):
             create_counter_sale(client_id=None, items=[{"product_id": self.product.id, "quantity": 5}])
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock_quantity, 1)  # no se tocó
         self.assertEqual(Invoice.objects.count(), 0)  # no quedó factura huérfana
+
+    def test_venta_mostrador_permite_sin_stock_si_bloqueo_desactivado(self):
+        self.product.stock_quantity = 1
+        self.product.block_sale_without_stock = False
+        self.product.save()
+        # No debe lanzar excepción
+        invoice = create_counter_sale(client_id=None, items=[{"product_id": self.product.id, "quantity": 5}])
+        self.assertEqual(Invoice.objects.count(), 1)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, -4)  # 1 - 5 = -4
 
 
 class POSChargeAndCancelTests(TestCase):
