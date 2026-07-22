@@ -39,7 +39,7 @@ export default function ClientPortalOffers() {
         id: offer.id,
         title: offer.title,
         description: offer.description,
-        image: null,
+        image: offer.image || null,
         valid_until: offer.valid_until || '',
         is_active: offer.is_active
       });
@@ -60,24 +60,35 @@ export default function ClientPortalOffers() {
     setIsModalOpen(false);
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, image: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
 
-    const uploadData = new FormData();
-    uploadData.append('title', formData.title);
-    uploadData.append('description', formData.description);
-    if (formData.valid_until) uploadData.append('valid_until', formData.valid_until);
-    uploadData.append('is_active', formData.is_active);
+    const payload = {
+      title: formData.title,
+      description: formData.description,
+      valid_until: formData.valid_until || null,
+      is_active: formData.is_active,
+    };
     if (formData.image) {
-      uploadData.append('image', formData.image);
+      payload.image = formData.image;
     }
 
     try {
       if (formData.id) {
-        await axios.patch(`/api/operations/portal-offers/${formData.id}/`, uploadData);
+        await axios.patch(`/api/operations/portal-offers/${formData.id}/`, payload);
         toast({ message: 'Oferta actualizada exitosamente', type: 'success' });
       } else {
-        await axios.post('/api/operations/portal-offers/', uploadData);
+        await axios.post('/api/operations/portal-offers/', payload);
         toast({ message: 'Oferta generada exitosamente', type: 'success' });
       }
       setIsModalOpen(false);
@@ -153,7 +164,12 @@ export default function ClientPortalOffers() {
                 </div>
                 <div className="input-group">
                   <label className="input-label">Imagen Promocional (Opcional)</label>
-                  <input type="file" accept="image/*" className="input-field" onChange={e => setFormData({...formData, image: e.target.files[0]})} />
+                  <input type="file" accept="image/*" className="input-field" onChange={handleImageChange} />
+                  {formData.image && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <img src={formData.image} alt="Vista previa" style={{ maxHeight: '100px', borderRadius: '4px', objectFit: 'cover' }} />
+                    </div>
+                  )}
                 </div>
                 <div className="input-group">
                   <label className="input-label">Válida hasta (Opcional)</label>

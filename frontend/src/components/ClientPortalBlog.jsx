@@ -40,7 +40,7 @@ export default function ClientPortalBlog() {
         title: blog.title,
         content: blog.content,
         author: blog.author,
-        image: null,
+        image: blog.image || null,
         is_published: blog.is_published
       });
     } else {
@@ -60,24 +60,35 @@ export default function ClientPortalBlog() {
     setIsModalOpen(false);
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, image: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
 
-    const uploadData = new FormData();
-    uploadData.append('title', formData.title);
-    uploadData.append('content', formData.content);
-    uploadData.append('author', formData.author);
-    uploadData.append('is_published', formData.is_published);
+    const payload = {
+      title: formData.title,
+      content: formData.content,
+      author: formData.author,
+      is_published: formData.is_published,
+    };
     if (formData.image) {
-      uploadData.append('image', formData.image);
+      payload.image = formData.image;
     }
 
     try {
       if (formData.id) {
-        await axios.patch(`/api/operations/portal-blogs/${formData.id}/`, uploadData);
+        await axios.patch(`/api/operations/portal-blogs/${formData.id}/`, payload);
         toast({ message: 'Artículo actualizado exitosamente', type: 'success' });
       } else {
-        await axios.post('/api/operations/portal-blogs/', uploadData);
+        await axios.post('/api/operations/portal-blogs/', payload);
         toast({ message: 'Artículo publicado exitosamente', type: 'success' });
       }
       setIsModalOpen(false);
@@ -160,7 +171,12 @@ export default function ClientPortalBlog() {
                   </div>
                   <div className="input-group">
                     <label className="input-label">Imagen de Portada (Opcional)</label>
-                    <input type="file" accept="image/*" className="input-field" onChange={e => setFormData({...formData, image: e.target.files[0]})} />
+                    <input type="file" accept="image/*" className="input-field" onChange={handleImageChange} />
+                    {formData.image && (
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <img src={formData.image} alt="Vista previa" style={{ maxHeight: '100px', borderRadius: '4px', objectFit: 'cover' }} />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="input-group">

@@ -447,7 +447,7 @@ class WhatsAppMessage(models.Model):
 class PortalOffer(models.Model):
     title = models.CharField(max_length=200, verbose_name="Título de la Oferta")
     description = models.TextField(verbose_name="Descripción o Detalles")
-    image = models.ImageField(upload_to='portal/offers/', blank=True, null=True, verbose_name="Imagen Promocional")
+    image = models.TextField(blank=True, null=True, verbose_name="Imagen Promocional (Base64 u URL)")
     valid_until = models.DateField(blank=True, null=True, verbose_name="Válida hasta")
     is_active = models.BooleanField(default=True, verbose_name="Activa")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -465,7 +465,7 @@ class PortalBlogPost(models.Model):
     title = models.CharField(max_length=255, verbose_name="Título del Artículo")
     content = models.TextField(verbose_name="Contenido (Markdown/HTML)")
     author = models.CharField(max_length=100, default="Equipo MecanIA", verbose_name="Autor")
-    image = models.ImageField(upload_to='portal/blogs/', blank=True, null=True, verbose_name="Imagen de Portada")
+    image = models.TextField(blank=True, null=True, verbose_name="Imagen de Portada (Base64 u URL)")
     is_published = models.BooleanField(default=True, verbose_name="Publicado")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
