@@ -49,9 +49,26 @@ class GenerateDiagnosisView(APIView):
             return Response({"error": "Notes are required"}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
+            from operations.models import TechnicalKnowledgeDocument
+            from django.db.models import Q
+            
+            words = [w.strip() for w in notes.split() if len(w.strip()) > 3]
+            tech_ref = ""
+            if words:
+                word_q = Q(is_active=True)
+                sub_q = Q()
+                for w in words[:5]:
+                    sub_q |= Q(title__icontains=w) | Q(content_text__icontains=w) | Q(tags__icontains=w)
+                word_q &= sub_q
+                docs = TechnicalKnowledgeDocument.objects.filter(word_q)[:2]
+                if docs.exists():
+                    tech_ref = "\n\nInformación técnica de soporte del taller:\n"
+                    for d in docs:
+                        tech_ref += f"[{d.title}]: {d.content_text[:1000]}\n"
+
             prompt = (
                 "Basado en las siguientes notas y problemas reportados del vehículo:\n"
-                f"{notes}\n\n"
+                f"{notes}{tech_ref}\n\n"
                 "Genera un diagnóstico técnico preliminar y recomienda 3 a 5 servicios "
                 "específicos que deberían realizarse para solucionar estos problemas. "
                 "Formatea la respuesta claramente."
@@ -60,7 +77,7 @@ class GenerateDiagnosisView(APIView):
             completion = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "Eres un mecánico maestro experto. Da respuestas profesionales, técnicas pero comprensibles."},
+                    {"role": "system", "content": "Eres un mecánico maestro experto. Da respuestas profesionales, técnicas pero comprensibles, apoyándote en los manuales del taller cuando aplique."},
                     {"role": "user", "content": prompt}
                 ]
             )
@@ -316,6 +333,31 @@ class WhatsAppAgentView(APIView):
             f"Sitio Web: {workshop.website or 'No especificado'}\n"
         )
 
+        # 3.b Búsqueda y RAG de Base de Conocimiento Técnica (Manuales, Diagramas, Filtros, Torques)
+        from operations.models import TechnicalKnowledgeDocument
+        from django.db.models import Q
+        
+        tech_docs_context = ""
+        words = [w.strip() for w in text.split() if len(w.strip()) > 3]
+        query_filter = Q(is_active=True)
+        if words:
+            word_q = Q()
+            for w in words[:5]:
+                word_q |= Q(title__icontains=w) | Q(content_text__icontains=w) | Q(tags__icontains=w) | Q(make__icontains=w) | Q(model__icontains=w)
+            query_filter &= word_q
+        
+        relevant_docs = TechnicalKnowledgeDocument.objects.filter(query_filter)[:3]
+        if not relevant_docs.exists() and words:
+            # Fallback a traer documentos generales activos
+            relevant_docs = TechnicalKnowledgeDocument.objects.filter(is_active=True)[:2]
+            
+        if relevant_docs.exists():
+            tech_docs_context = "\n📚 Información Técnica de Referencia (Manuales, Diagramas y Catálogos del Taller):\n"
+            for doc in relevant_docs:
+                vehicle_compat = f" [Compatibilidad: {doc.make or ''} {doc.model or ''} {doc.engine or ''}]" if doc.make or doc.model else ""
+                tech_docs_context += f"--- DOCUMENTO: {doc.title} ({doc.get_category_display()}){vehicle_compat} ---\n"
+                tech_docs_context += f"{doc.content_text[:1500]}\n\n"
+
         # 4. Construir System Prompt
         custom_instructions = matched_flow.response_text if (matched_flow and matched_flow.action_type == 'ai_assistant' and matched_flow.response_text.strip()) else None
 
@@ -328,6 +370,7 @@ class WhatsAppAgentView(APIView):
 
             Información del Cliente con el que estás hablando:
             {client_context}
+            {tech_docs_context}
             """
         elif workshop.assistant_prompt:
             system_prompt = f"""
@@ -340,17 +383,19 @@ class WhatsAppAgentView(APIView):
 
             Información del Cliente con el que estás hablando:
             {client_context}
+            {tech_docs_context}
             """
         else:
             system_prompt = f"""
             Eres 'MecanIA Bot', el agente inteligente de ventas y atención automatizada de {workshop.name or 'MecanIA'}.
-            Tu labor es asistir a los clientes de forma muy amable, profesional y rápida vía WhatsApp.
+            Tu labor es asistir a los clientes de forma muy amable, profesional y rápida vía WhatsApp. Utiliza los manuales y documentos de la base de conocimiento técnica si se consulta por detalles técnicos, códigos de repuestos o procedimientos.
 
             Contexto del Taller:
             {workshop_context}
 
             Información del Cliente con el que estás hablando:
             {client_context}
+            {tech_docs_context}
 
             Reglas de comportamiento y respuestas:
             1. **Saludos e Identificación**: Si el cliente está identificado por su nombre, saludalo cordialmente usando su nombre (ej: "Hola Juan..."). Si no está registrado, se amable y dale la bienvenida a MecanIA. Pregunta su nombre para registrarlo.

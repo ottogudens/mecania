@@ -14,13 +14,13 @@ from rest_framework.authtoken.models import Token
 import requests
 import os
 from openai import OpenAI
-from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment, PortalOffer, PortalBlogPost
+from .models import Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection, WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance, UserProfile, WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment, PortalOffer, PortalBlogPost, TechnicalKnowledgeDocument
 from .serializers import (
     ClientSerializer, VehicleSerializer, WorkOrderSerializer,
     WorkOrderItemSerializer, VisualInspectionSerializer, VisualInspectionListSerializer, WorkshopSettingsSerializer,
     VehiclePartSerializer, MaintenanceRecordSerializer, ScheduledMaintenanceSerializer,
     WhatsAppFlowSerializer, WhatsAppMessageSerializer, WorkOrderAttachmentSerializer,
-    PortalOfferSerializer, PortalBlogPostSerializer
+    PortalOfferSerializer, PortalBlogPostSerializer, TechnicalKnowledgeDocumentSerializer
 )
 from .services import transition_work_order_status, cancel_work_order, WorkOrderTransitionError
 
@@ -2403,3 +2403,35 @@ class PortalBlogPostViewSet(viewsets.ModelViewSet):
     queryset = PortalBlogPost.objects.all()
     serializer_class = PortalBlogPostSerializer
     permission_classes = [IsAuthenticated]
+
+
+class TechnicalKnowledgeDocumentViewSet(viewsets.ModelViewSet):
+    queryset = TechnicalKnowledgeDocument.objects.all()
+    serializer_class = TechnicalKnowledgeDocumentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        category = self.request.query_params.get('category')
+        make = self.request.query_params.get('make')
+        model = self.request.query_params.get('model')
+        search = self.request.query_params.get('search')
+
+        if category:
+            qs = qs.filter(category=category)
+        if make:
+            qs = qs.filter(make__icontains=make)
+        if model:
+            qs = qs.filter(model__icontains=model)
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(title__icontains=search) |
+                Q(content_text__icontains=search) |
+                Q(tags__icontains=search) |
+                Q(make__icontains=search) |
+                Q(model__icontains=search) |
+                Q(engine__icontains=search)
+            )
+        return qs
+

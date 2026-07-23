@@ -15,7 +15,7 @@ from .views import (
     WhatsAppLogoutView, WhatsAppMessageSyncView, WhatsAppStatusView, WhatsAppToggleSilenceView,
     DatabaseBackupView, DatabaseRestoreView, WhatsAppClearChatsView, WhatsAppRequestPairingCodeView,
     AIVehicleSummaryView, ClientWorkOrderPDFView, ClientInspectionPDFView,
-    PortalOfferViewSet, PortalBlogPostViewSet
+    PortalOfferViewSet, PortalBlogPostViewSet, TechnicalKnowledgeDocumentViewSet
 )
 
 router = DefaultRouter()
@@ -32,6 +32,7 @@ router.register(r'scheduled-maintenance', ScheduledMaintenanceViewSet, basename=
 router.register(r'whatsapp-flows', WhatsAppFlowViewSet, basename='whatsappflow')
 router.register(r'portal-offers', PortalOfferViewSet, basename='portaloffer')
 router.register(r'portal-blogs', PortalBlogPostViewSet, basename='portalblog')
+router.register(r'technical-knowledge', TechnicalKnowledgeDocumentViewSet, basename='technicalknowledge')
 
 urlpatterns = [
     path('dashboard-stats/', DashboardStatsView.as_view(), name='dashboard_stats'),

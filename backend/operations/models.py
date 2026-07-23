@@ -477,3 +477,42 @@ class PortalBlogPost(models.Model):
         
     def __str__(self):
         return self.title
+
+
+class TechnicalKnowledgeDocument(models.Model):
+    CATEGORY_CHOICES = [
+        ('manual', 'Manual de Taller / Reparación'),
+        ('filters', 'Catálogo de Filtros y Fluidos'),
+        ('diagram', 'Diagrama Eléctrico / Pinout'),
+        ('torques', 'Torques y Especificaciones Técnicas'),
+        ('maintenance', 'Guías de Mantenimiento / Pautas'),
+        ('other', 'Otra Documentación Técnica')
+    ]
+
+    title = models.CharField(max_length=255, verbose_name="Título del Documento o Manual")
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='manual', verbose_name="Categoría Técnica")
+    
+    # Compatibilidad con Vehículos (Opcional para filtrado/matching preciso)
+    make = models.CharField(max_length=100, blank=True, null=True, verbose_name="Marca del Vehículo (ej. Toyota)")
+    model = models.CharField(max_length=100, blank=True, null=True, verbose_name="Modelo (ej. RAV4)")
+    year_start = models.IntegerField(blank=True, null=True, verbose_name="Año Desde (ej. 2015)")
+    year_end = models.IntegerField(blank=True, null=True, verbose_name="Año Hasta (ej. 2022)")
+    engine = models.CharField(max_length=100, blank=True, null=True, verbose_name="Motor (ej. 2.0 3ZR-FE / 1.6 HDI)")
+    
+    tags = models.CharField(max_length=255, blank=True, default='', verbose_name="Etiquetas o Palabras Clave", help_text="Separadas por comas (ej. correa distribucion, torque culata, mann hu711/5x)")
+    content_text = models.TextField(verbose_name="Contenido Técnico / Extracto de Texto", help_text="Información, especificaciones y notas legibles por la IA para dar respuestas exactas.")
+    file_data = models.TextField(blank=True, null=True, verbose_name="Archivo Adjunto (Base64 u URL)", help_text="Opcional. PDF o Imagen del diagrama/manual.")
+    file_name = models.CharField(max_length=255, blank=True, null=True, verbose_name="Nombre Original del Archivo")
+    
+    is_active = models.BooleanField(default=True, verbose_name="Activo para IA", help_text="Si está activo, la IA leerá este documento para responder consultas.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Documento de Conocimiento Técnico"
+        verbose_name_plural = "Documentos de Conocimiento Técnico"
+
+    def __str__(self):
+        return f"{self.title} [{self.get_category_display()}]"
+

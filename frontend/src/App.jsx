@@ -27,6 +27,7 @@ import FinancialReports from './components/FinancialReports';
 import WhatsAppCanvas from './components/WhatsAppCanvas';
 import ClientPortalOffers from './components/ClientPortalOffers';
 import ClientPortalBlog from './components/ClientPortalBlog';
+import TechnicalKnowledgeManager from './components/TechnicalKnowledgeManager';
 /* ── Icons (inline SVG, no extra dep) ── */
 const Icon = ({ path, size = 18, ...props }) => (
   <svg
@@ -93,6 +94,7 @@ const NAV_ITEMS = [
   { id: 'client_blog',   label: 'Blog de Mecánica',      icon: 'history', group: 'Portal Clientes' },
 
   // Sistema
+  { id: 'technical_knowledge', label: 'Base de Conocimiento IA', icon: 'orders', group: 'Sistema' },
   { id: 'settings',   label: 'Configuración',     icon: 'settings', group: 'Sistema' },
   { id: 'users',      label: 'Usuarios',          icon: 'users',    group: 'Sistema' },
 ];
@@ -107,6 +109,7 @@ const PAGE_TITLES = {
   vehicles:   { title: 'Vehículos',           subtitle: 'Ficha técnica e historial clínico de vehículos' },
   whatsapp_chat: { title: 'Chat de WhatsApp', subtitle: 'Atención al cliente y control del asistente de IA' },
   whatsapp_canvas: { title: 'Flujos WhatsApp (Canvas)', subtitle: 'Diseñador visual de automatizaciones de WhatsApp' },
+  technical_knowledge: { title: 'Base de Conocimiento IA', subtitle: 'Manuales de taller, diagramas eléctricos, filtros y especificaciones técnicas para la IA' },
   finance_billing: { title: 'Clientes y Facturación', subtitle: 'Boletas, facturas y pagos del taller' },
   finance_cash_register: { title: 'Control de Caja (Turnos)', subtitle: 'Aperturas, cierres y reportes X/Z de caja' },
   finance_cash_movements: { title: 'Movimientos de Caja', subtitle: 'Registro manual de ingresos y egresos de caja' },
@@ -351,6 +354,7 @@ function AdminLayout({ onLogout, username, logoUrl, onSettingsUpdate, theme, tog
     pos:                        <POSDashboard onNavigate={setActiveTab} />,
     history:                    <CashRegister />,
     estimates:                  <EstimatesDashboard />,
+    technical_knowledge:        <TechnicalKnowledgeManager />,
     settings:                   <Settings onSettingsUpdate={onSettingsUpdate} />,
     users:                      <UserManager />,
   };

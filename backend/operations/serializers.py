@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import (
     Client, Vehicle, WorkOrder, WorkOrderItem, VisualInspection,
     WorkshopSettings, VehiclePart, MaintenanceRecord, ScheduledMaintenance,
-    WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment, PortalOffer, PortalBlogPost
+    WhatsAppFlow, WhatsAppMessage, WorkOrderAttachment, PortalOffer, PortalBlogPost,
+    TechnicalKnowledgeDocument
 )
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -250,4 +251,11 @@ class PortalOfferSerializer(serializers.ModelSerializer):
 class PortalBlogPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = PortalBlogPost
+        fields = '__all__'
+
+class TechnicalKnowledgeDocumentSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+
+    class Meta:
+        model = TechnicalKnowledgeDocument
         fields = '__all__'
