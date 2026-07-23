@@ -108,10 +108,9 @@ class WhatsAppAgentView(APIView):
         if not number or not text:
             return Response({"error": "Number and text are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Limpiar número telefónico para match (ej: remover @s.whatsapp.net o signos y sufijos de sesión como :0)
-        clean_num = number.replace('@s.whatsapp.net', '').split(':')[0]
+        # 1. Limpiar número telefónico para match (ej: remover @s.whatsapp.net, @lid, sufijos de sesión como :0, :1, etc)
+        clean_num = number.replace('@s.whatsapp.net', '').replace('@lid', '').split(':')[0].strip()
         if not clean_num.startswith('+'):
-            # Baileys usualmente entrega el número sin el '+'
             clean_num = '+' + clean_num
 
         # Buscar cliente por teléfono (flexibilidad de búsqueda con/sin +)
@@ -120,6 +119,8 @@ class WhatsAppAgentView(APIView):
         from django.utils import timezone
         
         client_obj = Client.objects.filter(phone__icontains=clean_num[-8:]).first()
+        if client_obj and client_obj.phone:
+            clean_num = client_obj.phone
 
         # Si el bot está silenciado para este cliente por intervención humana reciente, no responder
         import datetime

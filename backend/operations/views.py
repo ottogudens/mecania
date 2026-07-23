@@ -1921,12 +1921,15 @@ class WhatsAppChatListView(APIView):
         chats = []
         clients_handled = set()
         
+        phones_handled = set()
         for chat in chats_qs:
-            phone = chat['phone']
-            last_msg = WhatsAppMessage.objects.filter(phone=phone).order_by('-timestamp').first()
+            raw_phone = chat['phone']
+            # Normalizar número (quitar :0, :1, @s.whatsapp.net, @lid)
+            norm_phone = raw_phone.replace('@s.whatsapp.net', '').replace('@lid', '').split(':')[0].strip()
+            if not norm_phone.startswith('+') and norm_phone:
+                norm_phone = '+' + norm_phone
 
-            # Attempt to find the client
-            clean_num = ''.join(filter(str.isdigit, phone))
+            clean_num = ''.join(filter(str.isdigit, norm_phone))
             client_obj = None
             if len(clean_num) >= 8:
                 suffix = clean_num[-8:]
@@ -1934,12 +1937,14 @@ class WhatsAppChatListView(APIView):
 
             if client_obj:
                 if client_obj.id in clients_handled:
-                    continue  # Already added a grouped chat for this client
+                    continue  # Ya agregado para este cliente
                 clients_handled.add(client_obj.id)
-                # Find the global last message for THIS CLIENT across all their possible phones
-                all_client_msgs = WhatsAppMessage.objects.filter(client=client_obj).order_by('-timestamp')
-                if all_client_msgs.exists():
-                    last_msg = all_client_msgs.first()
+                last_msg = WhatsAppMessage.objects.filter(client=client_obj).order_by('-timestamp').first()
+            else:
+                if norm_phone in phones_handled:
+                    continue  # Ya agregado para este número sin cliente
+                phones_handled.add(norm_phone)
+                last_msg = WhatsAppMessage.objects.filter(phone__icontains=clean_num[-8:] if len(clean_num) >= 8 else norm_phone).order_by('-timestamp').first()
 
             client_info = None
             if client_obj:
@@ -1980,7 +1985,7 @@ class WhatsAppChatListView(APIView):
             bot_silenced_until = client_info["bot_silenced_until"] if client_info else None
 
             chats.append({
-                "phone": client_info["phone"] if client_info else phone,
+                "phone": client_info["phone"] if client_info else norm_phone,
                 "last_message": last_msg.text if last_msg else "",
                 "last_sender": last_msg.sender if last_msg else "client",
                 "last_timestamp": last_msg.timestamp if last_msg else chat['last_timestamp'],
@@ -2010,12 +2015,21 @@ class WhatsAppMessageListView(APIView):
         if not phone:
             return Response({'error': 'Parámetro phone es requerido'}, status=400)
 
-        if phone.startswith('+'):
-            alt_phone = phone[1:]
-        else:
-            alt_phone = '+' + phone
+        from .models import Client
+        clean_num = ''.join(filter(str.isdigit, phone))
+        client_obj = None
+        if len(clean_num) >= 8:
+            suffix = clean_num[-8:]
+            client_obj = Client.objects.filter(phone__icontains=suffix).first()
 
-        messages = WhatsAppMessage.objects.filter(Q(phone=phone) | Q(phone=alt_phone)).order_by('timestamp')
+        if client_obj:
+            messages = WhatsAppMessage.objects.filter(Q(client=client_obj) | Q(phone__icontains=suffix)).order_by('timestamp')
+        else:
+            if len(clean_num) >= 8:
+                messages = WhatsAppMessage.objects.filter(phone__icontains=clean_num[-8:]).order_by('timestamp')
+            else:
+                messages = WhatsAppMessage.objects.filter(Q(phone=phone) | Q(phone=alt_phone)).order_by('timestamp')
+
         serializer = WhatsAppMessageSerializer(messages, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -2121,7 +2135,7 @@ class WhatsAppMessageSyncView(APIView):
             if not phone or not text or timestamp_unix is None:
                 continue
 
-            clean_num = phone.replace('@s.whatsapp.net', '').replace('@lid', '')
+            clean_num = phone.replace('@s.whatsapp.net', '').replace('@lid', '').split(':')[0].strip()
             if not clean_num.startswith('+'):
                 clean_num = '+' + clean_num
 
