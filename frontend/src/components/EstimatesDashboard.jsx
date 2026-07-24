@@ -478,11 +478,9 @@ export default function EstimatesDashboard() {
                             ✏️
                           </button>
                         )}
-                        {e.status !== 'ACCEPTED' && (
-                          <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleDeleteEstimate(e.id)} title="Eliminar Presupuesto">
-                            🗑️
-                          </button>
-                        )}
+                        <button className="btn btn-danger" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => handleDeleteEstimate(e.id)} title="Eliminar Presupuesto">
+                          🗑️
+                        </button>
                         {e.status !== 'ACCEPTED' && e.vehicle && (
                           <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.8rem' }} onClick={() => convertToWorkOrder(e.id)} title="Convertir a Orden de Trabajo">
                             ➡️ OT
