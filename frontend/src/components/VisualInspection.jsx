@@ -206,6 +206,26 @@ const VisualInspection = () => {
     }
   };
 
+  // Delete Inspection
+  const handleDeleteInspection = async (id) => {
+    if (!window.confirm("¿Estás seguro de eliminar esta inspección visual?")) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`/api/operations/inspections/${id}/`, {
+        headers: { Authorization: `Token ${token}` }
+      });
+      toast({ title: 'Inspección Eliminada', message: 'Se ha borrado el registro correctamente.', type: 'success' });
+      if (selectedInspection && selectedInspection.id === id) {
+        setShowActiveInspection(false);
+        setSelectedInspection(null);
+      }
+      fetchInspections();
+    } catch (err) {
+      console.error("Error deleting inspection:", err);
+      toast({ title: 'Error', message: 'No se pudo eliminar la inspección.', type: 'error' });
+    }
+  };
+
   // Mechanic takes the inspection
   const handleTakeInspection = async (id) => {
     try {
@@ -585,6 +605,10 @@ const VisualInspection = () => {
                   ✓ Finalizar Lista para Entrega
                 </button>
               )}
+
+              <button className="btn btn-outline" style={{ borderColor: 'var(--status-red)', color: 'var(--status-red)' }} onClick={() => handleDeleteInspection(selectedInspection.id)} title="Eliminar Inspección">
+                🗑️ Eliminar
+              </button>
               
               <button className="btn btn-outline" onClick={() => { setShowActiveInspection(false); setSelectedInspection(null); fetchInspections(); }}>
                 Volver
@@ -886,30 +910,32 @@ const VisualInspection = () => {
                       </span>
                     </td>
                     <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      {ins.status === 'PENDING' ? (
-                        <button className="btn btn-sm" onClick={() => handleTakeInspection(ins.id)}>
-                          🛠️ Iniciar Auditoría
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                        {ins.status === 'PENDING' && (
+                          <button className="btn btn-sm" onClick={() => handleTakeInspection(ins.id)}>
+                            🛠️ Iniciar Auditoría
+                          </button>
+                        )}
+                        <button className="btn btn-outline btn-sm" onClick={() => openAuditView(ins)} title="Editar o Revisar Inspección">
+                          ✏️ {ins.status === 'COMPLETED' ? 'Editar / Ficha' : ins.status === 'IN_PROGRESS' ? 'Continuar' : 'Editar'}
                         </button>
-                      ) : ins.status === 'IN_PROGRESS' ? (
-                        <button className="btn btn-outline btn-sm" onClick={() => openAuditView(ins)}>
-                          ✏️ Continuar
+                        {ins.status === 'COMPLETED' && (
+                          <>
+                            <button className="btn btn-outline btn-sm" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => handleDownloadPDF(ins)} title="Descargar PDF">
+                              📄 PDF
+                            </button>
+                            <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: 'white', borderColor: 'transparent' }} onClick={() => handleSendWhatsApp(ins)} title="Enviar WhatsApp">
+                              📲 WSP
+                            </button>
+                            <button className="btn btn-sm" style={{ backgroundColor: 'var(--secondary)', color: 'black' }} onClick={() => openEstimateDraft(ins)} title="Crear Presupuesto">
+                              💰 Presupuesto
+                            </button>
+                          </>
+                        )}
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteInspection(ins.id)} title="Eliminar Inspección">
+                          🗑️
                         </button>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => openAuditView(ins)}>
-                            👁️ Ver Ficha
-                          </button>
-                          <button className="btn btn-outline btn-sm" style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }} onClick={() => handleDownloadPDF(ins)}>
-                            📄 PDF
-                          </button>
-                          <button className="btn btn-sm" style={{ backgroundColor: '#25D366', color: 'white', borderColor: 'transparent' }} onClick={() => handleSendWhatsApp(ins)}>
-                            📲 WSP
-                          </button>
-                          <button className="btn btn-sm" style={{ backgroundColor: 'var(--secondary)', color: 'black' }} onClick={() => openEstimateDraft(ins)}>
-                            💰 Presupuesto
-                          </button>
-                        </div>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
