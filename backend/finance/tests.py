@@ -16,7 +16,7 @@ class FinanceModuleTestCase(APITestCase):
             email='cajero1@mecan.ia',
             password='testpassword'
         )
-        self.client.login(username='cajero1', password='testpassword')
+        self.client.force_authenticate(user=self.user)
         
         # Create a test supplier
         self.supplier = Supplier.objects.create(
